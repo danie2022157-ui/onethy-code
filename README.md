@@ -13,157 +13,337 @@
 <br />
 
 <p align="center">
-  <img src="assets/omnicode-tui.png" alt="OmniCode Terminal UI" width="95%" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
+  <img src="assets/omnicode-tui.png" alt="OmniCode Terminal UI" width="95%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.6);" />
 </p>
 
 <p align="center">
-  <b>OmniCode</b> turns your terminal into a collaborative AI engineering studio. Powered by <b>Omni Fusion</b> (dynamic multi-model routing), <b>Autonomous Memory Bank</b>, <b>Self-Healing Test Loops</b>, and a built-in fleet of <b>430+ specialized agents</b>.
+  <b>OmniCode</b> turns your terminal into a collaborative AI engineering squad.<br />
+  Featuring <b>Omni Fusion</b> (dynamic multi-model auto-routing), <b>Autonomous Memory Bank</b>, <b>Self-Healing Test Loops</b>, and <b>430+ preloaded specialized agents</b>.
 </p>
 
-[Quickstart](#-quickstart) • [Superpowers](#-superpowers) • [Omni Fusion](#-omni-fusion-model-routing) • [Comparison](#-feature-matrix) • [Commands](#-interactive-slash-commands) • [Roadmap](#-roadmap-to-100k-stars)
+[Quickstart](#-quickstart) • [How to Use Guide](#-step-by-step-how-to-use-guide) • [Omni Fusion Deep Dive](#-omni-fusion-model-router) • [Memory Bank](#-autonomous-memory-bank) • [Comparison](#-feature-matrix) • [Commands](#-interactive-slash-commands) • [Guia em Português](#-guia-em-português)
 
 ---
 
 </div>
 
-## 🌟 Why OmniCode?
+## 📑 Table of Contents
 
-Most AI coding assistants lock you into a single model, lose context between prompts, or hallucinate silently when builds break. **OmniCode solves this by acting as an orchestrated engineering squad right in your terminal**:
-
-* **Never get blocked by rate limits**: Omni Fusion dynamically routes requests across Gemini 3.8, Claude 3.7/Opus, and GPT models based on complexity and remaining quota.
-* **Zero context loss**: The Autonomous Memory Bank persists architecture decisions and patterns across restarts without requiring manual `/remember` instructions.
-* **Code that actually builds**: The Self-Healing Loop runs your test suite, diagnoses failures, and iterates autonomously until tests pass.
-* **Fearless experimentation**: Time-Travel Checkpoints take snapshots before major AI modifications, letting you `/undo` instantly.
+- [🌟 Why OmniCode?](#-why-omnicode)
+- [📊 Feature Comparison Matrix](#-feature-matrix)
+- [🚀 Quickstart](#-quickstart)
+  - [Windows Installation](#-windows-powershell)
+  - [Linux & macOS Installation](#-linux--macos-bash)
+  - [Connecting Models in 1-Click](#-connecting-models)
+- [📖 Step-by-Step How to Use Guide](#-step-by-step-how-to-use-guide)
+  - [1. Launching OmniCode](#1-launching-omnicode)
+  - [2. Daily Prompting & Auto-Routing](#2-daily-prompting--auto-routing)
+  - [3. Filtering Models with `/fusion-models`](#3-filtering-allowed-models-with-fusion-models)
+  - [4. Autonomous Project Memory Bank](#4-autonomous-project-memory-bank)
+  - [5. Autonomous Self-Healing Test Loop (`/heal`)](#5-autonomous-self-healing-test-loop-heal)
+  - [6. Time-Travel Checkpoints & Instant Rollback (`/undo`)](#6-time-travel-checkpoints--instant-rollback-undo)
+  - [7. Full Engineering Squad Orchestration (`/team`)](#7-full-engineering-squad-orchestration-team)
+- [⚡ Omni Fusion Deep Dive](#-omni-fusion-model-router)
+- [🧠 Autonomous Memory Bank Architecture](#-autonomous-memory-bank)
+- [⌨️ Interactive Slash Commands & Keybindings](#-interactive-slash-commands)
+- [🏗️ System Architecture](#-system-architecture)
+- [❓ Frequently Asked Questions (FAQ)](#-frequently-asked-questions-faq)
+- [🇧🇷 Guia em Português](#-guia-em-português)
+- [🗺️ Roadmap to 100k Stars](#-roadmap-to-100k-stars)
+- [🤝 Contributing](#-contributing)
 
 ---
 
-## ⚡ Superpowers
+## 🌟 Why OmniCode?
 
-### 1. 🔀 Omni Fusion Router
-Intelligent complexity-based routing. Send trivial tasks to ultra-fast efficiency models, balanced tasks to production workhorses, and hard architectural reasoning to deep-thinking frontiers:
-* **🌱 Efficiency Tier**: `Gemini 3.8 Flash`, `Haiku 3.5`, `Llama 8B` (instant response, lowest credits)
-* **⚖️ Balanced Tier**: `Claude 3.5 Sonnet`, `Gemini Pro`, `GPT-4o` (optimal coding precision)
-* **🧠 Intelligence Tier**: `Claude 3.7 Sonnet Thinking`, `Claude Opus 4`, `o3-mini`, `DeepSeek R1` (deep math & architecture)
-* **🎯 Model Filtering**: Whitelist specific models or let Omni Fusion leverage all connected accounts (`/fusion-models`).
+Most AI coding tools lock you into a single provider, suffer from context amnesia across terminal sessions, or hallucinate silently when a build fails. **OmniCode is built from the ground up as an autonomous multi-agent platform designed to address these core problems**:
 
-### 2. 🧠 Autonomous Memory Bank
-No more repeating context on every prompt. OmniCode auto-discovers and synchronizes `.omnicode/memory-bank/`:
-* `project-brief.md`: Core requirements, mission, goals.
-* `system-patterns.md`: Coding standards, architectural decisions, component contracts.
-* `tech-context.md`: Stack, dependencies, runtime environments.
-* `active-context.md`: Current sprint state, next immediate tasks, active focus.
-
-### 3. 🔄 Self-Healing Test & Build Loop
-Run `/heal` and watch OmniCode run your build/test runner, isolate compiler or runtime errors, modify source files, and re-verify until 100% green.
-
-### 4. ⏪ Time-Travel Git Checkpoints
-Every multi-file rewrite creates an atomic git snapshot. If an agent goes off-track, execute `/undo` to instantly restore your working directory to the exact state before the command.
-
-### 5. 👥 Full Engineering Squad Pipeline
-Run `/team` to orchestrate an end-to-end task across specialized autonomous roles:
-1. `@planner`: Analyzes requirements and drafts an execution roadmap.
-2. `@architect`: Validates boundaries, interfaces, and schemas.
-3. `@coder`: Writes the implementation code and unit tests.
-4. `@reviewer`: Audits against clean-code, performance, and security gates.
+1. **Eliminate Rate-Limit & Quota Halts**: Omni Fusion dynamically routes requests across Gemini 3.8 Flash, Claude 3.7 Sonnet/Opus, and GPT models based on complexity and remaining quota. If one account exhausts quota, OmniCode fails over automatically.
+2. **Never Re-explain Your Architecture**: The 4-layer Autonomous Memory Bank automatically documents your requirements, coding conventions, tech stack, and sprint context in `.omnicode/memory-bank/`.
+3. **Verified Working Code**: The `/heal` loop detects test/build errors, diagnoses root causes, modifies source code, and re-runs the compiler until tests pass.
+4. **Fearless AI Edits**: Instant Git snapshots are created before major edits. Execute `/undo` at any point to restore your workspace to its exact prior state.
+5. **Lightning Performance**: Written in TypeScript and powered by Bun 1.4+, launching in milliseconds with low memory overhead.
 
 ---
 
 ## 📊 Feature Matrix
 
-| Feature | Vanilla OpenCode | Claude Code | Cursor | ⚡ OmniCode |
-| :--- | :---: | :---: | :---: | :---: |
-| **Multi-Model Auto Routing (Omni Fusion)** | ❌ | ❌ | ❌ | **✅ Yes (44+ Models)** |
-| **Model Whitelisting & Filtering** | ❌ | ❌ | ❌ | **✅ Yes (`/fusion-models`)** |
-| **Autonomous Memory Bank** | ❌ | ❌ | ❌ | **✅ Yes (Zero manual prompts)** |
-| **Self-Healing Test & Fix Loop** | ❌ | ❌ | ❌ | **✅ Yes (`/heal`)** |
-| **Time-Travel Checkpoints & Instant Undo** | ❌ | ❌ | ❌ | **✅ Yes (`/checkpoint`, `/undo`)** |
-| **4-Phase Autonomous Squad Pipeline** | ❌ | ❌ | ❌ | **✅ Yes (`/team`)** |
-| **Preloaded Agents & Skills** | 2 Agents | 1 Agent | N/A | **✅ 430+ Agents, 1,000+ Skills** |
-| **Terminal UI with Live Model Diagnostics** | Basic | Basic | ❌ | **✅ Rich 3D ASCII + Live Sidebar** |
-| **1-Click Windows / Linux Installer** | ❌ | ❌ | ❌ | **✅ Yes (`install.ps1`, `install.sh`)** |
+| Capability | Vanilla OpenCode | Claude Code | Cursor IDE | Aider | ⚡ OmniCode |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Multi-Model Dynamic Routing (Omni Fusion)** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (44+ Models)** |
+| **Model Whitelisting & Selection UI** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (`/fusion-models`)** |
+| **Automatic Memory Bank (Zero Prompting)** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (4-layer sync)** |
+| **Self-Healing Test/Build Loop** | ❌ | ❌ | ❌ | Basic | **✅ Yes (`/heal`)** |
+| **Time-Travel Checkpoints & Instant Undo** | ❌ | ❌ | ❌ | Git only | **✅ Yes (`/checkpoint`, `/undo`)** |
+| **Multi-Agent 4-Phase Squad Pipeline** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (`/team`)** |
+| **Preloaded Agents, Skills & Mods** | 2 Agents | 1 Agent | N/A | N/A | **✅ 430+ Agents, 1,000+ Skills** |
+| **Automated Dual-Stack OAuth Loopback** | ❌ | ❌ | N/A | N/A | **✅ 1-Click Browser Sync** |
+| **1-Command Terminal Installer** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (`install.ps1`, `install.sh`)** |
 
 ---
 
 ## 🚀 Quickstart
 
-### Installation
-
-#### 🪟 Windows (PowerShell):
+### 🪟 Windows (PowerShell)
+Open PowerShell (as normal user or Administrator) and run:
 ```powershell
 irm https://raw.githubusercontent.com/danie2022157-ui/omnicode/main/install.ps1 | iex
 ```
-*Or clone and run locally:*
+*Or clone and install locally:*
 ```powershell
 git clone https://github.com/danie2022157-ui/omnicode.git
 cd omnicode
 .\install.ps1
 ```
 
-#### 🐧 Linux & 🍎 macOS (Bash):
+### 🐧 Linux & 🍎 macOS (Bash)
+Open your terminal and run:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danie2022157-ui/omnicode/main/install.sh | bash
 ```
 
-Once installed, open any terminal in any project folder and launch:
+### 🔑 Connecting Models
+Once installed, connect your preferred AI providers:
+1. Launch OmniCode by typing `omni`.
+2. Type `/connect` (or `Ctrl+P` → *Conectar integração*).
+3. Select **Google (Antigravity)**, **Anthropic**, **OpenAI**, or **OpenRouter**.
+4. With Google Antigravity, click **OAuth with Google**: your browser opens, you approve access, and the local dual-stack listener binds automatically with zero copy-pasting required!
+
+---
+
+## 📖 Step-by-Step How to Use Guide
+
+### 1. Launching OmniCode
+Navigate to any project repository and run:
 ```bash
 omni
 ```
+OmniCode automatically inspects your repository structure, discovers your active git branch, detects installed dependencies, and initializes the **Autonomous Memory Bank**.
 
 ---
 
-## ⌨️ Interactive Slash Commands
+### 2. Daily Prompting & Auto-Routing
+You interact with OmniCode using natural language in the terminal prompt. Omni Fusion inspects your request in real time:
 
-| Command | Alias | What it does |
+```text
+> "Adicione autenticação JWT com refresh token na rota /auth/login e crie testes unitários com vitest"
+```
+
+* **What happens behind the scenes:**
+  1. **Complexity Evaluator**: Classifies the prompt as **High Complexity** (multi-file implementation + security + tests).
+  2. **Memory Bank Injection**: Reads `.omnicode/memory-bank/system-patterns.md` to match your existing JWT schema and error formatting.
+  3. **Tier Selection**: Routes to **🧠 Intelligence Tier** (`Claude 3.7 Sonnet Thinking` or `Claude Opus 4`).
+  4. **Atomic Checkpoint**: Takes a snapshot of your repo before modifying files.
+  5. **Execution**: Generates the token verification middleware, handler, and test suite.
+
+---
+
+### 3. Filtering Allowed Models with `/fusion-models`
+Do you want OmniCode to use only free models, or only Claude, or restrict specific models?
+1. In the chat prompt, type:
+   ```text
+   /fusion-models
+   ```
+2. An interactive checklist opens:
+   - **`✓ [Usar Todos os Modelos Conectados]`**: Omni Fusion freely routes between all connected providers.
+   - **`[✓] Google Gemini 3.8 Flash`** (Tier: Eficiência)
+   - **`[✓] Claude 3.5 Sonnet`** (Tier: Balanceado)
+   - **`[✓] Claude Opus 4 Thinking`** (Tier: Inteligência)
+   - **`[○] GPT-4o Mini`** (Desmarcado)
+3. Press `Enter` to toggle any model on or off.
+4. The sidebar instantly updates in real time:
+   `⚡ Omni Fusion (3 selecionados)` · `Filtro: 3 de 44 modelos`.
+
+---
+
+### 4. Autonomous Project Memory Bank
+OmniCode maintains a living memory of your codebase in `.omnicode/memory-bank/`:
+
+```text
+.omnicode/memory-bank/
+├── project-brief.md      # Core product vision, features, and non-negotiables
+├── system-patterns.md    # Architecture blueprints, naming rules, design patterns
+├── tech-context.md       # Frameworks, versions, database schemas, environments
+└── active-context.md     # Current sprint objectives, WIP changes, next steps
+```
+
+* **How it works:** Whenever you ask OmniCode to build or refactor features, it references these documents automatically. When significant architectural decisions are made, OmniCode updates the memory bank seamlessly.
+* **To inspect memory status:** Type `/memory` in chat.
+
+---
+
+### 5. Autonomous Self-Healing Test Loop (`/heal`)
+Stop debugging compiler and test errors by hand:
+1. Type `/heal` in chat.
+2. OmniCode detects your package manager and test runner (`bun test`, `pnpm test`, `pytest`, `cargo test`, `go test`).
+3. Executes the test suite and captures stack traces.
+4. **Self-Healing Loop**:
+   - Isolates the failing assertion or compilation error.
+   - Edits the source code to resolve the defect.
+   - Re-runs the test suite.
+   - Loops until 100% of tests pass.
+
+---
+
+### 6. Time-Travel Checkpoints & Instant Rollback (`/undo`)
+Before allowing an AI agent to perform complex refactors:
+1. Type `/checkpoint` to snapshot the repo.
+2. Let the agent perform edits across dozens of files.
+3. Don't like the result? Type:
+   ```text
+   /undo
+   ```
+4. OmniCode reverts your workspace to the exact git commit prior to the command, leaving uncommitted user changes intact.
+
+---
+
+### 7. Full Engineering Squad Orchestration (`/team`)
+When tackling major feature initiatives, single-agent prompting often misses edge cases. Run:
+```text
+/team "Construir sistema de faturamento com Stripe, webhook idempotente e painel de assinaturas"
+```
+OmniCode orchestrates a 4-phase autonomous pipeline:
+* **Phase 1 — `@planner`**: Deconstructs requirements into verifiable phases with quality gates.
+* **Phase 2 — `@architect`**: Validates database schema, idempotency keys, and security boundaries.
+* **Phase 3 — `@coder`**: Writes production code, type definitions, and test fixtures.
+* **Phase 4 — `@reviewer`**: Runs security audit, checks code conventions, and ensures zero regressions.
+
+---
+
+## ⚡ Omni Fusion Model Router
+
+Omni Fusion is the brain of OmniCode. Rather than forcing you to guess which model to select for every query, Omni Fusion continuously evaluates:
+* **Prompt Complexity** (syntactic depth, file count, reasoning needs).
+* **Quota & Remaining Credits** (tracks Google Cloud Code, Anthropic, and OpenAI rate limits).
+* **Tier Mapping**:
+
+```mermaid
+graph LR
+    P[Incoming Prompt] --> E{Complexity Engine}
+    E -->|Simple / Lookup| T1[🌱 Efficiency Tier<br/>Gemini 3.8 Flash / Haiku]
+    E -->|Standard Coding| T2[⚖️ Balanced Tier<br/>Claude Sonnet / GPT-4o]
+    E -->|Architecture / Refactor| T3[🧠 Intelligence Tier<br/>Claude Opus / Thinking / R1]
+    
+    T1 --> Failover{Quota OK?}
+    T2 --> Failover
+    T3 --> Failover
+    
+    Failover -->|Yes| Exec[Execute Prompt]
+    Failover -->|Low Quota| Reroute[Auto-Failover to Alternate Provider]
+    Reroute --> Exec
+```
+
+To manually lock a tier, use `/auto` or press `Ctrl+T` to choose:
+- **Modo Auto**: Dynamic complexity selection (Recommended).
+- **Eficiência**: Forces lowest latency and credit usage.
+- **Balanceado**: Optimized balance of speed and precision.
+- **Inteligente**: Forces deep thinking models on every query.
+
+---
+
+## ⌨️ Interactive Slash Commands & Keybindings
+
+<p align="center">
+  <img src="assets/omnicode-commands.jpg" alt="OmniCode Interactive Command Palette" width="90%" style="border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
+  <br />
+  <em>Press <code>Ctrl + P</code> or type <code>/</code> at any time to open the reactive command palette and launch autonomous tools.</em>
+</p>
+
+| Command | Aliases | Description |
 | :--- | :--- | :--- |
-| `/auto` | `/fusion` | Toggle Omni Fusion tiers (`Modo Auto`, `Eficiência`, `Balanceado`, `Inteligente`) |
-| `/fusion-models` | `/modelos-fusion` | Interactive checklist to choose which models Omni Fusion is allowed to use |
-| `/memory` | `/memory-bank` | Inspect the active 4-layer persistent project memory |
-| `/checkpoint` | `/salvar-ponto` | Create an instant Git snapshot before experimental code changes |
-| `/undo` | `/desfazer` | Revert working directory to previous AI checkpoint |
-| `/heal` | `/autofix` | Launch autonomous self-healing test and compiler fix loop |
+| `/auto` | `/fusion`, `/otimizar` | Cycle or pick Omni Fusion tier (`Modo Auto`, `Eficiência`, `Balanceado`, `Inteligente`) |
+| `/fusion-models` | `/modelos-fusion` | Open interactive checklist to mark allowed models or use all |
+| `/memory` | `/memory-bank` | View active persistent Memory Bank state |
+| `/checkpoint` | `/salvar-ponto` | Create an instant Git snapshot checkpoint |
+| `/undo` | `/desfazer` | Revert workspace to previous AI checkpoint |
+| `/heal` | `/autofix` | Start autonomous self-healing test and compiler fix loop |
 | `/team` | `/squad` | Launch the 4-phase Planner → Architect → Coder → Reviewer pipeline |
 | `/commit` | `/autocommit` | Generate conventional commit messages from git diff |
 | `/personalizacoes` | `/customizations` | Open catalog of 430+ Agents, 1,000+ Skills, Mods, Hooks, and MCPs |
-| `/update` | `/atualizar` | Synchronize and fetch latest OmniCode releases from GitHub |
+| `/update` | `/atualizar` | Check for updates and sync directly with the GitHub repository |
+| `/connect` | `/integrations` | Connect or authenticate AI providers and MCP servers |
+
+### Essential Keyboard Shortcuts
+* `Ctrl + P`: Open Command Palette (search all commands, agents, and tools).
+* `Ctrl + T`: Switch model variant / Omni Fusion tier.
+* `Shift + Tab`: Cycle through autonomous specialist agents (`@coder`, `@architect`, `@planner`, `@reviewer`, `@librarian`).
+* `Esc`: Close open modal dialogs.
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ System Architecture
 
 ```mermaid
 flowchart TD
-    User([Developer in Terminal]) -->|Prompt| OmniRouter[⚡ Omni Fusion Router]
-    
-    subgraph Context Engine
-        MB[(🧠 Autonomous Memory Bank)]
-        GitSnap[(💾 Git Checkpoints)]
-        MCP[🔌 29+ MCP Servers]
+    subgraph UI Layer
+        CLI[OmniCode CLI - omni]
+        TUI[OpenTUI Reactive Engine]
+        Sidebar[Live Diagnostics Sidebar]
     end
-    
-    OmniRouter -->|Load Context| MB
-    OmniRouter -->|Inject Tools| MCP
-    
-    subgraph Dynamic Model Execution
-        Complexity{Prompt Complexity}
-        Complexity -->|Low| EffTier[🌱 Efficiency: Gemini Flash / Haiku]
-        Complexity -->|Medium| BalTier[⚖️ Balanced: Claude Sonnet / GPT-4o]
-        Complexity -->|High| IntTier[🧠 Intelligence: Claude Opus / Thinking]
+
+    subgraph Orchestration Engine
+        Router[⚡ Omni Fusion Router]
+        Memory[🧠 Autonomous Memory Bank Loader]
+        Heal[🔄 Self-Healing Loop Controller]
+        Snap[💾 Git Time-Travel Snapshotter]
+        Squad[👥 4-Phase Squad Pipeline]
     end
-    
-    OmniRouter --> Complexity
-    
-    subgraph Squad Pipeline
-        P[Planner] --> A[Architect] --> C[Coder] --> R[Reviewer]
+
+    subgraph Provider & Protocol
+        DualOAuth[Dual-Stack Local Server :51121]
+        Accounts[Multi-Account Quota Manager]
+        LLM[Model Gateway: Gemini / Claude / GPT / Local]
     end
-    
-    OmniRouter -.->|Run /team| Squad Pipeline
-    EffTier & BalTier & IntTier --> CodeExec[Code Execution Engine]
-    
-    CodeExec --> HealCheck{Build / Test Pass?}
-    HealCheck -->|No| HealLoop[🔄 Self-Healing Loop]
-    HealLoop --> CodeExec
-    HealCheck -->|Yes| Success([Verified Working Code])
+
+    CLI --> TUI
+    TUI --> Sidebar
+    TUI --> Router
+    Router --> Memory
+    Router --> Heal
+    Router --> Snap
+    Router --> Squad
+    Router --> Accounts
+    Accounts --> DualOAuth
+    Accounts --> LLM
 ```
+
+---
+
+## ❓ Frequently Asked Questions (FAQ)
+
+#### Q: Are my credentials or API keys uploaded to GitHub?
+**A: Absolutely not.** All user credentials, tokens, and OAuth keys reside strictly in your operating system's local application data directory (`%APPDATA%/omnicode` on Windows, `~/.config/opencode` on Linux/macOS). The OmniCode repository has zero access to your private credentials.
+
+#### Q: How does Google Antigravity OAuth work?
+**A: 1-Click Zero Setup.** When you connect Google in OmniCode, a lightweight background server starts on `0.0.0.0:51121`. You log in via your browser, approve access, and the token exchanges automatically with no manual copy-pasting of redirect URLs.
+
+#### Q: Can I use OmniCode completely offline or with local models?
+**A: Yes.** OmniCode supports local endpoints via OpenAI-compatible APIs (Ollama, vLLM, LM Studio, LocalAI). Configure your base URL in `~/.config/opencode/opencode.json` and Omni Fusion will route to your local GPUs.
+
+#### Q: How do I update OmniCode?
+**A: Run `/update` in chat** or run `git pull origin main` in the checkout directory. OmniCode's built-in updater syncs with GitHub and preserves your local settings.
+
+---
+
+## 🇧🇷 Guia em Português
+
+### Instalação Rápida no Windows:
+Abra o PowerShell e cole:
+```powershell
+irm https://raw.githubusercontent.com/danie2022157-ui/omnicode/main/install.ps1 | iex
+```
+
+### Como Usar no Dia a Dia:
+1. Abra qualquer pasta de projeto no terminal e digite:
+   ```bash
+   omni
+   ```
+2. **Conectar seus modelos**: Digite `/connect` e escolha Google Antigravity, Anthropic ou OpenAI.
+3. **Omni Fusion**: O OmniCode escolhe automaticamente o melhor modelo para cada pergunta (Gemini 3.8 Flash para tarefas rápidas, Claude 3.7 Sonnet para código balanceado, Opus para arquitetura).
+4. **Filtrar Modelos**: Digite `/fusion-models` para marcar apenas os modelos que você quer usar.
+5. **Autocura de Código**: Se seus testes ou build quebrarem, digite `/heal` e a IA conserta o código sozinha até passar em todos os testes.
+6. **Desfazer Alterações**: Digite `/undo` para voltar o código ao estado anterior a qualquer momento.
+7. **Equipe Completa**: Digite `/team "sua funcionalidade"` para acionar o time de 4 agentes (Planejador, Arquiteto, Programador e Revisor).
 
 ---
 
@@ -173,9 +353,11 @@ flowchart TD
 - [x] **v2.2.1**: Persistent Memory Bank automatic loader & time-travel undo.
 - [x] **v2.2.2**: Model filtering checklist dialog (`/fusion-models`) & live sidebar diagnostics.
 - [x] **v2.2.2**: 1-Click automated Google Antigravity OAuth with dual-stack loopback.
-- [ ] **v2.3.0**: Local model integration with zero-setup Ollama / vLLM auto-discovery.
+- [x] **v2.2.2**: Dedicated `/update` GitHub synchronizer & offline installer.
+- [ ] **v2.3.0**: Native zero-setup Ollama / vLLM local model discovery.
 - [ ] **v2.4.0**: Distributed peer-to-peer agent pairing across local networks.
-- [ ] **v2.5.0**: VS Code and JetBrains extension bridges.
+- [ ] **v2.5.0**: VS Code & Cursor IDE extension bridge.
+- [ ] **v2.6.0**: Web-based visual dashboard for multi-agent execution traces.
 
 ---
 
