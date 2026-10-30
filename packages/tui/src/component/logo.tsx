@@ -5,31 +5,42 @@ import { useTheme } from "../context/theme"
 import { tint } from "../theme/color"
 import { bigLogo, compactLetters, go } from "../logo"
 
+const CYBER_PALETTE: RGBA[] = [
+  RGBA.fromHex("#00F5FF"), // O - Cyan
+  RGBA.fromHex("#00D2FF"), // N - Sky Cyan
+  RGBA.fromHex("#38BDF8"), // E - Cyan Blue
+  RGBA.fromHex("#6366F1"), // T - Indigo
+  RGBA.fromHex("#8B5CF6"), // H - Purple Neon
+  RGBA.fromHex("#A855F7"), // Y - Violet Neon
+  RGBA.fromHex("#C084FC"), // C - Light Violet
+  RGBA.fromHex("#D946EF"), // O - Magenta
+  RGBA.fromHex("#EC4899"), // D - Pink
+  RGBA.fromHex("#F43F5E"), // E - Rose Neon
+]
+
+const CYBER_BEVEL: RGBA[] = [
+  RGBA.fromHex("#0891B2"), // O bevel
+  RGBA.fromHex("#0284C7"), // N bevel
+  RGBA.fromHex("#0369A1"), // E bevel
+  RGBA.fromHex("#4338CA"), // T bevel
+  RGBA.fromHex("#6D28D9"), // H bevel
+  RGBA.fromHex("#7E22CE"), // Y bevel
+  RGBA.fromHex("#9333EA"), // C bevel
+  RGBA.fromHex("#A21CAF"), // O bevel
+  RGBA.fromHex("#BE123C"), // D bevel
+  RGBA.fromHex("#E11D48"), // E bevel
+]
+
 export function Logo() {
   const theme = useTheme()
   const dimensions = useTerminalDimensions()
 
-  const palette = (): RGBA[] => {
-    const scales = theme.categorical
-    if (scales.length === 0) return [theme.text.base]
-    return scales.map((scale) => scale[400])
-  }
-
-  const bevelPalette = (): RGBA[] => {
-    const scales = theme.categorical
-    if (scales.length === 0) return [theme.text.muted]
-    return scales.map((scale) => scale[200])
-  }
-
   const colorAt = (index: number) => {
-    const list = palette()
-    return list[index % list.length] ?? theme.text.base
+    return CYBER_PALETTE[index % CYBER_PALETTE.length] ?? theme.text.base
   }
 
   const bevelAt = (index: number) => {
-    const list = bevelPalette()
-    const base = list[(index + 1) % list.length] ?? theme.text.muted
-    return tint(theme.background.base, base, 0.82)
+    return CYBER_BEVEL[index % CYBER_BEVEL.length] ?? theme.text.muted
   }
 
   const renderCompactLine = (line: string, fg: RGBA, bold: boolean): JSX.Element[] => {
@@ -99,6 +110,23 @@ export function Logo() {
   const bigRows = [0, 1, 2, 3, 4, 5] as const
   const compactRows = [0, 1, 2, 3] as const
 
+  const glitchGlifs = [
+    { left: "  ───  ── ─   ", right: "   ─ ──  ───  " },
+    { left: "    ─  ─── ─  ", right: "  ─ ───  ─    " },
+    { left: "  ──── ─ ──   ", right: "   ── ─ ────  " },
+    { left: "   ── ──── ─  ", right: "  ─ ──── ──   " },
+    { left: "  ─── ─ ─     ", right: "     ─ ─ ───  " },
+    { left: "  ──   ─── ─  ", right: "  ─ ───   ──  " },
+  ]
+
+  const moonRays = [
+    { text: "             . · ´ ¯ ¯ ¯ ` · .             ", fg: RGBA.fromHex("#E0F2FE") },
+    { text: "         . · ´   . · ´ ¯ ` · . ` · .       ", fg: RGBA.fromHex("#BAE6FD") },
+    { text: "        /    . · ´         ` · .    \\      ", fg: RGBA.fromHex("#7DD3FC") },
+    { text: "       /   . ´                 ` .   \\     ", fg: RGBA.fromHex("#38BDF8") },
+    { text: "      │   /                       │   │    ", fg: RGBA.fromHex("#818CF8") },
+  ]
+
   return (
     <box alignItems="center" flexDirection="column">
       {dimensions().height < 12 ? null : dimensions().width < 22 ? (
@@ -152,46 +180,28 @@ export function Logo() {
         </box>
       ) : (
         <box alignItems="center" flexDirection="column">
-          <Show when={dimensions().height >= 26 && dimensions().width >= 86}>
+          {/* Meia-Lua ascendente no centro do topo (atrás do meio do nome) */}
+          <Show when={dimensions().height >= 24 && dimensions().width >= 70}>
             <box flexDirection="column" alignItems="center" justifyContent="center">
-              <box flexDirection="row" gap={1} alignItems="center" justifyContent="center">
-                <text fg={colorAt(1)} attributes={TextAttributes.BOLD} selectable={false}>
-                  ★
-                </text>
-                <text fg={colorAt(2)} selectable={false}>
-                  · ˙
-                </text>
-                <text fg={colorAt(3)} attributes={TextAttributes.BOLD} selectable={false}>
-                  🌙
-                </text>
-                <text fg={colorAt(2)} selectable={false}>
-                  ˙ ·
-                </text>
-                <text fg={colorAt(1)} attributes={TextAttributes.BOLD} selectable={false}>
-                  ★
-                </text>
-              </box>
-              <text fg={tint(theme.background.base, colorAt(3), 0.75)} attributes={TextAttributes.BOLD} selectable={false}>
-                ╭──────────────────────────.·´  L U N A R  `·.──────────────────────────╮
-              </text>
+              <For each={moonRays}>
+                {(line) => (
+                  <text fg={line.fg} attributes={TextAttributes.BOLD} selectable={false}>
+                    {line.text}
+                  </text>
+                )}
+              </For>
             </box>
           </Show>
+
+          {/* Nome ONETHYCODE com scanlines cósmicas nas laterais */}
           <For each={bigRows}>
             {(rowIdx) => {
-              const moonArcs = [
-                { left: "  .·´  ", right: "  `·.  " },
-                { left: " /     ", right: "     \\ " },
-                { left: "│  🌙  ", right: "  ✦  │ " },
-                { left: "│  ✦   ", right: "  🌙 │ " },
-                { left: " \\     ", right: "     / " },
-                { left: "  `·.  ", right: "  .·´  " },
-              ]
-              const arc = () => moonArcs[rowIdx] ?? { left: "", right: "" }
+              const glitch = () => glitchGlifs[rowIdx] ?? { left: "", right: "" }
               return (
                 <box flexDirection="row" gap={1} alignItems="center">
                   <Show when={dimensions().width >= 96}>
-                    <text fg={tint(theme.background.base, colorAt(2), 0.7)} attributes={TextAttributes.BOLD} selectable={false}>
-                      {arc().left}
+                    <text fg={RGBA.fromHex("#00D2FF")} attributes={TextAttributes.BOLD} selectable={false}>
+                      {glitch().left}
                     </text>
                   </Show>
                   <For each={bigLogo}>
@@ -206,50 +216,38 @@ export function Logo() {
                     )}
                   </For>
                   <Show when={dimensions().width >= 96}>
-                    <text fg={tint(theme.background.base, colorAt(5), 0.7)} attributes={TextAttributes.BOLD} selectable={false}>
-                      {arc().right}
+                    <text fg={RGBA.fromHex("#D946EF")} attributes={TextAttributes.BOLD} selectable={false}>
+                      {glitch().right}
                     </text>
                   </Show>
                 </box>
               )
             }}
           </For>
-          <Show when={dimensions().height >= 26 && dimensions().width >= 86}>
-            <text fg={tint(theme.background.base, colorAt(4), 0.75)} attributes={TextAttributes.BOLD} selectable={false}>
-              ╰──────────────────────────`·.  O N E T H Y  .·´──────────────────────────╯
-            </text>
-          </Show>
-          <Show when={dimensions().height >= 24}>
+
+          {/* Subtítulo idêntico ao design com diamantes/losangos */}
+          <Show when={dimensions().height >= 22}>
             <box flexDirection="row" paddingTop={1} gap={1} alignItems="center" justifyContent="center">
-              <For each={[0, 1, 2, 3, 4, 5, 6, 7]}>
-                {(idx) => (
-                  <text fg={colorAt(idx)} attributes={TextAttributes.BOLD} selectable={false}>
-                    ━━━━━━━━
-                  </text>
-                )}
-              </For>
-            </box>
-            <box flexDirection="row" paddingTop={0} gap={1} alignItems="center" justifyContent="center">
-              <text fg={colorAt(0)} attributes={TextAttributes.BOLD} selectable={false}>
-                ✦
+              <text fg={RGBA.fromHex("#D946EF")} attributes={TextAttributes.BOLD} selectable={false}>
+                ◇
               </text>
-              <text fg={colorAt(1)} attributes={TextAttributes.BOLD} selectable={false}>
+              <text fg={RGBA.fromHex("#A855F7")} attributes={TextAttributes.BOLD} selectable={false}>
                 ORQUESTRADOR MULTI-AGENTE IA
               </text>
-              <text fg={theme.text.muted} selectable={false}>
-                •
+              <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
+                ◇
               </text>
-              <text fg={colorAt(3)} attributes={TextAttributes.BOLD} selectable={false}>
-                ⚡ ONETHY FUSION
+              <text fg={RGBA.fromHex("#00D2FF")} attributes={TextAttributes.BOLD} selectable={false}>
+                ONETHY FUSION
               </text>
-              <text fg={theme.text.muted} selectable={false}>
-                •
+              <text fg={RGBA.fromHex("#D946EF")} attributes={TextAttributes.BOLD} selectable={false}>
+                ◇
               </text>
-              <text fg={colorAt(5)} attributes={TextAttributes.BOLD} selectable={false}>
-                🔗 ONETHY BUS ATIVO
+              <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
+                ONETHY BUS ATIVO
               </text>
-              <text fg={colorAt(7)} attributes={TextAttributes.BOLD} selectable={false}>
-                ✦
+              <text fg={RGBA.fromHex("#A855F7")} attributes={TextAttributes.BOLD} selectable={false}>
+                ◇
               </text>
             </box>
           </Show>

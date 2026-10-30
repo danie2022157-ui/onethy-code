@@ -21,7 +21,7 @@ import { DialogCustomizations } from "../component/dialog-customizations"
 import { DialogMcp } from "../component/dialog-mcp"
 import { DialogModel } from "../component/dialog-model"
 import { tint } from "../theme/color"
-import { TextAttributes } from "@opentui/core"
+import { RGBA, TextAttributes } from "@opentui/core"
 
 let once = false
 const placeholder = {
@@ -121,52 +121,52 @@ export function Home() {
     const mcps = (data.location.mcp.server.list(loc) ?? []).length
     return [
       {
-        icon: "🤖",
+        icon: "👤",
         label: "Agentes",
         count: String(agents),
-        colorIdx: 0,
+        colorHex: "#00F5FF",
         onClick: () => dialog.replace(() => <DialogAgent />),
       },
       {
-        icon: "✦",
+        icon: "📊",
         label: "Skills",
         count: String(skills),
-        colorIdx: 1,
+        colorHex: "#A855F7",
         onClick: () => dialog.replace(() => <DialogCustomizations filter="skills" />),
       },
       {
-        icon: "🧩",
+        icon: "🔗",
         label: "Mods",
         count: String(mods),
-        colorIdx: 2,
+        colorHex: "#10B981",
         onClick: () => dialog.replace(() => <DialogCustomizations filter="mods" />),
       },
       {
-        icon: "🪝",
+        icon: "</>",
         label: "Hooks",
         count: String(hooks),
-        colorIdx: 3,
+        colorHex: "#F59E0B",
         onClick: () => dialog.replace(() => <DialogCustomizations filter="hooks" />),
       },
       {
-        icon: "⌘",
+        icon: "⚡",
         label: "Comandos",
         count: String(commands),
-        colorIdx: 4,
+        colorHex: "#F43F5E",
         onClick: () => dialog.replace(() => <DialogCustomizations filter="commands" />),
       },
       {
         icon: "🔌",
         label: "MCPs",
         count: String(mcps),
-        colorIdx: 5,
+        colorHex: "#06B6D4",
         onClick: () => dialog.replace(() => <DialogMcp />),
       },
       {
         icon: "⚡",
         label: local.model.auto.modeName(),
         count: local.model.auto.enabled() ? local.model.auto.tierLabel() : "Auto",
-        colorIdx: 6,
+        colorHex: "#8B5CF6",
         onClick: () => dialog.replace(() => <DialogModel />),
       },
     ]
@@ -214,32 +214,61 @@ export function Home() {
             maxWidth={84}
             flexShrink={0}
           >
-            <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={1}>
-              <For each={ecosystemStats()}>
-                {(badge) => {
-                  const fg = () => colorAt(badge.colorIdx)
-                  const [hovered, setHovered] = createSignal(false)
-                  const bg = () => (hovered() ? tint(theme.background.base, fg(), 0.28) : tint(theme.background.base, fg(), 0.14))
-                  return (
-                    <box
-                      flexDirection="row"
-                      paddingLeft={1}
-                      paddingRight={1}
-                      backgroundColor={bg()}
-                      onMouseOver={() => setHovered(true)}
-                      onMouseOut={() => setHovered(false)}
-                      onMouseUp={badge.onClick}
-                    >
-                      <text fg={fg()} attributes={TextAttributes.BOLD} selectable={false}>
-                        {badge.icon} {badge.count}{" "}
-                      </text>
-                      <text fg={theme.text.base} selectable={false}>
-                        {badge.label}
-                      </text>
-                    </box>
-                  )
-                }}
-              </For>
+            <box flexDirection="column" alignItems="center" gap={1}>
+              <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={1}>
+                <For each={ecosystemStats().slice(0, 5)}>
+                  {(badge) => {
+                    const fg = () => RGBA.fromHex(badge.colorHex)
+                    const [hovered, setHovered] = createSignal(false)
+                    const bg = () => (hovered() ? tint(theme.background.base, fg(), 0.35) : tint(theme.background.base, fg(), 0.16))
+                    return (
+                      <box
+                        flexDirection="row"
+                        paddingLeft={1}
+                        paddingRight={1}
+                        backgroundColor={bg()}
+                        onMouseOver={() => setHovered(true)}
+                        onMouseOut={() => setHovered(false)}
+                        onMouseUp={badge.onClick}
+                      >
+                        <text fg={fg()} attributes={TextAttributes.BOLD} selectable={false}>
+                          {badge.icon} {badge.count}{" "}
+                        </text>
+                        <text fg={theme.text.base} selectable={false}>
+                          {badge.label}
+                        </text>
+                      </box>
+                    )
+                  }}
+                </For>
+              </box>
+              <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={1}>
+                <For each={ecosystemStats().slice(5)}>
+                  {(badge) => {
+                    const fg = () => RGBA.fromHex(badge.colorHex)
+                    const [hovered, setHovered] = createSignal(false)
+                    const bg = () => (hovered() ? tint(theme.background.base, fg(), 0.35) : tint(theme.background.base, fg(), 0.16))
+                    return (
+                      <box
+                        flexDirection="row"
+                        paddingLeft={1}
+                        paddingRight={1}
+                        backgroundColor={bg()}
+                        onMouseOver={() => setHovered(true)}
+                        onMouseOut={() => setHovered(false)}
+                        onMouseUp={badge.onClick}
+                      >
+                        <text fg={fg()} attributes={TextAttributes.BOLD} selectable={false}>
+                          {badge.icon} {badge.count}{" "}
+                        </text>
+                        <text fg={theme.text.base} selectable={false}>
+                          {badge.label}
+                        </text>
+                      </box>
+                    )
+                  }}
+                </For>
+              </box>
             </box>
             <Show when={dimensions().height >= 26}>
               <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={2}>
