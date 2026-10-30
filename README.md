@@ -13,7 +13,7 @@
 <br />
 
 <p align="center">
-  <img src="assets/onethy-code-tui.png" alt="OnethyCode Terminal UI" width="95%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.6);" />
+  <img src="assets/onethy-code-hero.jpg" alt="OnethyCode Lunar Edition" width="95%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.6);" />
 </p>
 
 <p align="center">
@@ -118,6 +118,11 @@ Navigate to any project repository and run:
 ```bash
 onethy
 ```
+
+<p align="center">
+  <img src="assets/onethy-code-tui.png" alt="OnethyCode Terminal Live" width="92%" style="border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
+</p>
+
 OnethyCode automatically inspects your repository structure, discovers your active git branch, detects installed dependencies, and initializes the **Autonomous Memory Bank**.
 
 ---
