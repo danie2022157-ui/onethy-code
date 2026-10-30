@@ -106,6 +106,7 @@ import { COMMAND_PALETTE_COMMAND, Keymap, type KeymapCommand } from "./context/k
 
 import { DialogVariant } from "./component/dialog-variant"
 import { DialogFusionModels } from "./component/dialog-fusion-models"
+import { DialogOmniUpdate } from "./component/dialog-omni-update"
 import { destroyRenderer, setTerminalTitle } from "./util/renderer"
 import { cliErrorMessage, errorFormat } from "./util/error"
 import { AttentionProvider } from "./context/attention"
@@ -1293,13 +1294,19 @@ function App() {
         },
         category: "System",
       },
-      ...(updater.open
+      ...(updater.open || process.env.OMNICODE_ACTIVE === "1"
         ? [
             {
               name: "opencode.update",
-              title: "Update OpenCode",
-              slash: { name: "update" },
-              run: () => updater.open?.("manual"),
+              title: process.env.OMNICODE_ACTIVE === "1" ? "Atualizar OmniCode" : "Update OpenCode",
+              slash: { name: "update", aliases: ["atualizar", "upgrade"] },
+              run: () => {
+                if (process.env.OMNICODE_ACTIVE === "1") {
+                  dialog.replace(() => <DialogOmniUpdate />)
+                  return
+                }
+                updater.open?.("manual")
+              },
               category: "System",
             },
           ]
