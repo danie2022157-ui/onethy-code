@@ -3066,13 +3066,15 @@ function ShellDisplay(props: {
         })
         .catch(() => undefined)
       if (!response) break
-      if (response.data.output)
+      if (response.data.output) {
+        const cleanChunk = stripAnsi(response.data.output)
         setBackgroundOutput((output) => {
-          const next = stripAnsi(output + response.data.output)
+          const next = output + cleanChunk
           if (next.length <= SHELL_DISPLAY_LIMIT) return next
           setOutputTruncated(true)
           return next.slice(-SHELL_DISPLAY_LIMIT)
         })
+      }
       if (response.data.cursor <= cursor) break
       cursor = response.data.cursor
       if (!drain || cursor >= response.data.size) break

@@ -1,27 +1,27 @@
 <div align="center">
 
-# ⚡ OmniCode
+# ⚡ OnethyCode
 
 ### *The Autonomous Multi-Agent AI Coding Platform with Omni Fusion & Self-Healing*
 
-[![GitHub Stars](https://img.shields.io/github/stars/danie2022157-ui/omnicode?style=for-the-badge&logo=github&color=FFD700)](https://github.com/danie2022157-ui/omnicode/stargazers)
+[![GitHub Stars](https://img.shields.io/github/stars/danie2022157-ui/onethy-code?style=for-the-badge&logo=github&color=FFD700)](https://github.com/danie2022157-ui/onethy-code/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![Bun](https://img.shields.io/badge/Runtime-Bun%201.4+-fbf0df?style=for-the-badge&logo=bun&logoColor=black)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-brightgreen?style=for-the-badge)](https://github.com/danie2022157-ui/omnicode)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-brightgreen?style=for-the-badge)](https://github.com/danie2022157-ui/onethy-code)
 
 <br />
 
 <p align="center">
-  <img src="assets/omnicode-tui.png" alt="OmniCode Terminal UI" width="95%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.6);" />
+  <img src="assets/onethy-code-tui.png" alt="OnethyCode Terminal UI" width="95%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.6);" />
 </p>
 
 <p align="center">
-  <b>OmniCode</b> turns your terminal into a collaborative AI engineering squad.<br />
+  <b>OnethyCode</b> turns your terminal into a collaborative AI engineering squad.<br />
   Featuring <b>Omni Fusion</b> (dynamic multi-model auto-routing), <b>Autonomous Memory Bank</b>, <b>Self-Healing Test Loops</b>, and <b>430+ preloaded specialized agents</b>.
 </p>
 
-[Quickstart](#-quickstart) • [How to Use Guide](#-step-by-step-how-to-use-guide) • [Omni Fusion Deep Dive](#-omni-fusion-model-router) • [Memory Bank](#-autonomous-memory-bank) • [Comparison](#-feature-matrix) • [Commands](#-interactive-slash-commands) • [Guia em Português](#-guia-em-português)
+[Quickstart](#-quickstart) • [How to Use Guide](#-step-by-step-how-to-use-guide) • [Omni Fusion Deep Dive](#-onethy-fusion-model-router) • [Memory Bank](#-autonomous-memory-bank) • [Comparison](#-feature-matrix) • [Commands](#-interactive-slash-commands) • [Guia em Português](#-guia-em-português)
 
 ---
 
@@ -29,21 +29,21 @@
 
 ## 📑 Table of Contents
 
-- [🌟 Why OmniCode?](#-why-omnicode)
+- [🌟 Why OnethyCode?](#-why-onethy-code)
 - [📊 Feature Comparison Matrix](#-feature-matrix)
 - [🚀 Quickstart](#-quickstart)
   - [Windows Installation](#-windows-powershell)
   - [Linux & macOS Installation](#-linux--macos-bash)
   - [Connecting Models in 1-Click](#-connecting-models)
 - [📖 Step-by-Step How to Use Guide](#-step-by-step-how-to-use-guide)
-  - [1. Launching OmniCode](#1-launching-omnicode)
+  - [1. Launching OnethyCode](#1-launching-onethy-code)
   - [2. Daily Prompting & Auto-Routing](#2-daily-prompting--auto-routing)
   - [3. Filtering Models with `/fusion-models`](#3-filtering-allowed-models-with-fusion-models)
   - [4. Autonomous Project Memory Bank](#4-autonomous-project-memory-bank)
   - [5. Autonomous Self-Healing Test Loop (`/heal`)](#5-autonomous-self-healing-test-loop-heal)
   - [6. Time-Travel Checkpoints & Instant Rollback (`/undo`)](#6-time-travel-checkpoints--instant-rollback-undo)
   - [7. Full Engineering Squad Orchestration (`/team`)](#7-full-engineering-squad-orchestration-team)
-- [⚡ Omni Fusion Deep Dive](#-omni-fusion-model-router)
+- [⚡ Omni Fusion Deep Dive](#-onethy-fusion-model-router)
 - [🧠 Autonomous Memory Bank Architecture](#-autonomous-memory-bank)
 - [⌨️ Interactive Slash Commands & Keybindings](#-interactive-slash-commands)
 - [🏗️ System Architecture](#-system-architecture)
@@ -54,12 +54,12 @@
 
 ---
 
-## 🌟 Why OmniCode?
+## 🌟 Why OnethyCode?
 
-Most AI coding tools lock you into a single provider, suffer from context amnesia across terminal sessions, or hallucinate silently when a build fails. **OmniCode is built from the ground up as an autonomous multi-agent platform designed to address these core problems**:
+Most AI coding tools lock you into a single provider, suffer from context amnesia across terminal sessions, or hallucinate silently when a build fails. **OnethyCode is built from the ground up as an autonomous multi-agent platform designed to address these core problems**:
 
-1. **Eliminate Rate-Limit & Quota Halts**: Omni Fusion dynamically routes requests across Gemini 3.8 Flash, Claude 3.7 Sonnet/Opus, and GPT models based on complexity and remaining quota. If one account exhausts quota, OmniCode fails over automatically.
-2. **Never Re-explain Your Architecture**: The 4-layer Autonomous Memory Bank automatically documents your requirements, coding conventions, tech stack, and sprint context in `.omnicode/memory-bank/`.
+1. **Eliminate Rate-Limit & Quota Halts**: Omni Fusion dynamically routes requests across Gemini 3.8 Flash, Claude 3.7 Sonnet/Opus, and GPT models based on complexity and remaining quota. If one account exhausts quota, OnethyCode fails over automatically.
+2. **Never Re-explain Your Architecture**: The 4-layer Autonomous Memory Bank automatically documents your requirements, coding conventions, tech stack, and sprint context in `.onethy-code/memory-bank/`.
 3. **Verified Working Code**: The `/heal` loop detects test/build errors, diagnoses root causes, modifies source code, and re-runs the compiler until tests pass.
 4. **Fearless AI Edits**: Instant Git snapshots are created before major edits. Execute `/undo` at any point to restore your workspace to its exact prior state.
 5. **Lightning Performance**: Written in TypeScript and powered by Bun 1.4+, launching in milliseconds with low memory overhead.
@@ -68,7 +68,7 @@ Most AI coding tools lock you into a single provider, suffer from context amnesi
 
 ## 📊 Feature Matrix
 
-| Capability | Vanilla OpenCode | Claude Code | Cursor IDE | Aider | ⚡ OmniCode |
+| Capability | Vanilla OpenCode | Claude Code | Cursor IDE | Aider | ⚡ OnethyCode |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Multi-Model Dynamic Routing (Omni Fusion)** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (44+ Models)** |
 | **Model Whitelisting & Selection UI** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (`/fusion-models`)** |
@@ -87,24 +87,24 @@ Most AI coding tools lock you into a single provider, suffer from context amnesi
 ### 🪟 Windows (PowerShell)
 Open PowerShell (as normal user or Administrator) and run:
 ```powershell
-irm https://raw.githubusercontent.com/danie2022157-ui/omnicode/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/danie2022157-ui/onethy-code/main/install.ps1 | iex
 ```
 *Or clone and install locally:*
 ```powershell
-git clone https://github.com/danie2022157-ui/omnicode.git
-cd omnicode
+git clone https://github.com/danie2022157-ui/onethy-code.git
+cd onethy-code
 .\install.ps1
 ```
 
 ### 🐧 Linux & 🍎 macOS (Bash)
 Open your terminal and run:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/danie2022157-ui/omnicode/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/danie2022157-ui/onethy-code/main/install.sh | bash
 ```
 
 ### 🔑 Connecting Models
 Once installed, connect your preferred AI providers:
-1. Launch OmniCode by typing `omni`.
+1. Launch OnethyCode by typing `onethy`.
 2. Type `/connect` (or `Ctrl+P` → *Conectar integração*).
 3. Select **Google (Antigravity)**, **Anthropic**, **OpenAI**, or **OpenRouter**.
 4. With Google Antigravity, click **OAuth with Google**: your browser opens, you approve access, and the local dual-stack listener binds automatically with zero copy-pasting required!
@@ -113,17 +113,17 @@ Once installed, connect your preferred AI providers:
 
 ## 📖 Step-by-Step How to Use Guide
 
-### 1. Launching OmniCode
+### 1. Launching OnethyCode
 Navigate to any project repository and run:
 ```bash
-omni
+onethy
 ```
-OmniCode automatically inspects your repository structure, discovers your active git branch, detects installed dependencies, and initializes the **Autonomous Memory Bank**.
+OnethyCode automatically inspects your repository structure, discovers your active git branch, detects installed dependencies, and initializes the **Autonomous Memory Bank**.
 
 ---
 
 ### 2. Daily Prompting & Auto-Routing
-You interact with OmniCode using natural language in the terminal prompt. Omni Fusion inspects your request in real time:
+You interact with OnethyCode using natural language in the terminal prompt. Omni Fusion inspects your request in real time:
 
 ```text
 > "Adicione autenticação JWT com refresh token na rota /auth/login e crie testes unitários com vitest"
@@ -131,7 +131,7 @@ You interact with OmniCode using natural language in the terminal prompt. Omni F
 
 * **What happens behind the scenes:**
   1. **Complexity Evaluator**: Classifies the prompt as **High Complexity** (multi-file implementation + security + tests).
-  2. **Memory Bank Injection**: Reads `.omnicode/memory-bank/system-patterns.md` to match your existing JWT schema and error formatting.
+  2. **Memory Bank Injection**: Reads `.onethy-code/memory-bank/system-patterns.md` to match your existing JWT schema and error formatting.
   3. **Tier Selection**: Routes to **🧠 Intelligence Tier** (`Claude 3.7 Sonnet Thinking` or `Claude Opus 4`).
   4. **Atomic Checkpoint**: Takes a snapshot of your repo before modifying files.
   5. **Execution**: Generates the token verification middleware, handler, and test suite.
@@ -139,7 +139,7 @@ You interact with OmniCode using natural language in the terminal prompt. Omni F
 ---
 
 ### 3. Filtering Allowed Models with `/fusion-models`
-Do you want OmniCode to use only free models, or only Claude, or restrict specific models?
+Do you want OnethyCode to use only free models, or only Claude, or restrict specific models?
 1. In the chat prompt, type:
    ```text
    /fusion-models
@@ -157,17 +157,17 @@ Do you want OmniCode to use only free models, or only Claude, or restrict specif
 ---
 
 ### 4. Autonomous Project Memory Bank
-OmniCode maintains a living memory of your codebase in `.omnicode/memory-bank/`:
+OnethyCode maintains a living memory of your codebase in `.onethy-code/memory-bank/`:
 
 ```text
-.omnicode/memory-bank/
+.onethy-code/memory-bank/
 ├── project-brief.md      # Core product vision, features, and non-negotiables
 ├── system-patterns.md    # Architecture blueprints, naming rules, design patterns
 ├── tech-context.md       # Frameworks, versions, database schemas, environments
 └── active-context.md     # Current sprint objectives, WIP changes, next steps
 ```
 
-* **How it works:** Whenever you ask OmniCode to build or refactor features, it references these documents automatically. When significant architectural decisions are made, OmniCode updates the memory bank seamlessly.
+* **How it works:** Whenever you ask OnethyCode to build or refactor features, it references these documents automatically. When significant architectural decisions are made, OnethyCode updates the memory bank seamlessly.
 * **To inspect memory status:** Type `/memory` in chat.
 
 ---
@@ -175,7 +175,7 @@ OmniCode maintains a living memory of your codebase in `.omnicode/memory-bank/`:
 ### 5. Autonomous Self-Healing Test Loop (`/heal`)
 Stop debugging compiler and test errors by hand:
 1. Type `/heal` in chat.
-2. OmniCode detects your package manager and test runner (`bun test`, `pnpm test`, `pytest`, `cargo test`, `go test`).
+2. OnethyCode detects your package manager and test runner (`bun test`, `pnpm test`, `pytest`, `cargo test`, `go test`).
 3. Executes the test suite and captures stack traces.
 4. **Self-Healing Loop**:
    - Isolates the failing assertion or compilation error.
@@ -193,7 +193,7 @@ Before allowing an AI agent to perform complex refactors:
    ```text
    /undo
    ```
-4. OmniCode reverts your workspace to the exact git commit prior to the command, leaving uncommitted user changes intact.
+4. OnethyCode reverts your workspace to the exact git commit prior to the command, leaving uncommitted user changes intact.
 
 ---
 
@@ -202,7 +202,7 @@ When tackling major feature initiatives, single-agent prompting often misses edg
 ```text
 /team "Construir sistema de faturamento com Stripe, webhook idempotente e painel de assinaturas"
 ```
-OmniCode orchestrates a 4-phase autonomous pipeline:
+OnethyCode orchestrates a 4-phase autonomous pipeline:
 * **Phase 1 — `@planner`**: Deconstructs requirements into verifiable phases with quality gates.
 * **Phase 2 — `@architect`**: Validates database schema, idempotency keys, and security boundaries.
 * **Phase 3 — `@coder`**: Writes production code, type definitions, and test fixtures.
@@ -212,7 +212,7 @@ OmniCode orchestrates a 4-phase autonomous pipeline:
 
 ## ⚡ Omni Fusion Model Router
 
-Omni Fusion is the brain of OmniCode. Rather than forcing you to guess which model to select for every query, Omni Fusion continuously evaluates:
+Omni Fusion is the brain of OnethyCode. Rather than forcing you to guess which model to select for every query, Omni Fusion continuously evaluates:
 * **Prompt Complexity** (syntactic depth, file count, reasoning needs).
 * **Quota & Remaining Credits** (tracks Google Cloud Code, Anthropic, and OpenAI rate limits).
 * **Tier Mapping**:
@@ -241,13 +241,7 @@ To manually lock a tier, use `/auto` or press `Ctrl+T` to choose:
 
 ---
 
-## ⌨️ Interactive Slash Commands & Keybindings
-
-<p align="center">
-  <img src="assets/omnicode-commands.jpg" alt="OmniCode Interactive Command Palette" width="90%" style="border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
-  <br />
-  <em>Press <code>Ctrl + P</code> or type <code>/</code> at any time to open the reactive command palette and launch autonomous tools.</em>
-</p>
+## ⌨️ Interactive Slash Commands
 
 | Command | Aliases | Description |
 | :--- | :--- | :--- |
@@ -276,7 +270,7 @@ To manually lock a tier, use `/auto` or press `Ctrl+T` to choose:
 ```mermaid
 flowchart TD
     subgraph UI Layer
-        CLI[OmniCode CLI - omni]
+        CLI[OnethyCode CLI - onethy]
         TUI[OpenTUI Reactive Engine]
         Sidebar[Live Diagnostics Sidebar]
     end
@@ -312,16 +306,16 @@ flowchart TD
 ## ❓ Frequently Asked Questions (FAQ)
 
 #### Q: Are my credentials or API keys uploaded to GitHub?
-**A: Absolutely not.** All user credentials, tokens, and OAuth keys reside strictly in your operating system's local application data directory (`%APPDATA%/omnicode` on Windows, `~/.config/opencode` on Linux/macOS). The OmniCode repository has zero access to your private credentials.
+**A: Absolutely not.** All user credentials, tokens, and OAuth keys reside strictly in your operating system's local application data directory (`%APPDATA%/onethy-code` on Windows, `~/.config/opencode` on Linux/macOS). The OnethyCode repository has zero access to your private credentials.
 
 #### Q: How does Google Antigravity OAuth work?
-**A: 1-Click Zero Setup.** When you connect Google in OmniCode, a lightweight background server starts on `0.0.0.0:51121`. You log in via your browser, approve access, and the token exchanges automatically with no manual copy-pasting of redirect URLs.
+**A: 1-Click Zero Setup.** When you connect Google in OnethyCode, a lightweight background server starts on `0.0.0.0:51121`. You log in via your browser, approve access, and the token exchanges automatically with no manual copy-pasting of redirect URLs.
 
-#### Q: Can I use OmniCode completely offline or with local models?
-**A: Yes.** OmniCode supports local endpoints via OpenAI-compatible APIs (Ollama, vLLM, LM Studio, LocalAI). Configure your base URL in `~/.config/opencode/opencode.json` and Omni Fusion will route to your local GPUs.
+#### Q: Can I use OnethyCode completely offline or with local models?
+**A: Yes.** OnethyCode supports local endpoints via OpenAI-compatible APIs (Ollama, vLLM, LM Studio, LocalAI). Configure your base URL in `~/.config/opencode/opencode.json` and Omni Fusion will route to your local GPUs.
 
-#### Q: How do I update OmniCode?
-**A: Run `/update` in chat** or run `git pull origin main` in the checkout directory. OmniCode's built-in updater syncs with GitHub and preserves your local settings.
+#### Q: How do I update OnethyCode?
+**A: Run `/update` in chat** or run `git pull origin main` in the checkout directory. OnethyCode's built-in updater syncs with GitHub and preserves your local settings.
 
 ---
 
@@ -330,16 +324,16 @@ flowchart TD
 ### Instalação Rápida no Windows:
 Abra o PowerShell e cole:
 ```powershell
-irm https://raw.githubusercontent.com/danie2022157-ui/omnicode/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/danie2022157-ui/onethy-code/main/install.ps1 | iex
 ```
 
 ### Como Usar no Dia a Dia:
 1. Abra qualquer pasta de projeto no terminal e digite:
    ```bash
-   omni
+   onethy
    ```
 2. **Conectar seus modelos**: Digite `/connect` e escolha Google Antigravity, Anthropic ou OpenAI.
-3. **Omni Fusion**: O OmniCode escolhe automaticamente o melhor modelo para cada pergunta (Gemini 3.8 Flash para tarefas rápidas, Claude 3.7 Sonnet para código balanceado, Opus para arquitetura).
+3. **Omni Fusion**: O OnethyCode escolhe automaticamente o melhor modelo para cada pergunta (Gemini 3.8 Flash para tarefas rápidas, Claude 3.7 Sonnet para código balanceado, Opus para arquitetura).
 4. **Filtrar Modelos**: Digite `/fusion-models` para marcar apenas os modelos que você quer usar.
 5. **Autocura de Código**: Se seus testes ou build quebrarem, digite `/heal` e a IA conserta o código sozinha até passar em todos os testes.
 6. **Desfazer Alterações**: Digite `/undo` para voltar o código ao estado anterior a qualquer momento.
@@ -364,7 +358,7 @@ irm https://raw.githubusercontent.com/danie2022157-ui/omnicode/main/install.ps1 
 ## 🤝 Contributing
 
 We welcome issues, feature suggestions, and PRs!
-1. Fork the project (`https://github.com/danie2022157-ui/omnicode`)
+1. Fork the project (`https://github.com/danie2022157-ui/onethy-code`)
 2. Create your feature branch (`git checkout -b feat/amazing-feature`)
 3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
 4. Push to your branch (`git push origin feat/amazing-feature`)
@@ -374,7 +368,7 @@ We welcome issues, feature suggestions, and PRs!
 
 <div align="center">
 
-### ⭐ Star us on GitHub — It helps OmniCode reach more developers!
+### ⭐ Star us on GitHub — It helps OnethyCode reach more developers!
 
 Made with ⚡ by [Daniel](https://github.com/danie2022157-ui) and the open source community.
 

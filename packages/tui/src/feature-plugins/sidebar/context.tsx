@@ -10,6 +10,19 @@ const money = new Intl.NumberFormat("en-US", {
   currency: "USD",
 })
 
+function renderProgressBar(percent: number, width = 12): string {
+  const clamped = Math.max(0, Math.min(100, Math.round(percent)))
+  const filled = Math.round((clamped / 100) * width)
+  const empty = Math.max(0, width - filled)
+  return `[${"█".repeat(filled)}${"░".repeat(empty)}] ${clamped}%`
+}
+
+function truncateMiddle(str: string, maxLen = 38): string {
+  if (str.length <= maxLen) return str
+  const half = Math.floor((maxLen - 3) / 2)
+  return `${str.slice(0, half)}...${str.slice(-half)}`
+}
+
 export function SidebarContext(props: { context: Plugin.Context; sessionID: string }) {
   let local: ReturnType<typeof useLocal> | undefined
   try {
@@ -177,27 +190,40 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
   return (
     <>
       <Show when={state() || cost() > 0}>
-        <box>
+        <box paddingBottom={1}>
           <text fg={theme.text.base}>
-            <b>Context</b>
+            <b>Contexto & Limites</b>
           </text>
           <Show when={state()}>
             {(value) => (
               <>
                 <text fg={theme.text.muted}>{value().tokens.toLocaleString()} tokens</text>
                 <Show when={value().percent !== undefined}>
-                  <text fg={theme.text.muted}>{value().percent}% used</text>
+                  <text fg={theme.text.feedback.info.base} wrapMode="none">
+                    {renderProgressBar(value().percent!)}
+                  </text>
                 </Show>
               </>
             )}
           </Show>
           <Show when={cost() > 0}>
-            <text fg={theme.text.muted}>{money.format(cost())} spent</text>
+            <text fg={theme.text.muted}>{money.format(cost())} gasto</text>
           </Show>
         </box>
       </Show>
+      <box paddingBottom={1}>
+        <text fg={theme.text.base}>
+          <b>🧠 Memory Bank</b>
+        </text>
+        <text fg={theme.text.feedback.info.base} wrapMode="none">
+          ● Ativo · .omnicode/
+        </text>
+        <text fg={theme.text.muted} wrapMode="none">
+          Use /memory para gerenciar
+        </text>
+      </box>
       <Show when={activeSubagents().length > 0}>
-        <box>
+        <box paddingBottom={1}>
           <text fg={theme.text.base}>
             <b>Subagentes ({activeSubagents().length})</b>
           </text>
@@ -205,7 +231,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
             {(item) => (
               <text fg={theme.text.muted} wrapMode="none">
                 {item.running ? "● " : "✓ "}
-                {item.agent}: {item.model}
+                {truncateMiddle(`${item.agent}: ${item.model}`)}
               </text>
             )}
           </For>
@@ -213,12 +239,12 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
       </Show>
       <Show when={fusionSummary()}>
         {(fusion) => (
-          <box>
+          <box paddingBottom={1}>
             <text fg={theme.text.base}>
               <b>⚡ Omni Fusion ({fusion().modelCount} {fusion().isFiltered ? "selecionados" : "modelos"})</b>
             </text>
             <text fg={theme.text.muted} wrapMode="none">
-              Provedores: {fusion().providers}
+              Provedores: {truncateMiddle(fusion().providers)}
             </text>
             <Show when={fusion().isFiltered}>
               <text fg={theme.text.feedback.info.base} wrapMode="none">
@@ -226,19 +252,19 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
               </text>
             </Show>
             <text fg={theme.text.muted} wrapMode="none">
-              🌱 Eficiência: {fusion().efficiency}
+              🌱 Eficiência: {truncateMiddle(fusion().efficiency)}
             </text>
             <text fg={theme.text.muted} wrapMode="none">
-              ⚖️ Balanceado: {fusion().balanced}
+              ⚖️ Balanceado: {truncateMiddle(fusion().balanced)}
             </text>
             <text fg={theme.text.muted} wrapMode="none">
-              🧠 Inteligência: {fusion().intelligence}
+              🧠 Inteligência: {truncateMiddle(fusion().intelligence)}
             </text>
             <Show when={fusion().isFiltered && fusion().modelCount <= 6}>
               <For each={fusion().selectedList}>
                 {(m) => (
                   <text fg={theme.text.muted} wrapMode="none">
-                    • {m}
+                    • {truncateMiddle(m)}
                   </text>
                 )}
               </For>

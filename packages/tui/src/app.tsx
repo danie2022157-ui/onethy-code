@@ -107,6 +107,7 @@ import { COMMAND_PALETTE_COMMAND, Keymap, type KeymapCommand } from "./context/k
 import { DialogVariant } from "./component/dialog-variant"
 import { DialogFusionModels } from "./component/dialog-fusion-models"
 import { DialogOmniUpdate } from "./component/dialog-omni-update"
+import { DialogMemoryBank } from "./component/dialog-memory-bank"
 import { destroyRenderer, setTerminalTitle } from "./util/renderer"
 import { cliErrorMessage, errorFormat } from "./util/error"
 import { AttentionProvider } from "./context/attention"
@@ -644,18 +645,18 @@ function App() {
     if (!terminalTitleEnabled()) return
 
     if (route.data.type === "home") {
-      setTerminalTitle(renderer, "OmniCode")
+      setTerminalTitle(renderer, "OnethyCode")
       return
     }
 
     if (route.data.type === "session") {
       const title = session?.title
       if (!title || isFallbackTitle(title)) {
-        setTerminalTitle(renderer, "OmniCode")
+        setTerminalTitle(renderer, "OnethyCode")
         return
       }
 
-      setTerminalTitle(renderer, `OC | ${title.length > 40 ? title.slice(0, 37) + "…" : title}`)
+      setTerminalTitle(renderer, `OTC | ${title.length > 40 ? title.slice(0, 37) + "…" : title}`)
       return
     }
 
@@ -1075,6 +1076,7 @@ function App() {
             {
               name: "omnicode.auto_model",
               title: "Omni Fusion — Selecionar Variante (Modo Auto / Eficiência / Balanceado / Inteligente)",
+              description: "Alterna tiers de inteligência e roteamento dinâmico entre modelos conectados",
               category: "OmniCode",
               suggested: true,
               slash: { name: "auto", aliases: ["fusion", "omnfusion", "omnifusion", "otimizar", "optimize"] },
@@ -1086,6 +1088,7 @@ function App() {
             {
               name: "omnicode.fusion_models",
               title: "Omni Fusion — Configurar Modelos Permitidos (Marcar modelos ou Usar Todos)",
+              description: "Abre checklist interativo para permitir ou restringir modelos no Omni Fusion",
               category: "OmniCode",
               suggested: true,
               slash: { name: "fusion-models", aliases: ["modelos-fusion", "fusionmodels", "allowed-models"] },
@@ -1097,20 +1100,18 @@ function App() {
             {
               name: "omnicode.memory",
               title: "Memory Bank Persistente (.omnicode/memory-bank/)",
+              description: "Abre painel visual com os arquivos de memória arquitetural do projeto",
               category: "OmniCode",
               suggested: true,
               slash: { name: "memory", aliases: ["memory-bank", "lembrar", "memoria"] },
               run: () => {
-                toast.show({
-                  variant: "info",
-                  title: "🧠 Memory Bank Ativo",
-                  message: "Arquivos em .omnicode/memory-bank/ (project-brief, system-patterns, tech-context, active-context).",
-                })
+                dialog.replace(() => <DialogMemoryBank />)
               },
             },
             {
               name: "omnicode.checkpoint",
               title: "Workspace Checkpoints (Salvar Snapshot Git)",
+              description: "Salva snapshot do workspace para permitir time-travel e rollback",
               category: "OmniCode",
               suggested: true,
               slash: { name: "checkpoint", aliases: ["checkpoints", "salvar-ponto"] },
@@ -1118,27 +1119,29 @@ function App() {
                 toast.show({
                   variant: "info",
                   title: "💾 Checkpoints Git",
-                  message: "Use a ferramenta omni_checkpoint ou rode /undo para restaurar o último estado.",
+                  message: "Use a ferramenta omni_checkpoint ou rode /checkpoint-undo para restaurar o estado.",
                 })
               },
             },
             {
               name: "omnicode.undo",
-              title: "Time-Travel Undo (Reverter Workspace para Checkpoint Anterior)",
+              title: "Time-Travel Checkpoint Undo (Reverter Workspace para Snapshot Anterior)",
+              description: "Reverte alterações de código feitas pela IA para o snapshot git anterior",
               category: "OmniCode",
               suggested: true,
-              slash: { name: "undo", aliases: ["desfazer", "reverter"] },
+              slash: { name: "checkpoint-undo", aliases: ["desfazer-checkpoint", "reverter-checkpoint", "git-undo"] },
               run: () => {
                 toast.show({
                   variant: "warning",
                   title: "⏪ Time-Travel Undo",
-                  message: "Enviando comando para reverter alterações da IA ao checkpoint anterior...",
+                  message: "Revertendo arquivos modificados pela IA ao último snapshot git...",
                 })
               },
             },
             {
               name: "omnicode.heal",
               title: "Self-Healing Test & Build Loop (Autocura Autônoma)",
+              description: "Inicia loop autônomo de execução de testes, diagnóstico e correção de falhas",
               category: "OmniCode",
               suggested: true,
               slash: { name: "heal", aliases: ["self-heal", "corrigir-loop", "autofix"] },
@@ -1153,6 +1156,7 @@ function App() {
             {
               name: "omnicode.commit",
               title: "Auto-Commit Inteligente (Mensagens Convencionais do Git Diff)",
+              description: "Analisa o git diff e gera mensagens de commit padronizadas",
               category: "OmniCode",
               suggested: true,
               slash: { name: "commit", aliases: ["autocommit", "git-commit", "salvar"] },
@@ -1167,6 +1171,7 @@ function App() {
             {
               name: "omnicode.team",
               title: "Pipeline de Equipe Completa (Planner -> Architect -> Coder -> Reviewer)",
+              description: "Dispara esquadrão autônomo de 4 fases para construir funcionalidades complexas",
               category: "OmniCode",
               suggested: true,
               slash: { name: "team", aliases: ["equipe", "pipeline", "squad"] },
@@ -1298,7 +1303,7 @@ function App() {
         ? [
             {
               name: "opencode.update",
-              title: process.env.OMNICODE_ACTIVE === "1" ? "Atualizar OmniCode" : "Update OpenCode",
+              title: process.env.OMNICODE_ACTIVE === "1" ? "Atualizar OnethyCode" : "Update OpenCode",
               slash: { name: "update", aliases: ["atualizar", "upgrade"] },
               run: () => {
                 if (process.env.OMNICODE_ACTIVE === "1") {

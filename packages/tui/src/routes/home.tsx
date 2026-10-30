@@ -218,13 +218,16 @@ export function Home() {
               <For each={ecosystemStats()}>
                 {(badge) => {
                   const fg = () => colorAt(badge.colorIdx)
-                  const bg = () => tint(theme.background.base, fg(), 0.16)
+                  const [hovered, setHovered] = createSignal(false)
+                  const bg = () => (hovered() ? tint(theme.background.base, fg(), 0.28) : tint(theme.background.base, fg(), 0.14))
                   return (
                     <box
                       flexDirection="row"
                       paddingLeft={1}
                       paddingRight={1}
                       backgroundColor={bg()}
+                      onMouseOver={() => setHovered(true)}
+                      onMouseOut={() => setHovered(false)}
                       onMouseUp={badge.onClick}
                     >
                       <text fg={fg()} attributes={TextAttributes.BOLD} selectable={false}>
@@ -241,24 +244,33 @@ export function Home() {
             <Show when={dimensions().height >= 26}>
               <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={2}>
                 <For each={quickChips}>
-                  {(chip) => (
-                    <box
-                      flexDirection="row"
-                      onMouseUp={() => {
-                        const composer = ref()
-                        if (!composer) return
-                        composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
-                      }}
-                    >
-                      <text fg={colorAt(chip.colorIdx)} attributes={TextAttributes.BOLD} selectable={false}>
-                        {chip.cmd}
-                      </text>
-                      <text fg={theme.text.muted} selectable={false}>
-                        {" "}
-                        {chip.desc}
-                      </text>
-                    </box>
-                  )}
+                  {(chip) => {
+                    const [hovered, setHovered] = createSignal(false)
+                    return (
+                      <box
+                        flexDirection="row"
+                        onMouseOver={() => setHovered(true)}
+                        onMouseOut={() => setHovered(false)}
+                        onMouseUp={() => {
+                          const composer = ref()
+                          if (!composer) return
+                          composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
+                        }}
+                      >
+                        <text
+                          fg={colorAt(chip.colorIdx)}
+                          attributes={hovered() ? TextAttributes.BOLD | TextAttributes.UNDERLINE : TextAttributes.BOLD}
+                          selectable={false}
+                        >
+                          {chip.cmd}
+                        </text>
+                        <text fg={hovered() ? theme.text.base : theme.text.muted} selectable={false}>
+                          {" "}
+                          {chip.desc}
+                        </text>
+                      </box>
+                    )
+                  }}
                 </For>
               </box>
             </Show>

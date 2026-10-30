@@ -190,13 +190,13 @@ export function Logo() {
                 •
               </text>
               <text fg={colorAt(3)} attributes={TextAttributes.BOLD} selectable={false}>
-                ⚡ OMNI FUSION
+                ⚡ ONETHY FUSION
               </text>
               <text fg={theme.text.muted} selectable={false}>
                 •
               </text>
               <text fg={colorAt(5)} attributes={TextAttributes.BOLD} selectable={false}>
-                🔗 OMNIBUS ATIVO
+                🔗 ONETHY BUS ATIVO
               </text>
               <text fg={colorAt(7)} attributes={TextAttributes.BOLD} selectable={false}>
                 ✦

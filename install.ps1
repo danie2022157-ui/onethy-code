@@ -1,12 +1,12 @@
-# OmniCode — Instalador Global para Windows
+# OnethyCode — Instalador Global para Windows
 $ErrorActionPreference = "Stop"
 
 $currentDir = $PSScriptRoot
 $targetDir = "$env:LOCALAPPDATA\Microsoft\WindowsApps"
 
-Write-Host "======================================================" -ForegroundColor Cyan
-Write-Host "  Instalando OmniCode CLI (omni / omnicode) no Windows" -ForegroundColor Cyan
-Write-Host "======================================================" -ForegroundColor Cyan
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host "  Instalando OnethyCode CLI (onethy / onethy-code) no Windows" -ForegroundColor Cyan
+Write-Host "==========================================================" -ForegroundColor Cyan
 
 $nodePath = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $nodePath) {
@@ -56,20 +56,22 @@ if ($LASTEXITCODE -ne 0) {
   exit 1
 }
 
+$onethyCmd = Join-Path $targetDir "onethy.cmd"
+$onethyCodeCmd = Join-Path $targetDir "onethy-code.cmd"
 $omniCmd = Join-Path $targetDir "omni.cmd"
 $omnicodeCmd = Join-Path $targetDir "omnicode.cmd"
-$launcherPs1 = Join-Path $targetDir "omni.ps1"
-$configPath = Join-Path $targetDir "omni-config.json"
+$launcherPs1 = Join-Path $targetDir "onethy.ps1"
+$configPath = Join-Path $targetDir "onethy-config.json"
 
 $cmdContent = @"
 @echo off
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0omni.ps1" %*
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0onethy.ps1" %*
 exit /b %ERRORLEVEL%
 "@
 $launcherContent = @'
 $ErrorActionPreference = "Stop"
-$config = Get-Content -LiteralPath (Join-Path $PSScriptRoot "omni-config.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-& $config.nodePath (Join-Path $config.checkout "bin\omni.js") @args
+$config = Get-Content -LiteralPath (Join-Path $PSScriptRoot "onethy-config.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+& $config.nodePath (Join-Path $config.checkout "bin\onethy.js") @args
 exit $LASTEXITCODE
 '@
 $configContent = [ordered]@{ nodePath = $nodePath; checkout = $currentDir } | ConvertTo-Json -Compress
@@ -77,12 +79,12 @@ $configContent = [ordered]@{ nodePath = $nodePath; checkout = $currentDir } | Co
 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 Set-Content -Path $launcherPs1 -Value $launcherContent -Encoding ASCII
 [System.IO.File]::WriteAllText($configPath, $configContent, [System.Text.UTF8Encoding]::new($false))
+Set-Content -Path $onethyCmd -Value $cmdContent -Encoding ASCII
+Set-Content -Path $onethyCodeCmd -Value $cmdContent -Encoding ASCII
 Set-Content -Path $omniCmd -Value $cmdContent -Encoding ASCII
 Set-Content -Path $omnicodeCmd -Value $cmdContent -Encoding ASCII
 
-Write-Host "[OK] Atalhos de desenvolvimento 'omni' e 'omnicode' instalados em: $targetDir" -ForegroundColor Green
-Write-Host "[AVISO] Eles apontam para este checkout; mantenha o checkout e suas dependências disponíveis." -ForegroundColor Yellow
-Write-Host "[AVISO] Ainda não há canal de atualização independente do OmniCode; atualize este checkout manualmente." -ForegroundColor Yellow
-Write-Host "[OK] Agora você pode abrir qualquer terminal e digitar 'omni' diretamente!" -ForegroundColor Green
-Write-Host "======================================================" -ForegroundColor Cyan
+Write-Host "[OK] Comandos 'onethy', 'onethy-code' e aliases instalados em: $targetDir" -ForegroundColor Green
+Write-Host "[OK] Agora você pode abrir qualquer terminal e digitar 'onethy' diretamente!" -ForegroundColor Green
+Write-Host "==========================================================" -ForegroundColor Cyan
 

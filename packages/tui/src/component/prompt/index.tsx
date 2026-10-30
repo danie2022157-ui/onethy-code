@@ -176,10 +176,11 @@ function argumentSlash(input: string, commands: readonly KeymapCommand[]) {
   if (!head) return
   const command = commands.find(
     (command) =>
-      command.slash?.arguments &&
+      command.slash &&
       (command.slash.name === head.name || command.slash.aliases?.includes(head.name) === true),
   )
   if (!command) return
+  if (!command.slash?.arguments && head.arguments.trim().length > 0) return
   return { command, input: head.arguments }
 }
 
@@ -337,18 +338,20 @@ export function Prompt(props: PromptProps) {
   let promptPartTypeId = 0
   const event = useEvent()
 
-  event.on("tui.prompt.append", (evt, { directory }) => {
-    if (directory !== (currentLocation.current?.directory ?? data.location.default().directory)) return
-    if (!input || input.isDestroyed) return
-    input.insertText(evt.data.text)
-    setTimeout(() => {
-      // setTimeout is a workaround and needs to be addressed properly
+  onCleanup(
+    event.on("tui.prompt.append", (evt, { directory }) => {
+      if (directory !== (currentLocation.current?.directory ?? data.location.default().directory)) return
       if (!input || input.isDestroyed) return
-      input.invalidateIntrinsicSize()
-      input.gotoBufferEnd()
-      renderer.requestRender()
-    }, 0)
-  })
+      input.insertText(evt.data.text)
+      setTimeout(() => {
+        // setTimeout is a workaround and needs to be addressed properly
+        if (!input || input.isDestroyed) return
+        input.invalidateIntrinsicSize()
+        input.gotoBufferEnd()
+        renderer.requestRender()
+      }, 0)
+    }),
+  )
 
   createEffect(() => {
     if (!input || input.isDestroyed) return

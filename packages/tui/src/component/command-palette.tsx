@@ -18,11 +18,15 @@ export function CommandPaletteDialog() {
     commands().flatMap((command) => {
       if (!command.id || !command.palette || command.id === COMMAND_PALETTE_COMMAND) return []
       const footer = shortcuts.all(command.id)
+      const slashWords = command.slash ? [command.slash.name, ...(command.slash.aliases ?? [])] : []
+      const slashPrefixed = slashWords.map((word) => `/${word}`)
       return {
         title: command.title ?? command.id,
         description: command.description,
         category: command.group,
-        searchText: [command.id, command.description].filter(Boolean).join(" "),
+        searchText: [command.id, command.title, command.description, ...slashWords, ...slashPrefixed]
+          .filter(Boolean)
+          .join(" "),
         searchFooter: [command.group, footer].filter(Boolean).join(" · "),
         footer,
         value: command.id,

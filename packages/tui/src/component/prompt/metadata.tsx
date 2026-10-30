@@ -74,7 +74,7 @@ export function PromptMetadataRow(props: {
                 <>
                   <text fg={fade(theme.text.muted, props.variantAlpha)}>·</text>
                   <text
-                    fg={fade(theme.text.feedback.warning.base, props.variantAlpha)}
+                    fg={fade(theme.text.formfield.selected, props.variantAlpha)}
                     attributes={TextAttributes.BOLD}
                   >
                     {variant()}
