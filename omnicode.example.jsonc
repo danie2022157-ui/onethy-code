@@ -1,0 +1,92 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // ==============================================================================
+  // CENÁRIO 1: MODELOS VERIFICADOS NO SEU CATÁLOGO ATIVO (`omnicode models`)
+  // Combina OpenAI conectado + Modelos Gratuitos Nativos (sem precisar de chave extra)
+  // ==============================================================================
+  "model": "openai/gpt-6-astra",
+  "agents": {
+    // 🧠 Omni (Orquestrador Mestre - Padrão ao abrir): Coordenação e síntese
+    "omni": {
+      "model": "openai/gpt-6-astra"
+    },
+
+    // 📋 Planner (Planejador): Decomposição rápida de metas e checklists
+    "planner": {
+      "model": "opencode/deepseek-v4.1-flash-free"
+    },
+
+    // 🏛️ Architect (Arquiteto): Desenho de contratos, segurança e boundaries
+    "architect": {
+      "model": "openai/gpt-6-astra"
+    },
+
+    // 💻 Coder (Programador): Implementação cirúrgica de código e testes
+    "coder": {
+      "model": "openai/gpt-5.6-sol"
+    },
+
+    // 🔍 Reviewer (Revisor): Auditoria de regressões, segurança e tipagem
+    "reviewer": {
+      "model": "opencode/big-pickle"
+    },
+
+    // 📚 Librarian (Bibliotecário): Pesquisa de documentações oficiais, APIs e web
+    "librarian": {
+      "model": "opencode/deepseek-v4.1-flash-free"
+    },
+
+    // ⚡ Explore (Explorador): Varredura ultra rápida e gratuita de arquivos
+    "explore": {
+      "model": "opencode/glm-5.3-flash-free"
+    }
+  },
+
+  // ==============================================================================
+  // CENÁRIO 2: MÚLTIPLOS MODELOS DE UM ÚNICO PROVEDOR (Ex: 100% Gratuito Nativo)
+  // Descomente se quiser rodar todos os subagentes usando apenas o provedor gratuito:
+  // ==============================================================================
+  /*
+  "model": "opencode/big-pickle",
+  "agents": {
+    "omni":      { "model": "opencode/big-pickle" },
+    "planner":   { "model": "opencode/deepseek-v4.1-flash-free" },
+    "architect": { "model": "opencode/nemotron-3.5-super-vl-free" },
+    "coder":     { "model": "opencode/big-pickle" },
+    "reviewer":  { "model": "opencode/deepseek-v4.1-flash-free" },
+    "explore":   { "model": "opencode/flint-40b-free" }
+  },
+  */
+
+  // ==============================================================================
+  // CENÁRIO 3: MULTI-PROVEDOR EXTERNO (Anthropic + OpenAI + Google + DeepSeek)
+  // ==============================================================================
+  /*
+  "model": "anthropic/claude-3-7-sonnet",
+  "agents": {
+    "omni":      { "model": "anthropic/claude-3-7-sonnet" },
+    "planner":   { "model": "openai/o3-mini" },
+    "architect": { "model": "google/gemini-2.5-pro" },
+    "coder":     { "model": "anthropic/claude-3-7-sonnet" },
+    "reviewer":  { "model": "deepseek/deepseek-reasoner" },
+    "explore":   { "model": "google/gemini-2.5-flash" }
+  },
+  */
+
+  // ==============================================================================
+  // PROVEDORES PERSONALIZADOS OU LOCAIS (Ollama, vLLM, LM Studio, etc.)
+  // ==============================================================================
+  "providers": {
+    // Exemplo de LLM Local 100% gratuito rodando na sua máquina via Ollama:
+    // Você pode usar: "coder": { "model": "ollama/qwen2.5-coder:32b" }
+    "ollama": {
+      "endpoint": "http://127.0.0.1:11434"
+    }
+  },
+
+  // Profundidade permitida para subagentes acionarem outros subagentes
+  "experimental": {
+    "subagent_depth": 2
+  }
+}

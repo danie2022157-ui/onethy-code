@@ -1,0 +1,975 @@
+import { createStore } from "solid-js/store"
+import { dedupeWith } from "effect/Array"
+import { createSimpleContext } from "./helper"
+import { batch, createMemo, onCleanup } from "solid-js"
+import { useEvent } from "./event"
+import path from "path"
+import { useTuiPaths } from "./runtime"
+import { useArgs } from "./args"
+import { RGBA } from "@opentui/core"
+import { readJson, writeJsonAtomic } from "../util/persistence"
+import {
+  createModelPreferenceRepository,
+  cycleModelVariant,
+  favoriteModels,
+  modelPreferenceKey,
+  normalizeModelVariant,
+  recentModels,
+  type ModelPreference,
+  type ModelPreferenceModel,
+} from "../model-preference"
+import { useTheme } from "./theme"
+import { useNewDesigns } from "../config"
+import { useToast } from "../ui/toast"
+import { useRoute } from "./route"
+import { useData } from "./data"
+import { usePermission } from "./permission"
+import { useLocation } from "./location"
+import { parse } from "../util/model"
+
+export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
+  name: "Local",
+  init: () => {
+    const data = useData()
+    const toast = useToast()
+    const theme = useTheme()
+    const newDesigns = useNewDesigns()
+    const route = useRoute()
+    const paths = useTuiPaths()
+    const args = useArgs()
+    const event = useEvent()
+    const permission = usePermission()
+    const location = useLocation()
+
+    const models = () => data.location.model.list(location.ref)
+    const providers = () => data.location.provider.list(location.ref)
+
+    function isModelValid(model: ModelPreferenceModel) {
+      return !!models()?.some((item) => item.providerID === model.providerID && item.id === model.modelID)
+    }
+
+    function getFirstValidModel(...modelFns: (() => ModelPreferenceModel | undefined)[]) {
+      for (const modelFn of modelFns) {
+        const model = modelFn()
+        if (model && isModelValid(model)) return model
+      }
+    }
+
+    function createAgent() {
+      const agents = createMemo(() =>
+        (data.location.agent.list(location.ref) ?? []).filter((agent) => agent.mode !== "subagent" && !agent.hidden),
+      )
+      const visibleAgents = createMemo(() =>
+        (data.location.agent.list(location.ref) ?? []).filter((agent) => !agent.hidden),
+      )
+      const [agentStore, setAgentStore] = createStore({
+        current: undefined as string | undefined,
+        draftBySession: {} as Record<string, { agent?: string } | undefined>,
+      })
+      onCleanup(event.on("session.deleted", (evt) => setAgentStore("draftBySession", evt.data.sessionID, undefined)))
+      onCleanup(
+        event.on("session.agent.selected", (evt) => {
+          // Keep an entry after acknowledgment: CLI defaults must not override a user's later choice.
+          if (agentStore.draftBySession[evt.data.sessionID]?.agent === evt.data.agent)
+            setAgentStore("draftBySession", evt.data.sessionID, { agent: undefined })
+        }),
+      )
+      const colors = createMemo(() => {
+        // The new designs palette keeps its vivid accent at 400; 200 there is a muted tint.
+        const step = newDesigns() ? 400 : 200
+        return dedupeWith(
+          theme.categorical.map((scale) => scale[step]),
+          (first, second) => first.equals(second),
+        )
+      })
+      return {
+        list() {
+          return agents()
+        },
+        all() {
+          return visibleAgents()
+        },
+        current() {
+          const draft = route.data.type === "session" ? agentStore.draftBySession[route.data.sessionID] : undefined
+          const selected =
+            route.data.type === "session"
+              ? (draft?.agent ??
+                (draft ? undefined : args.agent) ??
+                data.session.get(route.data.sessionID)?.agent ??
+                agentStore.current)
+              : agentStore.current
+          const defaultOmni = process.env.OMNICODE_ACTIVE === "1" ? "omni" : undefined
+          return visibleAgents().find((agent) => agent.id === (selected ?? defaultOmni)) ?? agents().find((agent) => agent.id === defaultOmni) ?? agents().at(0)
+        },
+        set(id: string) {
+          if (!visibleAgents().some((agent) => agent.id === id))
+            return toast.show({
+              variant: "warning",
+              message: `Agent not found: ${id}`,
+              duration: 3000,
+            })
+          batch(() => {
+            const changed = this.current()?.id !== id
+            if (changed) model.remember()
+            setAgentStore("current", id)
+            if (route.data.type === "session") setAgentStore("draftBySession", route.data.sessionID, { agent: id })
+            // Retain both selections while agent and model commits arrive separately.
+            const selected = changed && route.data.type === "session" ? model.current() : undefined
+            if (selected) model.set(selected)
+          })
+        },
+        move(direction: 1 | -1) {
+          batch(() => {
+            const current = this.current()
+            if (!current) return
+            let next = agents().findIndex((agent) => agent.id === current.id) + direction
+            if (next < 0) next = agents().length - 1
+            if (next >= agents().length) next = 0
+            const value = agents()[next]
+            this.set(value.id)
+          })
+        },
+        color(id: string) {
+          const index = visibleAgents().findIndex((agent) => agent.id === id)
+          if (index === -1) return colors()[0]
+          const agent = visibleAgents()[index]
+
+          if (agent?.color) return RGBA.fromHex(agent.color)
+          return colors()[index % colors().length]
+        },
+      }
+    }
+
+    const agent = createAgent()
+
+    function createModel() {
+      type ModelSelection = ModelPreferenceModel & { variant?: string }
+      const [preferences, setPreferences] = createStore<ModelPreference & { ready: boolean }>({
+        ready: false,
+        recent: [],
+        favorite: [],
+        variant: {},
+      })
+      const [selectionState, setSelectionState] = createStore<{
+        newSessionModelByLocationAgent: Record<string, ModelPreferenceModel | undefined>
+        selectionBySessionAgent: Record<string, Record<string, ModelSelection | undefined> | undefined>
+      }>({
+        newSessionModelByLocationAgent: {},
+        selectionBySessionAgent: {},
+      })
+
+      const repository = createModelPreferenceRepository(path.join(paths.state, "model.json"))
+      const autoFilePath = path.join(paths.state, "auto-model.json")
+      const [autoStore, setAutoStore] = createStore<{
+        enabled: boolean
+        explicitTier: "efficiency" | "balanced" | "intelligence" | undefined
+        managedDefaultTier: "efficiency" | "balanced" | "intelligence"
+        selectedModels: string[] | undefined
+        lastDecision:
+          | {
+              complexity: "low" | "medium" | "high"
+              tier: "efficiency" | "balanced" | "intelligence"
+              providerID: string
+              modelID: string
+              modelName: string
+              fusion: boolean
+            }
+          | undefined
+      }>({
+        enabled: process.env.OMNICODE_ACTIVE === "1",
+        explicitTier: undefined,
+        managedDefaultTier: "balanced",
+        selectedModels: undefined,
+        lastDecision: undefined,
+      })
+
+      function saveAutoStore() {
+        void writeJsonAtomic(autoFilePath, {
+          enabled: autoStore.enabled,
+          explicitTier: autoStore.explicitTier,
+          selectedModels: autoStore.selectedModels,
+        }).catch(() => undefined)
+      }
+
+      readJson<Record<string, unknown>>(autoFilePath)
+        .then((saved) => {
+          if (!saved || typeof saved !== "object") return
+          batch(() => {
+            if (typeof saved.enabled === "boolean") setAutoStore("enabled", saved.enabled)
+            if (
+              saved.explicitTier === "efficiency" ||
+              saved.explicitTier === "balanced" ||
+              saved.explicitTier === "intelligence"
+            ) {
+              setAutoStore("explicitTier", saved.explicitTier)
+              process.env.OMNICODE_OPTIMIZE_TIER = saved.explicitTier
+            }
+            if (Array.isArray(saved.selectedModels) && saved.selectedModels.every((x) => typeof x === "string")) {
+              setAutoStore("selectedModels", saved.selectedModels as string[])
+            }
+          })
+        })
+        .catch(() => undefined)
+
+      function classifyModelBucket(id: string, name: string): "efficiency" | "balanced" | "intelligence" {
+        const combined = `${id} ${name}`.toLowerCase()
+        if (/(flash|mini|haiku|nano|lite|small|instant|fast|8b)/.test(combined)) return "efficiency"
+        if (/(opus|gpt-5|o3|o1|pro|sonnet-4|claude-4|r1|reasoning|max|large)/.test(combined)) return "intelligence"
+        return "balanced"
+      }
+
+      function evaluatePromptComplexity(text: string): "low" | "medium" | "high" {
+        const trimmed = text.trim()
+        if (
+          trimmed.length > 450 ||
+          /\b(arquitetura|architecture|security|seguran[cç]a|vulnerab|refator|refactor|ulw|ultrawork|arena|concorr[eê]ncia|race condition|performance|otimiz|migra[cç][aã]o|complex|deep|design)\b/i.test(
+            trimmed,
+          ) ||
+          (trimmed.match(/@[a-zA-Z0-9_-]+/g)?.length ?? 0) >= 2
+        ) {
+          return "high"
+        }
+        if (
+          trimmed.length < 120 &&
+          !trimmed.includes("```") &&
+          !/\b(bug|erro|error|fix|corrig|implement|test|crie|create|build)\b/i.test(trimmed)
+        ) {
+          return "low"
+        }
+        return "medium"
+      }
+
+      function tierLabelText(tier: "default" | "efficiency" | "balanced" | "intelligence"): string {
+        if (tier === "efficiency") return "Eficiência"
+        if (tier === "intelligence") return "Inteligente"
+        if (tier === "balanced") return "Balanceado"
+        return "Modo Auto"
+      }
+
+      function autoVariantValue(tier: "default" | "efficiency" | "balanced" | "intelligence"): string {
+        if (tier === "efficiency") return "eficiência"
+        if (tier === "balanced") return "balanceado"
+        if (tier === "intelligence") return "inteligente"
+        return "modo auto"
+      }
+      const pendingSelectionCommits = new Map<string, { agentID: string; selection: string }>()
+      const selectionKey = (value: ModelSelection) =>
+        `${modelPreferenceKey(value)}:${normalizeModelVariant(value.variant) ?? "default"}`
+
+      function applyPreferences(value: ModelPreference) {
+        batch(() => {
+          setPreferences("recent", value.recent)
+          setPreferences("favorite", value.favorite)
+          setPreferences("variant", value.variant)
+          setPreferences("ready", true)
+        })
+      }
+
+      onCleanup(repository.subscribe(applyPreferences))
+
+      const configuredModel = createMemo(() => {
+        const entry = data.location.config
+          .list(location.ref)
+          ?.findLast((entry) => entry.type === "document" && entry.info.model !== undefined)
+        const configured = entry?.type === "document" ? entry.info.model : undefined
+        if (!configured) return
+        return typeof configured === "string"
+          ? { ...parse(configured), variant: undefined }
+          : { providerID: configured.providerID, modelID: configured.model, variant: configured.variant }
+      })
+
+      const fallbackModel = createMemo(() => {
+        if (args.model) {
+          const { providerID, modelID } = parse(args.model)
+          if (isModelValid({ providerID, modelID })) {
+            return {
+              providerID,
+              modelID,
+            }
+          }
+        }
+
+        const configured = configuredModel()
+        if (configured && isModelValid(configured)) return configured
+
+        for (const item of preferences.recent) {
+          if (isModelValid(item)) {
+            return item
+          }
+        }
+
+        const model = models()?.[0]
+        if (!model) return undefined
+        return {
+          providerID: model.providerID,
+          modelID: model.id,
+        }
+      })
+
+      const newSessionModel = createMemo(() => {
+        const a = agent.current()
+        return getFirstValidModel(
+          () => a && selectionState.newSessionModelByLocationAgent[locationAgentKey(a.id)],
+          () => a?.model && { providerID: a.model.providerID, modelID: a.model.id },
+          fallbackModel,
+        )
+      })
+
+      const currentSelection = createMemo<ModelSelection | undefined>(() => {
+        if (route.data.type === "session") return sessionSelection(route.data.sessionID)
+        const model = newSessionModel()
+        if (!model) return
+        return preferredSelection(model)
+      })
+
+      const currentModel = createMemo(() => {
+        const selection = currentSelection()
+        if (!selection) return
+        return { providerID: selection.providerID, modelID: selection.modelID }
+      })
+
+      function locationAgentKey(agentID: string) {
+        const ref = location.ref ?? data.location.default()
+        return `${JSON.stringify([ref.directory, ref.workspaceID])}:${agentID}`
+      }
+
+      function preferredSelection(model: ModelPreferenceModel): ModelSelection {
+        const configured = agent.current()?.model
+        const fallback = configuredModel()
+        const preferred = preferences.variant[modelPreferenceKey(model)]
+        const variant = normalizeModelVariant(
+          preferred ??
+            (configured?.providerID === model.providerID && configured.id === model.modelID
+              ? configured.variant
+              : undefined) ??
+            (fallback?.providerID === model.providerID && fallback.modelID === model.modelID
+              ? fallback.variant
+              : undefined),
+        )
+        const info = models()?.find((item) => item.providerID === model.providerID && item.id === model.modelID)
+        return { ...model, variant: info?.variants.some((item) => item.id === variant) ? variant : undefined }
+      }
+
+      function durableSelection(sessionID: string): ModelSelection | undefined {
+        const model = data.session.get(sessionID)?.model
+        if (!model) return
+        return {
+          providerID: model.providerID,
+          modelID: model.id,
+          variant: normalizeModelVariant(model.variant),
+        }
+      }
+
+      function sessionSelection(sessionID: string) {
+        const current = agent.current()
+        if (!current) return
+        const session = data.session.get(sessionID)
+        const selected =
+          selectionState.selectionBySessionAgent[sessionID]?.[current.id] ??
+          (!session?.agent || session.agent === current.id ? durableSelection(sessionID) : undefined)
+        if (selected) {
+          const info = models()?.find((item) => item.providerID === selected.providerID && item.id === selected.modelID)
+          return {
+            ...selected,
+            variant:
+              !info || info.variants.some((variant) => variant.id === selected.variant) ? selected.variant : undefined,
+          }
+        }
+        const model = newSessionModel()
+        return model && preferredSelection(model)
+      }
+
+      function setSessionSelection(sessionID: string, agentID: string, selection: ModelSelection | undefined) {
+        setSelectionState("selectionBySessionAgent", sessionID, {
+          ...selectionState.selectionBySessionAgent[sessionID],
+          [agentID]: selection,
+        })
+      }
+
+      function setSessionDraft(sessionID: string, selection: ModelSelection) {
+        const current = agent.current()
+        if (!current) return
+        const durable = durableSelection(sessionID)
+        const session = data.session.get(sessionID)
+        setSessionSelection(
+          sessionID,
+          current.id,
+          (!session?.agent || session.agent === current.id) &&
+            durable &&
+            selectionKey(durable) === selectionKey(selection)
+            ? undefined
+            : selection,
+        )
+      }
+
+      function selectModel(model: ModelPreferenceModel) {
+        if (route.data.type === "session") {
+          const sessionID = route.data.sessionID
+          const current = sessionSelection(sessionID)
+          setSessionDraft(
+            sessionID,
+            current?.providerID === model.providerID && current.modelID === model.modelID
+              ? current
+              : preferredSelection(model),
+          )
+          return true
+        }
+        const current = agent.current()
+        if (!current) return false
+        setSelectionState("newSessionModelByLocationAgent", locationAgentKey(current.id), model)
+        return true
+      }
+
+      function reconcileSessionSelection(sessionID: string) {
+        const expected = pendingSelectionCommits.get(sessionID)
+        const durable = durableSelection(sessionID)
+        if (!expected || !durable || data.session.get(sessionID)?.agent !== expected.agentID) return
+        if (selectionKey(durable) !== expected.selection) return
+        pendingSelectionCommits.delete(sessionID)
+        // Inactive agents keep their remembered choices after another agent commits.
+        if (
+          route.data.type !== "session" ||
+          route.data.sessionID !== sessionID ||
+          agent.current()?.id !== expected.agentID
+        )
+          return
+        const draft = selectionState.selectionBySessionAgent[sessionID]?.[expected.agentID]
+        if (draft && selectionKey(draft) === expected.selection)
+          setSessionSelection(sessionID, expected.agentID, undefined)
+      }
+
+      onCleanup(event.on("session.model.selected", (evt) => reconcileSessionSelection(evt.data.sessionID)))
+      onCleanup(event.on("session.agent.selected", (evt) => reconcileSessionSelection(evt.data.sessionID)))
+
+      onCleanup(
+        event.on("session.deleted", (evt) => {
+          pendingSelectionCommits.delete(evt.data.sessionID)
+          setSelectionState("selectionBySessionAgent", evt.data.sessionID, undefined)
+        }),
+      )
+
+      return {
+        current: currentModel,
+        selection: currentSelection,
+        remember() {
+          const current = agent.current()
+          const selection = currentSelection()
+          if (route.data.type !== "session" || !current || !selection) return
+          setSessionSelection(route.data.sessionID, current.id, { ...selection })
+        },
+        available(model = currentModel()) {
+          return model ? isModelValid(model) : false
+        },
+        trackSessionCommit(
+          sessionID: string,
+          value: {
+            providerID: string
+            id: string
+            variant?: string
+          },
+          agentID: string,
+        ) {
+          const committed = {
+            agentID,
+            selection: selectionKey({ providerID: value.providerID, modelID: value.id, variant: value.variant }),
+          }
+          pendingSelectionCommits.set(sessionID, committed)
+          // An unchanged model emits no event; the agent may be the only durable change.
+          reconcileSessionSelection(sessionID)
+          return () => {
+            if (pendingSelectionCommits.get(sessionID) === committed) pendingSelectionCommits.delete(sessionID)
+          }
+        },
+        get ready() {
+          return preferences.ready
+        },
+        get catalogReady() {
+          return models() !== undefined
+        },
+        recent() {
+          return preferences.recent
+        },
+        favorite() {
+          return preferences.favorite
+        },
+        parsed: createMemo(() => {
+          const value = currentSelection()
+          if (!value) {
+            return {
+              provider: "Connect a provider",
+              model: "No provider selected",
+              reasoning: false,
+            }
+          }
+          const provider = providers()?.find((item) => item.id === value.providerID)
+          const info = models()?.find((item) => item.providerID === value.providerID && item.id === value.modelID)
+          const baseModelName = info?.name ?? `${value.modelID} (unavailable)`
+          const availableCount = (models() ?? []).filter((m) => m.status !== "deprecated").length
+          const modeTitle = availableCount >= 2 ? "Omni Fusion" : "Auto"
+          return {
+            provider: provider?.name ?? value.providerID,
+            model: autoStore.enabled ? `⚡ ${modeTitle} → ${baseModelName}` : baseModelName,
+            reasoning: autoStore.enabled ? true : (info?.variants?.length ?? 0) !== 0,
+          }
+        }),
+        cycle(direction: 1 | -1) {
+          const current = currentSelection()
+          if (!current) return
+          const recent = preferences.recent.filter(isModelValid)
+          const index = recent.findIndex((x) => x.providerID === current.providerID && x.modelID === current.modelID)
+          let next = index === -1 ? (direction === 1 ? 0 : recent.length - 1) : index + direction
+          if (next < 0) next = recent.length - 1
+          if (next >= recent.length) next = 0
+          const val = recent[next]
+          if (!val) return
+          selectModel({ ...val })
+        },
+        cycleFavorite(direction: 1 | -1) {
+          const favorites = preferences.favorite.filter((item) => isModelValid(item))
+          if (!favorites.length) {
+            toast.show({
+              variant: "info",
+              message: "Add a favorite model to use this shortcut",
+              duration: 3000,
+            })
+            return
+          }
+          const current = currentSelection()
+          let index = -1
+          if (current) {
+            index = favorites.findIndex((x) => x.providerID === current.providerID && x.modelID === current.modelID)
+          }
+          if (index === -1) {
+            index = direction === 1 ? 0 : favorites.length - 1
+          } else {
+            index += direction
+            if (index < 0) index = favorites.length - 1
+            if (index >= favorites.length) index = 0
+          }
+          const next = favorites[index]
+          if (!next) return
+          if (!selectModel({ ...next })) return
+          setPreferences("recent", recentModels(next, preferences.recent))
+          void repository.addRecent(next).catch(() => undefined)
+        },
+        set(model: { providerID: string; modelID: string }, options?: { recent?: boolean; fromAuto?: boolean }) {
+          batch(() => {
+            if (!isModelValid(model)) return
+            if (!options?.fromAuto && autoStore.enabled) {
+              setAutoStore("enabled", false)
+              saveAutoStore()
+            }
+            if (!selectModel(model)) return
+            if (options?.recent) {
+              setPreferences("recent", recentModels(model, preferences.recent))
+              void repository.addRecent(model).catch(() => undefined)
+            }
+          })
+        },
+        auto: {
+          enabled() {
+            return autoStore.enabled
+          },
+          connectedProviders() {
+            const integrations = data.location.integration.list(location.ref) ?? []
+            const connectedIntegrationIDs = new Set(
+              integrations.filter((item) => item.connections.length > 0).map((item) => item.id),
+            )
+            const provList = providers() ?? []
+            const activeModels = (models() ?? []).filter((m) => m.status !== "deprecated")
+            const provWithModels = new Set(activeModels.map((m) => m.providerID))
+            const externalConnected = provList.filter(
+              (p) =>
+                provWithModels.has(p.id) &&
+                (connectedIntegrationIDs.has(p.integrationID ?? p.id) || p.id !== "opencode"),
+            )
+            if (externalConnected.length > 0) return externalConnected
+            return provList.filter((p) => provWithModels.has(p.id))
+          },
+          rawConnectedModels() {
+            const activeModels = (models() ?? []).filter((m) => m.status !== "deprecated")
+            const connProvs = new Set(this.connectedProviders().map((p) => p.id))
+            const filtered = activeModels.filter((m) => connProvs.has(m.providerID))
+            const nonFree = filtered.filter((m) => m.providerID !== "opencode" || m.cost.some((c) => c.input > 0))
+            return nonFree.length > 0 ? nonFree : filtered.length > 0 ? filtered : activeModels
+          },
+          connectedModels() {
+            const raw = this.rawConnectedModels()
+            if (!autoStore.selectedModels || autoStore.selectedModels.length === 0) {
+              return raw
+            }
+            const set = new Set(autoStore.selectedModels)
+            const filtered = raw.filter((m) => set.has(`${m.providerID}/${m.id}`))
+            return filtered.length > 0 ? filtered : raw
+          },
+          selectedModels(): string[] | undefined {
+            return autoStore.selectedModels
+          },
+          isModelAllowed(providerID: string, modelID: string): boolean {
+            if (!autoStore.selectedModels || autoStore.selectedModels.length === 0) return true
+            return autoStore.selectedModels.includes(`${providerID}/${modelID}`)
+          },
+          isAllModelsAllowed(): boolean {
+            const raw = this.rawConnectedModels()
+            if (!autoStore.selectedModels || autoStore.selectedModels.length === 0) return true
+            return autoStore.selectedModels.length >= raw.length
+          },
+          toggleModelAllowed(providerID: string, modelID: string) {
+            const raw = this.rawConnectedModels()
+            const key = `${providerID}/${modelID}`
+            batch(() => {
+              if (!autoStore.selectedModels || autoStore.selectedModels.length === 0) {
+                const next = raw.map((m) => `${m.providerID}/${m.id}`).filter((k) => k !== key)
+                setAutoStore("selectedModels", next.length > 0 ? next : undefined)
+              } else {
+                const current = autoStore.selectedModels
+                if (current.includes(key)) {
+                  const next = current.filter((k) => k !== key)
+                  setAutoStore("selectedModels", next.length > 0 ? next : undefined)
+                } else {
+                  const next = [...current, key]
+                  if (next.length >= raw.length) {
+                    setAutoStore("selectedModels", undefined)
+                  } else {
+                    setAutoStore("selectedModels", next)
+                  }
+                }
+              }
+              saveAutoStore()
+            })
+          },
+          setAllowAllModels() {
+            batch(() => {
+              setAutoStore("selectedModels", undefined)
+              saveAutoStore()
+            })
+          },
+          allowedModelsSummary(): string {
+            const raw = this.rawConnectedModels()
+            if (this.isAllModelsAllowed()) {
+              return `Todos os modelos (${raw.length})`
+            }
+            const count = autoStore.selectedModels?.length ?? 0
+            return `${count} de ${raw.length} selecionados`
+          },
+          classify(id: string, name: string): "efficiency" | "balanced" | "intelligence" {
+            return classifyModelBucket(id, name)
+          },
+          fusionAvailable() {
+            return this.connectedModels().length >= 2
+          },
+          modeName() {
+            return this.fusionAvailable() ? "Omni Fusion" : "Auto"
+          },
+          tier(): "default" | "efficiency" | "balanced" | "intelligence" {
+            return autoStore.explicitTier ?? "default"
+          },
+          effectiveTier(): "efficiency" | "balanced" | "intelligence" {
+            return autoStore.explicitTier ?? autoStore.managedDefaultTier
+          },
+          tierLabel(tier?: "default" | "efficiency" | "balanced" | "intelligence") {
+            return tierLabelText(tier ?? this.tier())
+          },
+          lastDecision() {
+            return autoStore.lastDecision
+          },
+          pickForBucket(targetBucket: "efficiency" | "balanced" | "intelligence") {
+            const available = this.connectedModels()
+            if (available.length === 0) return undefined
+            const fallbackOrder: ("efficiency" | "balanced" | "intelligence")[] =
+              targetBucket === "efficiency"
+                ? ["efficiency", "balanced", "intelligence"]
+                : targetBucket === "intelligence"
+                  ? ["intelligence", "balanced", "efficiency"]
+                  : ["balanced", "intelligence", "efficiency"]
+
+            const activeProv = currentSelection()?.providerID
+            const favSet = new Set(preferences.favorite.map((f) => `${f.providerID}/${f.modelID}`))
+            const recSet = new Set(preferences.recent.map((r) => `${r.providerID}/${r.modelID}`))
+
+            for (const bucket of fallbackOrder) {
+              const inBucket = available.filter((m) => classifyModelBucket(m.id, m.name) === bucket)
+              if (inBucket.length > 0) {
+                const favMatch = inBucket.find((m) => favSet.has(`${m.providerID}/${m.id}`))
+                if (favMatch) return favMatch
+                const sameProv = activeProv ? inBucket.find((m) => m.providerID === activeProv) : undefined
+                if (sameProv) return sameProv
+                const recMatch = inBucket.find((m) => recSet.has(`${m.providerID}/${m.id}`))
+                if (recMatch) return recMatch
+                return inBucket[0]!
+              }
+            }
+            return available[0]
+          },
+          tierPool() {
+            const provMap = new Map((providers() ?? []).map((p) => [p.id, p.name]))
+            const formatModel = (m: ReturnType<typeof this.pickForBucket>) =>
+              m ? `${m.name} (${provMap.get(m.providerID) ?? m.providerID})` : "Nenhum modelo conectado"
+            const eff = this.pickForBucket("efficiency")
+            const bal = this.pickForBucket("balanced")
+            const int = this.pickForBucket("intelligence")
+            return {
+              efficiency: { model: eff, label: formatModel(eff) },
+              balanced: { model: bal, label: formatModel(bal) },
+              intelligence: { model: int, label: formatModel(int) },
+            }
+          },
+          enable(tier?: "default" | "efficiency" | "balanced" | "intelligence") {
+            batch(() => {
+              setAutoStore("enabled", true)
+              if (tier !== undefined) {
+                setAutoStore("explicitTier", tier === "default" ? undefined : tier)
+              }
+              process.env.OMNICODE_OPTIMIZE_TIER = autoStore.explicitTier ?? autoStore.managedDefaultTier
+              saveAutoStore()
+            })
+            this.routeForPrompt("")
+          },
+          disable() {
+            setAutoStore("enabled", false)
+            saveAutoStore()
+          },
+          setTier(tier: "default" | "efficiency" | "balanced" | "intelligence") {
+            this.enable(tier)
+          },
+          cycleTier() {
+            const order: ("default" | "efficiency" | "balanced" | "intelligence")[] = [
+              "default",
+              "efficiency",
+              "balanced",
+              "intelligence",
+            ]
+            const next = order[(order.indexOf(this.tier()) + 1) % order.length]!
+            this.enable(next)
+            return next
+          },
+          routeForPrompt(promptText: string) {
+            const available = this.connectedModels()
+            if (available.length === 0) return undefined
+            const complexity = promptText.trim() ? evaluatePromptComplexity(promptText) : "medium"
+            const explicit = autoStore.explicitTier
+            const effective = explicit ?? autoStore.managedDefaultTier
+            const targetBucket: "efficiency" | "balanced" | "intelligence" =
+              explicit === "efficiency"
+                ? "efficiency"
+                : explicit === "intelligence"
+                  ? "intelligence"
+                  : explicit === "balanced"
+                    ? "balanced"
+                    : complexity === "low"
+                      ? "efficiency"
+                      : complexity === "high"
+                        ? "intelligence"
+                        : "balanced"
+            const picked = this.pickForBucket(targetBucket) ?? available[0]!
+            selectModel({ providerID: picked.providerID, modelID: picked.id })
+            const decision = {
+              complexity,
+              tier: effective,
+              providerID: picked.providerID,
+              modelID: picked.id,
+              modelName: picked.name,
+              fusion: available.length >= 2,
+            }
+            setAutoStore("lastDecision", decision)
+            return decision
+          },
+        },
+        toggleFavorite(model: { providerID: string; modelID: string }) {
+          batch(() => {
+            if (!isModelValid(model)) return
+            const exists = preferences.favorite.some(
+              (x) => x.providerID === model.providerID && x.modelID === model.modelID,
+            )
+            setPreferences("favorite", favoriteModels(model, preferences.favorite, !exists))
+            void repository.setFavorite(model, !exists).catch(() => undefined)
+          })
+        },
+        variant: {
+          selected() {
+            if (autoStore.enabled) {
+              return autoVariantValue(autoStore.explicitTier ?? "default")
+            }
+            return currentSelection()?.variant
+          },
+          current() {
+            return this.selected()
+          },
+          list() {
+            if (autoStore.enabled) {
+              return ["modo auto", "eficiência", "balanceado", "inteligente"]
+            }
+            const m = currentSelection()
+            if (!m) return []
+            const info = models()?.find((item) => item.providerID === m.providerID && item.id === m.modelID)
+            return info?.variants?.map((variant) => variant.id) ?? []
+          },
+          set(value: string | undefined) {
+            if (autoStore.enabled) {
+              const norm = (value ?? "").toLowerCase().trim()
+              if (norm === "eficiência" || norm === "eficiencia" || norm === "efficiency") {
+                this.autoSetTier("efficiency")
+              } else if (norm === "balanceado" || norm === "balanced") {
+                this.autoSetTier("balanced")
+              } else if (norm === "inteligente" || norm === "inteligência" || norm === "intelligence") {
+                this.autoSetTier("intelligence")
+              } else {
+                this.autoSetTier("default")
+              }
+              return
+            }
+            const m = currentSelection()
+            if (!m) return
+            if (route.data.type === "session") {
+              setSessionDraft(route.data.sessionID, { ...m, variant: normalizeModelVariant(value) })
+            }
+            setPreferences("variant", modelPreferenceKey(m), value ?? "default")
+            void repository.saveVariant(m, value).catch(() => undefined)
+          },
+          autoSetTier(tier: "default" | "efficiency" | "balanced" | "intelligence") {
+            batch(() => {
+              setAutoStore("enabled", true)
+              setAutoStore("explicitTier", tier === "default" ? undefined : tier)
+              process.env.OMNICODE_OPTIMIZE_TIER = autoStore.explicitTier ?? autoStore.managedDefaultTier
+              saveAutoStore()
+            })
+            const targetBucket: "efficiency" | "balanced" | "intelligence" =
+              tier === "efficiency" ? "efficiency" : tier === "intelligence" ? "intelligence" : "balanced"
+            const available = (models() ?? []).filter((m) => m.status !== "deprecated")
+            if (available.length > 0) {
+              const inBucket = available.filter((m) => classifyModelBucket(m.id, m.name) === targetBucket)
+              const picked = inBucket[0] ?? available[0]!
+              selectModel({ providerID: picked.providerID, modelID: picked.id })
+            }
+          },
+          cycle() {
+            if (autoStore.enabled) {
+              const order: ("default" | "efficiency" | "balanced" | "intelligence")[] = [
+                "default",
+                "efficiency",
+                "balanced",
+                "intelligence",
+              ]
+              const cur = autoStore.explicitTier ?? "default"
+              const next = order[(order.indexOf(cur) + 1) % order.length]!
+              this.autoSetTier(next)
+              return
+            }
+            const variants = this.list()
+            if (variants.length === 0) return
+            this.set(cycleModelVariant(this.current(), variants))
+          },
+        },
+      }
+    }
+
+    const model = createModel()
+
+    function createSession() {
+      const [sessionStore, setSessionStore] = createStore<{
+        ready: boolean
+        pinned: string[]
+      }>({
+        ready: false,
+        pinned: [],
+      })
+
+      const filePath = path.join(paths.state, "session.json")
+      const state = {
+        pending: false,
+      }
+
+      function save() {
+        if (!sessionStore.ready) {
+          state.pending = true
+          return
+        }
+        state.pending = false
+        void writeJsonAtomic(filePath, {
+          pinned: sessionStore.pinned,
+        })
+      }
+
+      readJson<unknown>(filePath)
+        .then((x) => {
+          if (!x || typeof x !== "object") return
+          const pinned = (x as Record<string, unknown>).pinned
+          if (Array.isArray(pinned))
+            setSessionStore(
+              "pinned",
+              pinned.filter((item): item is string => typeof item === "string"),
+            )
+        })
+        .catch(() => {})
+        .finally(() => {
+          setSessionStore("ready", true)
+          if (state.pending) save()
+        })
+
+      const slots = createMemo(() => {
+        const existing = new Set(
+          data.session
+            .list()
+            .filter((x) => x.parentID === undefined)
+            .map((x) => x.id),
+        )
+        return sessionStore.pinned.filter((id) => existing.has(id)).slice(0, 9)
+      })
+
+      function prune(sessionID: string) {
+        batch(() => {
+          if (sessionStore.pinned.includes(sessionID)) {
+            setSessionStore(
+              "pinned",
+              sessionStore.pinned.filter((x) => x !== sessionID),
+            )
+          }
+          save()
+        })
+      }
+
+      event.on("session.deleted", (evt) => {
+        prune(evt.data.sessionID)
+      })
+
+      return {
+        get ready() {
+          return sessionStore.ready
+        },
+        pinned() {
+          return sessionStore.pinned
+        },
+        slots,
+        isPinned(sessionID: string) {
+          return sessionStore.pinned.includes(sessionID)
+        },
+        togglePin(sessionID: string) {
+          batch(() => {
+            const exists = sessionStore.pinned.includes(sessionID)
+            const next = exists
+              ? sessionStore.pinned.filter((x) => x !== sessionID)
+              : [...sessionStore.pinned, sessionID]
+            setSessionStore("pinned", next)
+            save()
+          })
+        },
+        quickSwitch(slot: number) {
+          const target = slots()[slot - 1]
+          if (!target) return
+          if (route.data.type === "session" && route.data.sessionID === target) return
+          route.navigate({ type: "session", sessionID: target })
+        },
+      }
+    }
+
+    const session = createSession()
+
+    const result = {
+      model,
+      agent,
+      session,
+      permission,
+    }
+    return result
+  },
+})
