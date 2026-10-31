@@ -183,12 +183,21 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         lastDecision: undefined,
       })
 
+      function syncAllowedModelsEnv() {
+        if (autoStore.selectedModels && autoStore.selectedModels.length > 0) {
+          process.env.OMNICODE_ALLOWED_MODELS = JSON.stringify(autoStore.selectedModels)
+        } else {
+          delete process.env.OMNICODE_ALLOWED_MODELS
+        }
+      }
+
       function saveAutoStore() {
         void writeJsonAtomic(autoFilePath, {
           enabled: autoStore.enabled,
           explicitTier: autoStore.explicitTier,
           selectedModels: autoStore.selectedModels,
         }).catch(() => undefined)
+        syncAllowedModelsEnv()
       }
 
       readJson<Record<string, unknown>>(autoFilePath)
@@ -208,6 +217,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               setAutoStore("selectedModels", saved.selectedModels as string[])
             }
           })
+          syncAllowedModelsEnv()
         })
         .catch(() => undefined)
 
@@ -578,20 +588,19 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             const provList = providers() ?? []
             const activeModels = (models() ?? []).filter((m) => m.status !== "deprecated")
             const provWithModels = new Set(activeModels.map((m) => m.providerID))
-            const externalConnected = provList.filter(
+            const connected = provList.filter(
               (p) =>
                 provWithModels.has(p.id) &&
-                (connectedIntegrationIDs.has(p.integrationID ?? p.id) || p.id !== "opencode"),
+                (connectedIntegrationIDs.has(p.integrationID ?? p.id) || p.id === "opencode"),
             )
-            if (externalConnected.length > 0) return externalConnected
+            if (connected.length > 0) return connected
             return provList.filter((p) => provWithModels.has(p.id))
           },
           rawConnectedModels() {
             const activeModels = (models() ?? []).filter((m) => m.status !== "deprecated")
             const connProvs = new Set(this.connectedProviders().map((p) => p.id))
             const filtered = activeModels.filter((m) => connProvs.has(m.providerID))
-            const nonFree = filtered.filter((m) => m.providerID !== "opencode" || m.cost.some((c) => c.input > 0))
-            return nonFree.length > 0 ? nonFree : filtered.length > 0 ? filtered : activeModels
+            return filtered.length > 0 ? filtered : activeModels
           },
           connectedModels() {
             const raw = this.rawConnectedModels()

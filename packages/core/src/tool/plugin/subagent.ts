@@ -1,5 +1,8 @@
 export * as SubagentTool from "./subagent.js"
 
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
 import { ToolFailure } from "@opencode/ai/effect"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
@@ -28,6 +31,38 @@ const backgroundResult = (sessionID: SessionSchema.ID) => ({
     "To send it follow-ups or change its instructions while it runs, call subagent again with this sessionID.",
   ].join("\n"),
 })
+
+function resolveOmniAllowedModels(): Set<string> | undefined {
+  if (process.env.OMNICODE_ALLOWED_MODELS) {
+    try {
+      const parsed = JSON.parse(process.env.OMNICODE_ALLOWED_MODELS)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return new Set(parsed.filter((item): item is string => typeof item === "string"))
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    const stateDir =
+      process.env.OMNICODE_STATE_DIR ||
+      (process.platform === "win32"
+        ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "omnicode", "state")
+        : path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"), "omnicode"))
+    const autoFile = path.join(stateDir, "auto-model.json")
+    if (fs.existsSync(autoFile)) {
+      const content = JSON.parse(fs.readFileSync(autoFile, "utf8"))
+      if (Array.isArray(content.selectedModels) && content.selectedModels.length > 0) {
+        return new Set(content.selectedModels.filter((item: unknown): item is string => typeof item === "string"))
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return undefined
+}
 
 export const Input = Schema.Struct({
   agent: Schema.String.annotate({
@@ -176,11 +211,50 @@ export const Plugin = {
                   message: `Session ${existing.id} is not a child of the current session`,
                 })
               const override = input.model === undefined ? undefined : yield* resolveModel(input.model)
+
+              const allowedSet = process.env.OMNICODE_ACTIVE === "1" ? resolveOmniAllowedModels() : undefined
+              const hasAllowedConstraint = allowedSet !== undefined && allowedSet.size > 0
+              const isAllowed = (m: typeof parent.model) =>
+                m !== undefined && (!hasAllowedConstraint || allowedSet.has(`${m.providerID}/${m.id}`))
+
+              let routedModel: typeof parent.model = undefined
+              if (
+                process.env.OMNICODE_ACTIVE === "1" &&
+                Option.isSome(orchestratorOpt) &&
+                override === undefined
+              ) {
+                const availableList = yield* models.available()
+                const candidatePool = hasAllowedConstraint
+                  ? availableList.filter((m) => allowedSet.has(`${m.providerID}/${m.id}`))
+                  : availableList
+                const pool = candidatePool.length > 0 ? candidatePool : availableList
+
+                const agentModelAllowed =
+                  agent.model !== undefined &&
+                  isAllowed(agent.model) &&
+                  pool.some((m) => m.providerID === agent.model?.providerID && m.id === agent.model?.id)
+
+                if (!agentModelAllowed) {
+                  const selection = yield* orchestratorOpt.value.selectModelForAgent(
+                    agent.id,
+                    `${input.description} ${input.prompt}`,
+                    pool,
+                  )
+                  const matched = selection.primary
+                    ? pool.find(
+                        (m) => m.providerID === selection.primary?.providerID && m.id === selection.primary?.id,
+                      )
+                    : undefined
+                  routedModel = matched ? { providerID: matched.providerID, id: matched.id } : undefined
+                }
+              }
+
               // Continuing with a different agent switches the child, mirroring create semantics
               // where an explicit model wins over the agent's configured model, which wins over the inherited one.
               if (existing !== undefined) {
                 const switched = existing.agent !== agent.id
-                const model = override ?? (switched ? agent.model : undefined)
+                const model =
+                  override ?? (switched ? ((isAllowed(agent.model) ? agent.model : undefined) ?? routedModel) : undefined)
                 yield* Effect.all([
                   switched ? sessions.switchAgent({ sessionID: existing.id, agent: agent.id }) : Effect.void,
                   model === undefined ? Effect.void : sessions.switchModel({ sessionID: existing.id, model }),
@@ -191,32 +265,13 @@ export const Plugin = {
                 )
               }
 
-              let routedModel: typeof parent.model = undefined
-              if (
-                process.env.OMNICODE_ACTIVE === "1" &&
-                Option.isSome(orchestratorOpt) &&
-                override === undefined
-              ) {
-                const availableList = yield* models.available()
-                const configuredValid =
-                  agent.model !== undefined &&
-                  availableList.some((m) => m.providerID === agent.model?.providerID && m.id === agent.model?.id)
-                if (!configuredValid) {
-                  const selection = yield* orchestratorOpt.value.selectModelForAgent(
-                    agent.id,
-                    `${input.description} ${input.prompt}`,
-                    availableList,
-                  )
-                  const matched = selection.primary
-                    ? availableList.find(
-                        (m) => m.providerID === selection.primary?.providerID && m.id === selection.primary?.id,
-                      )
-                    : undefined
-                  routedModel = matched ? { providerID: matched.providerID, id: matched.id } : undefined
-                }
-              }
-
-              const model = override ?? routedModel ?? agent.model ?? parent.model
+              const model =
+                override ??
+                routedModel ??
+                (isAllowed(agent.model) ? agent.model : undefined) ??
+                (isAllowed(parent.model) ? parent.model : undefined) ??
+                routedModel ??
+                parent.model
               const child =
                 existing ??
                 (yield* sessions

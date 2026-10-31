@@ -442,9 +442,7 @@ const layer = Layer.effect(
                 ? "intelligence"
                 : "balanced"
 
-      // Prioritize connected external providers over fallback free models when available
-      const connectedExternal = availableModels.filter((m) => m.providerID !== "opencode" || !m.id.endsWith("-free"))
-      const pool = connectedExternal.length > 0 ? connectedExternal : availableModels
+      const pool = availableModels
 
       const bucketOrder: ("efficiency" | "balanced" | "intelligence")[] =
         targetBucket === "efficiency"
