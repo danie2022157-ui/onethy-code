@@ -2,6 +2,7 @@ export * as OmniHealTool from "./omni-heal.js"
 
 import child_process from "node:child_process"
 import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { ToolFailure } from "@opencode/ai/effect"
 import type { Context } from "@opencode/plugin/effect/plugin"
@@ -46,10 +47,13 @@ function detectProjectTestCommand(rootDir: string): string {
   if (fs.existsSync(pkgJsonPath)) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"))
-      if (pkg.scripts?.test) return "bun test"
       if (pkg.scripts?.typecheck) return "bun run typecheck"
+      if (pkg.scripts?.test) return "bun test"
       if (pkg.scripts?.check) return "bun run check"
     } catch {}
+  }
+  if (fs.existsSync(path.join(rootDir, "tsconfig.json"))) {
+    return "npx tsc --noEmit -p tsconfig.json"
   }
   if (fs.existsSync(path.join(rootDir, "Cargo.toml"))) return "cargo test"
   if (fs.existsSync(path.join(rootDir, "pytest.ini")) || fs.existsSync(path.join(rootDir, "pyproject.toml")))
@@ -58,13 +62,112 @@ function detectProjectTestCommand(rootDir: string): string {
   return "bun test"
 }
 
+function optimizeCommandForWorkspace(rawCmd: string, rootDir: string): string {
+  const trimmed = rawCmd.trim()
+  // Replace slow `npx tsc` with direct local `./node_modules/.bin/tsc` when available so it never hangs or downloads
+  if (/^npx\s+tsc\b/i.test(trimmed)) {
+    const isWin = process.platform === "win32"
+    const localTsc = path.join(rootDir, "node_modules", ".bin", isWin ? "tsc.cmd" : "tsc")
+    if (fs.existsSync(localTsc)) {
+      const rest = trimmed.replace(/^npx\s+tsc\b/i, "").trim()
+      return `& "${localTsc}" ${rest}`.trim()
+    }
+  }
+  return trimmed
+}
+
+function buildSubprocessEnv(rootDir: string): NodeJS.ProcessEnv {
+  const home = process.env.USERPROFILE || os.homedir()
+  const localAppData = process.env.LOCALAPPDATA || path.join(home, "AppData", "Local")
+  const sep = process.platform === "win32" ? ";" : ":"
+  const extraPaths = [
+    path.join(rootDir, "node_modules", ".bin"),
+    path.join(localAppData, "omnicode", "bin"),
+    path.join(home, ".bun", "bin"),
+  ].filter((p) => fs.existsSync(p))
+  const currentPath = process.env.PATH || process.env.Path || ""
+  return {
+    ...process.env,
+    PATH: [...extraPaths, currentPath].join(sep),
+  }
+}
+
+function runCommandAsync(
+  commandToRun: string,
+  rootDir: string,
+  timeoutMs = 120_000,
+): Effect.Effect<{ stdout: string; stderr: string; exitCode: number }> {
+  return Effect.callback((resume) => {
+    const isWin = process.platform === "win32"
+    const optimized = isWin ? optimizeCommandForWorkspace(commandToRun, rootDir) : commandToRun
+    const shell = isWin ? "powershell.exe" : "bash"
+    const args = isWin ? ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", optimized] : ["-c", optimized]
+
+    let settled = false
+    const child = child_process.spawn(shell, args, {
+      cwd: rootDir,
+      env: buildSubprocessEnv(rootDir),
+      windowsHide: true,
+    })
+
+    let stdout = ""
+    let stderr = ""
+
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8")
+    })
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8")
+    })
+
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      try {
+        child.kill()
+      } catch {}
+      resume(
+        Effect.succeed({
+          stdout,
+          stderr: `${stderr}\n[omni_heal timeout after ${Math.round(timeoutMs / 1000)}s]`.trim(),
+          exitCode: 124,
+        }),
+      )
+    }, timeoutMs)
+
+    child.on("error", (err) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resume(Effect.succeed({ stdout, stderr: `${stderr}\n${String(err)}`.trim(), exitCode: 1 }))
+    })
+
+    child.on("close", (code) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resume(Effect.succeed({ stdout, stderr, exitCode: code ?? 0 }))
+    })
+
+    return Effect.sync(() => {
+      clearTimeout(timer)
+      if (!settled) {
+        settled = true
+        try {
+          child.kill()
+        } catch {}
+      }
+    })
+  })
+}
+
 function extractFailureDetails(output: string): string {
   const lines = output.split("\n")
   const relevant: string[] = []
   let capturing = false
 
   for (const line of lines) {
-    if (/error|fail|exception|panic|assert|traceback|undefined|typeerror/i.test(line) || capturing) {
+    if (/error|fail|exception|panic|assert|traceback|undefined|typeerror|TS\d{4}/i.test(line) || capturing) {
       relevant.push(line)
       if (relevant.length > 50) break
     }
@@ -111,27 +214,7 @@ export const Plugin = {
               }
 
               if (params.action === "run_and_heal") {
-                let stdout = ""
-                let stderr = ""
-                let exitCode = 0
-
-                try {
-                  const isWin = process.platform === "win32"
-                  const shell = isWin ? "powershell" : "bash"
-                  const flag = isWin ? "-Command" : "-c"
-                  const res = child_process.spawnSync(shell, [flag, commandToRun], {
-                    cwd: rootDir,
-                    encoding: "utf-8",
-                    timeout: 90000,
-                  })
-                  stdout = res.stdout || ""
-                  stderr = res.stderr || ""
-                  exitCode = res.status ?? 0
-                } catch (e: any) {
-                  exitCode = 1
-                  stderr = String(e)
-                }
-
+                const { stdout, stderr, exitCode } = yield* runCommandAsync(commandToRun, rootDir, 120_000)
                 const combinedOutput = `${stdout}\n${stderr}`.trim()
 
                 if (exitCode === 0) {

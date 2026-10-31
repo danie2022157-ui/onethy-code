@@ -7,6 +7,7 @@ import { Provider } from "@opencode/schema/provider"
 import { Context, Effect, Layer, Schema } from "effect"
 import { Agent } from "../../agent.js"
 import { ModelResolver } from "../../model-resolver.js"
+import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { SessionSchema } from "../schema.js"
 
 export class ModelNotSelectedError extends Schema.TaggedError<ModelNotSelectedError>()(
@@ -87,7 +88,45 @@ const layer = Layer.effect(
           if (resolved) return resolved
           return yield* new ModelNotSelectedError({ sessionID: session.id })
         }
-        const selected = (yield* available()).find(
+
+        const list = yield* available()
+        const isCooldownOrDeadFree =
+          OmniOrchestrator.isModelInCooldown(session.model.providerID, session.model.id) ||
+          (session.model.providerID === "opencode" &&
+            session.model.id === "flint-40b-free" &&
+            list.some((m) => m.providerID !== "opencode"))
+
+        if (isCooldownOrDeadFree) {
+          const preferredFallbackOrder = [
+            "google/antigravity-gemini-3.8-flash",
+            "openai/gpt-5.6-luna",
+            "openai/gpt-6-luna",
+            "google/gemini-4-argon",
+            "google/gemini-3.8-flash",
+            "opencode/nemotron-3.5-super-vl-free",
+          ]
+          const healthyList = list.filter((m) => !OmniOrchestrator.isModelInCooldown(m.providerID, m.id))
+          const pool = healthyList.length > 0 ? healthyList : list
+          let fallbackModel = undefined
+          for (const candidate of preferredFallbackOrder) {
+            const [pId, mId] = candidate.split("/")
+            const match = pool.find((m) => m.providerID === pId && m.id === mId)
+            if (match) {
+              fallbackModel = match
+              break
+            }
+          }
+          if (!fallbackModel) {
+            fallbackModel = pool.find(
+              (m) => m.providerID !== session.model?.providerID || m.id !== session.model?.id,
+            )
+          }
+          if (fallbackModel) {
+            return yield* resolver.resolveModel(fallbackModel, undefined)
+          }
+        }
+
+        const selected = list.find(
           (model) => model.providerID === session.model?.providerID && model.id === session.model.id,
         )
         if (!selected)

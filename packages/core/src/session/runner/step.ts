@@ -13,6 +13,7 @@ import type { Agent } from "@opencode/schema/agent"
 import { Cause, Clock, Data, Effect, Exit, Fiber, Option, Stream } from "effect"
 import { SessionError } from "@opencode/schema/session-error"
 import { Bus } from "../../bus.js"
+import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { Permission } from "../../permission.js"
 import { Snapshot } from "../../snapshot.js"
 import { Tool } from "../../tool.js"
@@ -179,6 +180,13 @@ export const make = Effect.gen(function* () {
             : undefined
         const llmFailure = streamFailure instanceof AIError ? streamFailure : unknownFinish
         const llmError = llmFailure && !recorded.providerFailed ? toSessionError(llmFailure) : undefined
+        const isQuotaOrFreeLimit =
+          llmFailure !== undefined &&
+          (llmFailure.reason._tag === "RateLimit" ||
+            /Free usage limit reached|QuotaExceeded|429|quota|rate limit/i.test(llmFailure.message))
+        if (isQuotaOrFreeLimit) {
+          OmniOrchestrator.markModelCooldown(input.model.ref.providerID, input.model.ref.id, 5 * 60_000)
+        }
         if (
           input.recoverContinuation &&
           llmFailure?.reason._tag === "Transport" &&
@@ -192,7 +200,8 @@ export const make = Effect.gen(function* () {
                 input.retry(
                   llmFailure,
                   llmError,
-                  SessionRunnerRetry.isRetryable(llmFailure) ||
+                  isQuotaOrFreeLimit ||
+                    SessionRunnerRetry.isRetryable(llmFailure) ||
                     (recorded.outputStarted && isInterruptedStream(llmFailure)),
                 ),
               )

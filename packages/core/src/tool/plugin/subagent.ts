@@ -331,8 +331,12 @@ export const Plugin = {
               // where an explicit model wins over the agent's configured model, which wins over the inherited one.
               if (existing !== undefined) {
                 const switched = existing.agent !== agent.id
+                const needsModelFailover = !isAllowed(existing.model)
                 const model =
-                  override ?? (switched ? ((isAllowed(agent.model) ? agent.model : undefined) ?? routedModel) : undefined)
+                  override ??
+                  (switched || needsModelFailover
+                    ? ((isAllowed(agent.model) ? agent.model : undefined) ?? routedModel)
+                    : undefined)
                 yield* Effect.all([
                   switched ? sessions.switchAgent({ sessionID: existing.id, agent: agent.id }) : Effect.void,
                   model === undefined ? Effect.void : sessions.switchModel({ sessionID: existing.id, model }),
