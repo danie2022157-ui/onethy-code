@@ -2,7 +2,7 @@ import { Plugin } from "@opencode/plugin/tui"
 import { createMemo, createSignal, Match, Show, Switch } from "solid-js"
 import { contextUsage, formatContextUsage } from "../../util/session"
 import { useTerminalDimensions } from "@opentui/solid"
-import { TextAttributes } from "@opentui/core"
+import { RGBA, TextAttributes } from "@opentui/core"
 import { useInteractivity } from "../../context/interactivity"
 import { stringWidth } from "../../util/string-width"
 import { createGoal, GoalStatus } from "./goal"
@@ -107,26 +107,37 @@ export function PromptFooter(props: {
             </box>
           </Match>
           <Match when={props.showDetails && layout().shortcuts}>
-            <text
-              fg={interactive() ? props.context.theme.text.base : props.context.theme.text.action.primary.disabled}
-              attributes={interactive() ? 0 : TextAttributes.DIM}
+            <box
+              flexDirection="row"
+              gap={1}
+              alignItems="center"
               flexShrink={0}
+              onMouseUp={() => props.context.keymap.dispatch("agent.cycle")}
             >
-              {shortcut("agent.cycle")}{" "}
-              <span style={interactive() ? { fg: props.context.theme.text.muted } : {}}>agentes</span>
-            </text>
+              <text fg={interactive() ? RGBA.fromHex("#00D2FF") : props.context.theme.text.action.primary.disabled} attributes={interactive() ? TextAttributes.BOLD : TextAttributes.DIM} selectable={false}>
+                [{shortcut("agent.cycle") ?? "shift+tab"}]
+              </text>
+              <text fg={props.context.theme.text.muted} selectable={false}>
+                agentes
+              </text>
+            </box>
           </Match>
         </Switch>
         <Show when={props.showDetails && layout().shortcuts}>
-          <text
-            fg={interactive() ? props.context.theme.text.base : props.context.theme.text.action.primary.disabled}
-            attributes={interactive() ? 0 : TextAttributes.DIM}
-            wrapMode="none"
+          <box
+            flexDirection="row"
+            gap={1}
+            alignItems="center"
             flexShrink={0}
+            onMouseUp={() => props.context.keymap.dispatch("command.palette.show")}
           >
-            {shortcut("command.palette.show")}{" "}
-            <span style={interactive() ? { fg: props.context.theme.text.muted } : {}}>comandos</span>
-          </text>
+            <text fg={interactive() ? RGBA.fromHex("#00D2FF") : props.context.theme.text.action.primary.disabled} attributes={interactive() ? TextAttributes.BOLD : TextAttributes.DIM} selectable={false}>
+              [{shortcut("command.palette.show") ?? "ctrl+p"}]
+            </text>
+            <text fg={props.context.theme.text.muted} selectable={false}>
+              comandos
+            </text>
+          </box>
         </Show>
       </Match>
       <Match when={props.mode === "shell"}>
