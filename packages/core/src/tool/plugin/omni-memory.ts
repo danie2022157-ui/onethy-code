@@ -10,14 +10,14 @@ import { Location } from "../../location.js"
 export const name = "omni_memory"
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["read", "update", "init", "status"]).annotate({
+  action: Schema.Literals(["read", "update", "init", "status", "delete", "clear"]).annotate({
     description:
-      "Action to perform: 'read' reads memory bank files; 'update' updates a memory bank file; 'init' initializes the 4 memory bank files; 'status' checks memory bank readiness.",
+      "Action to perform: 'read' reads memory bank files; 'update' updates a memory bank file; 'init' initializes the 4 memory bank files; 'status' checks memory bank readiness; 'delete' deletes a specific memory bank file; 'clear' clears all memory bank files.",
   }),
   file: Schema.optionalKey(
-    Schema.Literals(["project-brief", "system-patterns", "tech-context", "active-context", "all"]),
+    Schema.String,
   ).annotate({
-    description: "Specific memory bank file to target.",
+    description: "Specific memory bank file to target (e.g. 'project-brief', 'system-patterns', 'tech-context', 'active-context', 'all', or filename).",
   }),
   content: Schema.optionalKey(Schema.String).annotate({
     description: "New markdown content when action is 'update'.",
@@ -222,6 +222,55 @@ export const Plugin = {
                   output: { action: "update", summary },
                   content: summary,
                   metadata: { action: "update", file: fileName },
+                }
+              }
+
+              if (params.action === "delete") {
+                ensureDir()
+                const rawName = params.file ?? "active-context"
+                const fileName = rawName.endsWith(".md") ? rawName : `${rawName}.md`
+                const filePath = path.join(memoryDir, fileName)
+                if (fs.existsSync(filePath)) {
+                  fs.unlinkSync(filePath)
+                  const summary = `Arquivo '${fileName}' excluído do Memory Bank com sucesso.`
+                  return {
+                    output: { action: "delete", summary },
+                    content: summary,
+                    metadata: { action: "delete", file: fileName },
+                  }
+                }
+                const summary = `Arquivo '${fileName}' não encontrado no Memory Bank.`
+                return {
+                  output: { action: "delete", summary },
+                  content: summary,
+                  metadata: { action: "delete", file: fileName },
+                }
+              }
+
+              if (params.action === "clear") {
+                if (fs.existsSync(memoryDir)) {
+                  const files = fs.readdirSync(memoryDir)
+                  let count = 0
+                  for (const f of files) {
+                    if (f.endsWith(".md")) {
+                      try {
+                        fs.unlinkSync(path.join(memoryDir, f))
+                        count++
+                      } catch {}
+                    }
+                  }
+                  const summary = `Banco de memória limpo: ${count} arquivos removidos de .omnicode/memory-bank/.`
+                  return {
+                    output: { action: "clear", summary },
+                    content: summary,
+                    metadata: { action: "clear" },
+                  }
+                }
+                const summary = "Memory Bank não inicializado."
+                return {
+                  output: { action: "clear", summary },
+                  content: summary,
+                  metadata: { action: "clear" },
                 }
               }
 

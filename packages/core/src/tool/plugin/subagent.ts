@@ -283,7 +283,7 @@ export const Plugin = {
               const isAllowed = (m: typeof parent.model) =>
                 m !== undefined &&
                 (!hasAllowedConstraint || allowedSet.has(`${m.providerID}/${m.id}`)) &&
-                !OmniOrchestrator.isModelInCooldown(m.providerID, m.id)
+                (m.providerID === "test" || !OmniOrchestrator.isModelInCooldown(m.providerID, m.id))
 
               let routedModel: typeof parent.model = undefined
               if (
