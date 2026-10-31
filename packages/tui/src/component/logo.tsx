@@ -119,12 +119,58 @@ export function Logo() {
     { left: "  ──   ─── ─  ", right: "  ─ ───   ──  " },
   ]
 
-  const moonRays = [
-    { text: "             . · ´ ¯ ¯ ¯ ` · .             ", fg: RGBA.fromHex("#E0F2FE") },
-    { text: "         . · ´   . · ´ ¯ ` · . ` · .       ", fg: RGBA.fromHex("#BAE6FD") },
-    { text: "        /    . · ´         ` · .    \\      ", fg: RGBA.fromHex("#7DD3FC") },
-    { text: "       /   . ´                 ` .   \\     ", fg: RGBA.fromHex("#38BDF8") },
-    { text: "      │   /                       │   │    ", fg: RGBA.fromHex("#818CF8") },
+  type MoonPart = { text: string; fg: RGBA; bold?: boolean }
+
+  const moonRows: MoonPart[][] = [
+    [
+      { text: "                      . · ´ ¯ ¯ ", fg: RGBA.fromHex("#38BDF8") },
+      { text: "▄▄", fg: RGBA.fromHex("#FFFFFF"), bold: true },
+      { text: " ` · .                      ", fg: RGBA.fromHex("#38BDF8") },
+    ],
+    [
+      { text: "                  . · ´ ", fg: RGBA.fromHex("#38BDF8") },
+      { text: "▄███", fg: RGBA.fromHex("#FFFFFF"), bold: true },
+      { text: "▀", fg: RGBA.fromHex("#A855F7"), bold: true },
+      { text: "   °  ·", fg: RGBA.fromHex("#49329E") },
+      { text: " ` · .                  ", fg: RGBA.fromHex("#38BDF8") },
+    ],
+    [
+      { text: "               . · ´ ", fg: RGBA.fromHex("#38BDF8") },
+      { text: "▄████", fg: RGBA.fromHex("#FFFFFF"), bold: true },
+      { text: "▀", fg: RGBA.fromHex("#A855F7"), bold: true },
+      { text: "      ·  *  ", fg: RGBA.fromHex("#49329E") },
+      { text: "` · .                ", fg: RGBA.fromHex("#38BDF8") },
+    ],
+    [
+      { text: "             . ´  ", fg: RGBA.fromHex("#38BDF8") },
+      { text: "▄████", fg: RGBA.fromHex("#FFFFFF"), bold: true },
+      { text: "▀", fg: RGBA.fromHex("#A855F7"), bold: true },
+      { text: "   *      ·      ", fg: RGBA.fromHex("#49329E") },
+      { text: "` .              ", fg: RGBA.fromHex("#38BDF8") },
+    ],
+    [
+      { text: "  ─── ─ ──   ", fg: RGBA.fromHex("#00D2FF"), bold: true },
+      { text: "/   ", fg: RGBA.fromHex("#38BDF8") },
+      { text: "▄████", fg: RGBA.fromHex("#FFFFFF"), bold: true },
+      { text: "▀", fg: RGBA.fromHex("#A855F7"), bold: true },
+      { text: "                   ", fg: RGBA.fromHex("#49329E") },
+      { text: "\\", fg: RGBA.fromHex("#38BDF8") },
+      { text: "   ── ─── ──  ", fg: RGBA.fromHex("#D946EF"), bold: true },
+    ],
+    [
+      { text: "           /   ", fg: RGBA.fromHex("#38BDF8") },
+      { text: "█████", fg: RGBA.fromHex("#FFFFFF"), bold: true },
+      { text: "▌", fg: RGBA.fromHex("#818CF8"), bold: true },
+      { text: "                      ", fg: RGBA.fromHex("#49329E") },
+      { text: "\\           ", fg: RGBA.fromHex("#38BDF8") },
+    ],
+    [
+      { text: "          │   ", fg: RGBA.fromHex("#38BDF8") },
+      { text: "█████", fg: RGBA.fromHex("#FFFFFF"), bold: true },
+      { text: "▌", fg: RGBA.fromHex("#818CF8"), bold: true },
+      { text: "      ·  °              ", fg: RGBA.fromHex("#49329E") },
+      { text: "│          ", fg: RGBA.fromHex("#38BDF8") },
+    ],
   ]
 
   return (
@@ -181,13 +227,23 @@ export function Logo() {
       ) : (
         <box alignItems="center" flexDirection="column">
           {/* Meia-Lua ascendente no centro do topo (atrás do meio do nome) */}
-          <Show when={dimensions().height >= 24 && dimensions().width >= 70}>
+          <Show when={dimensions().height >= 22 && dimensions().width >= 64}>
             <box flexDirection="column" alignItems="center" justifyContent="center">
-              <For each={moonRays}>
-                {(line) => (
-                  <text fg={line.fg} attributes={TextAttributes.BOLD} selectable={false}>
-                    {line.text}
-                  </text>
+              <For each={moonRows}>
+                {(row) => (
+                  <box flexDirection="row">
+                    <For each={row}>
+                      {(part) => (
+                        <text
+                          fg={part.fg}
+                          attributes={part.bold ? TextAttributes.BOLD : undefined}
+                          selectable={false}
+                        >
+                          {part.text}
+                        </text>
+                      )}
+                    </For>
+                  </box>
                 )}
               </For>
             </box>

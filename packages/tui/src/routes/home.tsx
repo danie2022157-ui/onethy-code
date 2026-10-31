@@ -172,13 +172,15 @@ export function Home() {
     ]
   })
 
-  const quickChips = [
-    { cmd: "/ulw", desc: "Ultrawork", colorIdx: 0 },
-    { cmd: "/arena", desc: "Multi-Modelo", colorIdx: 2 },
-    { cmd: "/ralph", desc: "Loop Verificador", colorIdx: 4 },
-    { cmd: "/bus", desc: "OmniBus", colorIdx: 5 },
-    { cmd: "/auto", desc: "Omni Fusion", colorIdx: 1 },
-    { cmd: "/personalizacoes", desc: "Catálogo", colorIdx: 3 },
+  const quickRow1 = [
+    { cmd: "/ulw", desc: "Ultrawork", fg: RGBA.fromHex("#00F5FF") },
+    { cmd: "/arena", desc: "Multi-Modelo", fg: RGBA.fromHex("#10B981") },
+    { cmd: "/raph", desc: "Loop Verificador", fg: RGBA.fromHex("#F43F5E") },
+    { cmd: "/bus", desc: "OmniBus", fg: RGBA.fromHex("#00D2FF") },
+  ]
+  const quickRow2 = [
+    { cmd: "/auto", desc: "Omni Fusion", fg: RGBA.fromHex("#A855F7") },
+    { cmd: "/personalizacoes", desc: "Catálogo", fg: RGBA.fromHex("#F59E0B") },
   ]
 
   return (
@@ -271,36 +273,69 @@ export function Home() {
               </box>
             </box>
             <Show when={dimensions().height >= 26}>
-              <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={2}>
-                <For each={quickChips}>
-                  {(chip) => {
-                    const [hovered, setHovered] = createSignal(false)
-                    return (
-                      <box
-                        flexDirection="row"
-                        onMouseOver={() => setHovered(true)}
-                        onMouseOut={() => setHovered(false)}
-                        onMouseUp={() => {
-                          const composer = ref()
-                          if (!composer) return
-                          composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
-                        }}
-                      >
-                        <text
-                          fg={colorAt(chip.colorIdx)}
-                          attributes={hovered() ? TextAttributes.BOLD | TextAttributes.UNDERLINE : TextAttributes.BOLD}
-                          selectable={false}
+              <box flexDirection="column" alignItems="center" gap={1}>
+                <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={2}>
+                  <For each={quickRow1}>
+                    {(chip) => {
+                      const [hovered, setHovered] = createSignal(false)
+                      return (
+                        <box
+                          flexDirection="row"
+                          onMouseOver={() => setHovered(true)}
+                          onMouseOut={() => setHovered(false)}
+                          onMouseUp={() => {
+                            const composer = ref()
+                            if (!composer) return
+                            composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
+                          }}
                         >
-                          {chip.cmd}
-                        </text>
-                        <text fg={hovered() ? theme.text.base : theme.text.muted} selectable={false}>
-                          {" "}
-                          {chip.desc}
-                        </text>
-                      </box>
-                    )
-                  }}
-                </For>
+                          <text
+                            fg={chip.fg}
+                            attributes={hovered() ? TextAttributes.BOLD | TextAttributes.UNDERLINE : TextAttributes.BOLD}
+                            selectable={false}
+                          >
+                            {chip.cmd}
+                          </text>
+                          <text fg={hovered() ? theme.text.base : theme.text.muted} selectable={false}>
+                            {" "}
+                            {chip.desc}
+                          </text>
+                        </box>
+                      )
+                    }}
+                  </For>
+                </box>
+                <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={2}>
+                  <For each={quickRow2}>
+                    {(chip) => {
+                      const [hovered, setHovered] = createSignal(false)
+                      return (
+                        <box
+                          flexDirection="row"
+                          onMouseOver={() => setHovered(true)}
+                          onMouseOut={() => setHovered(false)}
+                          onMouseUp={() => {
+                            const composer = ref()
+                            if (!composer) return
+                            composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
+                          }}
+                        >
+                          <text
+                            fg={chip.fg}
+                            attributes={hovered() ? TextAttributes.BOLD | TextAttributes.UNDERLINE : TextAttributes.BOLD}
+                            selectable={false}
+                          >
+                            {chip.cmd}
+                          </text>
+                          <text fg={hovered() ? theme.text.base : theme.text.muted} selectable={false}>
+                            {" "}
+                            {chip.desc}
+                          </text>
+                        </box>
+                      )
+                    }}
+                  </For>
+                </box>
               </box>
             </Show>
           </box>

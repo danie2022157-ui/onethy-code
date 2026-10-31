@@ -5,8 +5,8 @@ declare const OPENCODE_CHANNEL: string
 declare const OPENCODE_ARTIFACT: string
 declare const OPENCODE_RELEASE_HIGHLIGHTS: string
 
-const isOmni = process.env.OMNICODE_ACTIVE === "1";
-const version = isOmni ? "2.2.2 (OmniCode)" : (typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local")
+const isOmni = process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1";
+const version = isOmni ? "2.2.2 (OnethyCode)" : (typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local")
 const channel = typeof OPENCODE_CHANNEL === "string" ? OPENCODE_CHANNEL : "local"
 const artifact = typeof OPENCODE_ARTIFACT === "string" ? OPENCODE_ARTIFACT : "cli"
 // Stable release builds embed the release notes' Highlights; every other build has none.

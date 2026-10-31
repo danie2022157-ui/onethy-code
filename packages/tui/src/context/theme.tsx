@@ -110,10 +110,12 @@ type ThemeContextValue = {
   readonly ready: boolean
 }
 
+const defaultThemeName = process.env.OPENCODE_THEME ?? "onethy"
+
 const [store, setStore] = createStore<State>({
   mode: "dark",
   lock: undefined,
-  active: "opencode",
+  active: defaultThemeName,
   ready: false,
 })
 const [themeSources, setThemeSources] = createSignal(allThemes())
@@ -136,7 +138,7 @@ const themeContext = createSimpleContext({
         const mode = lock ?? renderer.themeMode ?? props.mode
         draft.mode = mode
         draft.lock = lock
-        draft.active = config.theme?.name ?? "opencode"
+        draft.active = config.theme?.name ?? defaultThemeName
         draft.ready = false
       }),
     )
@@ -163,7 +165,7 @@ const themeContext = createSimpleContext({
         .then((themes) => {
           setCustomThemes(themes)
         })
-        .catch(() => setStore("active", "opencode"))
+        .catch(() => setStore("active", defaultThemeName))
     }
 
     onMount(() => {
@@ -297,14 +299,15 @@ const themeContext = createSimpleContext({
     const initStarted = performance.now()
     const selected = createMemo(() => {
       const sources = available()
-      const name = sources[store.active] ? store.active : "opencode"
+      const fallback = sources.onethy ? "onethy" : "opencode"
+      const name = sources[store.active] ? store.active : fallback
       try {
         return loadTheme(sources[name], name, store.mode, newDesigns())
       } catch (error) {
-        if (name === "opencode") throw error
+        if (name === fallback) throw error
         themeErrors.emit(name, error)
-        setStore("active", "opencode")
-        return loadTheme(sources.opencode, "opencode", store.mode, newDesigns())
+        setStore("active", fallback)
+        return loadTheme(sources[fallback], fallback, store.mode, newDesigns())
       }
     })
     const modes = () => selected().modes
