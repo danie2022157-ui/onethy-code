@@ -1373,8 +1373,8 @@ function App() {
       },
       {
         name: "theme.switch",
-        title: "Switch theme",
-        slash: { name: "themes" },
+        title: "Alternar tema (Themes)",
+        slash: { name: "themes", aliases: ["theme", "tema", "temas"] },
         run: () => {
           dialog.replace(() => <DialogThemeList />)
         },

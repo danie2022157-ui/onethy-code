@@ -37,34 +37,46 @@ export function PromptMetadataRow(props: {
   })
 
   return (
-    <box flexDirection="row" gap={1} flexGrow={1} flexShrink={1} minWidth={0}>
+    <box flexDirection="row" gap={1} flexGrow={1} flexShrink={1} minWidth={0} alignItems="center">
       <Show
         when={(props.mode === "shell" || props.agent) && (layout().agent || layout().model)}
         fallback={<box height={1} />}
       >
         <Show when={layout().agent}>
-          {(agent) => <text fg={fade(props.highlight, props.agentAlpha)}>{agent()}</text>}
+          {(agent) => (
+            <box flexDirection="row" gap={1} alignItems="center">
+              <text fg={RGBA.fromHex("#E0F2FE")} attributes={TextAttributes.BOLD} selectable={false}>
+                ✦
+              </text>
+              <text fg={RGBA.fromHex("#10B981")} attributes={TextAttributes.BOLD} selectable={false}>
+                {agent()}
+              </text>
+            </box>
+          )}
         </Show>
         <Show when={props.mode === "normal" && layout().auto}>
-          <text fg={fade(theme.text.muted, props.agentAlpha)}>auto</text>
+          <text fg={fade(RGBA.fromHex("#34D399"), props.agentAlpha)}>auto</text>
         </Show>
         <Show when={props.mode === "normal" && layout().model}>
-          <box flexDirection="row" gap={1} flexGrow={1} flexShrink={1} minWidth={0}>
+          <box flexDirection="row" gap={1} flexGrow={1} flexShrink={1} minWidth={0} alignItems="center">
             <Show when={layout().agent}>
-              <text fg={fade(theme.text.muted, props.modelAlpha)}>·</text>
+              <text fg={RGBA.fromHex("#38BDF8")} attributes={TextAttributes.BOLD} selectable={false}>
+                •
+              </text>
             </Show>
             <text
               flexShrink={1}
               minWidth={0}
               wrapMode="none"
               truncate
-              fg={fade(props.muted ? theme.text.muted : theme.text.base, props.modelAlpha)}
+              fg={fade(props.muted ? theme.text.muted : RGBA.fromHex("#FFFFFF"), props.modelAlpha)}
+              attributes={TextAttributes.BOLD}
             >
               {layout().model}
             </text>
             <Show when={layout().provider}>
               {(provider) => (
-                <text flexShrink={0} fg={fade(theme.text.muted, props.modelAlpha)}>
+                <text flexShrink={0} fg={fade(RGBA.fromHex("#94A3B8"), props.modelAlpha)}>
                   {provider()}
                 </text>
               )}
@@ -72,10 +84,13 @@ export function PromptMetadataRow(props: {
             <Show when={layout().variant}>
               {(variant) => (
                 <>
-                  <text fg={fade(theme.text.muted, props.variantAlpha)}>·</text>
+                  <text fg={RGBA.fromHex("#38BDF8")} attributes={TextAttributes.BOLD} selectable={false}>
+                    •
+                  </text>
                   <text
-                    fg={fade(theme.text.formfield.selected, props.variantAlpha)}
+                    fg={fade(RGBA.fromHex("#F59E0B"), props.variantAlpha)}
                     attributes={TextAttributes.BOLD}
+                    selectable={false}
                   >
                     {variant()}
                   </text>

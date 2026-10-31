@@ -1612,7 +1612,10 @@ export function Prompt(props: PromptProps) {
   createEffect(() => {
     if (agentLabel()) revealedPromptMetadata.add(local)
   })
-  const borderHighlight = createMemo(() => tint(theme.border.base, highlight(), agentMetaAlpha()))
+  const borderHighlight = createMemo(() => {
+    if (muted()) return theme.border.base
+    return theme.borderActive ?? RGBA.fromHex("#0099FF")
+  })
   const footerInput = () => ({
     sessionID: props.sessionID,
     mode: store.mode,
@@ -1687,19 +1690,18 @@ export function Prompt(props: PromptProps) {
       <box ref={(r: BoxRenderable) => (anchor = r)} visible={props.visible !== false} width="100%">
         <box
           width="100%"
-          border={["left"]}
+          border
+          borderStyle="rounded"
           borderColor={borderHighlight()}
-          customBorderChars={{
-            ...SplitBorder.customBorderChars,
-            bottomLeft: "╹",
-          }}
+          backgroundColor={promptBg()}
+          paddingLeft={dimensions().width < 44 ? 1 : 2}
+          paddingRight={dimensions().width < 44 ? 1 : 2}
+          paddingTop={0}
+          paddingBottom={0}
+          flexShrink={0}
         >
           <box
-            paddingLeft={dimensions().width < 44 ? 1 : 2}
-            paddingRight={dimensions().width < 44 ? 1 : 2}
-            paddingTop={1}
             flexShrink={0}
-            backgroundColor={promptBg()}
             flexGrow={1}
             width="100%"
           >
@@ -1771,137 +1773,121 @@ export function Prompt(props: PromptProps) {
                 </Show>
               </box>
             </Show>
-            <textarea
-              width="100%"
-              placeholder={placeholderText()}
-              placeholderColor={theme.text.muted}
-              textColor={muted() ? theme.text.muted : theme.text.base}
-              focusedTextColor={muted() ? theme.text.muted : theme.text.base}
-              minHeight={1}
-              maxHeight={maxHeight()}
-              cursorStyle={config.cursor}
-              onContentChange={() => {
-                const value = input.plainText
-                setStore("prompt", "text", value)
-                auto()?.onInput(value)
-                syncExtmarksWithPromptParts()
-                setCursorVersion((value) => value + 1)
-              }}
-              onCursorChange={() => setCursorVersion((value) => value + 1)}
-              onKeyDown={(e: { preventDefault(): void }) => {
-                if (disabled()) {
-                  e.preventDefault()
-                  return
-                }
-              }}
-              onSubmit={() => {
-                if (disabled()) return
-                // IME: double-defer so the last composed character (e.g. Korean
-                // hangul) is flushed to plainText before we read it for submission.
-                setTimeout(() => setTimeout(() => submit(), 0), 0)
-              }}
-              onPaste={(event: PasteEvent) => {
-                if (disabled()) {
+            <box flexDirection="row" width="100%" alignItems="flex-start" paddingTop={1}>
+              <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
+                │ >{" "}
+              </text>
+              <textarea
+                width="100%"
+                placeholder={placeholderText()}
+                placeholderColor={theme.text.muted}
+                textColor={muted() ? theme.text.muted : theme.text.base}
+                focusedTextColor={muted() ? theme.text.muted : theme.text.base}
+                minHeight={1}
+                maxHeight={maxHeight()}
+                cursorStyle={config.cursor}
+                onContentChange={() => {
+                  const value = input.plainText
+                  setStore("prompt", "text", value)
+                  auto()?.onInput(value)
+                  syncExtmarksWithPromptParts()
+                  setCursorVersion((value) => value + 1)
+                }}
+                onCursorChange={() => setCursorVersion((value) => value + 1)}
+                onKeyDown={(e: { preventDefault(): void }) => {
+                  if (disabled()) {
+                    e.preventDefault()
+                    return
+                  }
+                }}
+                onSubmit={() => {
+                  if (disabled()) return
+                  // IME: double-defer so the last composed character (e.g. Korean
+                  // hangul) is flushed to plainText before we read it for submission.
+                  setTimeout(() => setTimeout(() => submit(), 0), 0)
+                }}
+                onPaste={(event: PasteEvent) => {
+                  if (disabled()) {
+                    event.preventDefault()
+                    return
+                  }
+
+                  // Normalize line endings at the boundary
+                  // Windows ConPTY/Terminal often sends CR-only newlines in bracketed paste
+                  // Replace CRLF first, then any remaining CR
+                  const normalizedText = decodePasteBytes(event.bytes).replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+
+                  // Windows Terminal <1.25 can surface image-only clipboard as an
+                  // empty bracketed paste. Windows Terminal 1.25+ does not.
+                  if (event.bytes.byteLength === 0) {
+                    keymap.dispatch("prompt.paste")
+                    return
+                  }
+
+                  // Once we cross an async boundary below, the terminal may perform its
+                  // default paste unless we suppress it first and handle insertion ourselves.
                   event.preventDefault()
-                  return
-                }
 
-                // Normalize line endings at the boundary
-                // Windows ConPTY/Terminal often sends CR-only newlines in bracketed paste
-                // Replace CRLF first, then any remaining CR
-                const normalizedText = decodePasteBytes(event.bytes).replace(/\r\n/g, "\n").replace(/\r/g, "\n")
-
-                // Windows Terminal <1.25 can surface image-only clipboard as an
-                // empty bracketed paste. Windows Terminal 1.25+ does not.
-                if (event.bytes.byteLength === 0) {
-                  keymap.dispatch("prompt.paste")
-                  return
-                }
-
-                // Once we cross an async boundary below, the terminal may perform its
-                // default paste unless we suppress it first and handle insertion ourselves.
-                event.preventDefault()
-
-                void enqueuePaste((changed) => pasteInputText(normalizedText, changed))
-              }}
-              ref={(r: TextareaRenderable) => {
-                input = r
-                Object.assign(r, {
-                  getClipboardText: (text: string) => expandPastedTextPlaceholders(text, store.prompt.pasted),
-                })
-                setInputTarget(r)
-                if (promptPartTypeId === 0) {
-                  promptPartTypeId = input.extmarks.registerType("prompt-part")
-                }
-                props.ref?.(ref)
-                setTimeout(() => {
-                  // setTimeout is a workaround and needs to be addressed properly
-                  if (!input || input.isDestroyed) return
-                  input.cursorColor = disabled() ? theme.background.raised.base : theme.text.base
-                  if (config.cursor) input.cursorStyle = config.cursor
-                }, 0)
-              }}
-              onMouseDown={(r: MouseEvent) => {
-                if (disabled()) {
+                  void enqueuePaste((changed) => pasteInputText(normalizedText, changed))
+                }}
+                ref={(r: TextareaRenderable) => {
+                  input = r
+                  Object.assign(r, {
+                    getClipboardText: (text: string) => expandPastedTextPlaceholders(text, store.prompt.pasted),
+                  })
+                  setInputTarget(r)
+                  if (promptPartTypeId === 0) {
+                    promptPartTypeId = input.extmarks.registerType("prompt-part")
+                  }
+                  props.ref?.(ref)
+                  setTimeout(() => {
+                    // setTimeout is a workaround and needs to be addressed properly
+                    if (!input || input.isDestroyed) return
+                    input.cursorColor = disabled() ? theme.background.raised.base : theme.text.base
+                    if (config.cursor) input.cursorStyle = config.cursor
+                  }, 0)
+                }}
+                onMouseDown={(r: MouseEvent) => {
+                  if (disabled()) {
+                    r.preventDefault()
+                    return
+                  }
+                  if (r.button !== 0) return
+                  r.target?.focus()
+                  const extmark = input.extmarks
+                    .getAtOffset(input.cursorOffset)
+                    .find((item) => store.extmarkToPart.get(item.id)?.type === "pasted")
+                  if (!extmark || !expandPastedText(extmark.id)) return
                   r.preventDefault()
-                  return
-                }
-                if (r.button !== 0) return
-                r.target?.focus()
-                const extmark = input.extmarks
-                  .getAtOffset(input.cursorOffset)
-                  .find((item) => store.extmarkToPart.get(item.id)?.type === "pasted")
-                if (!extmark || !expandPastedText(extmark.id)) return
-                r.preventDefault()
-                r.stopPropagation()
-              }}
-              focusedBackgroundColor="transparent"
-              cursorColor={disabled() ? theme.background.raised.base : theme.text.base}
-              syntaxStyle={syntax()}
-            />
-            <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
-              <PromptMetadataRow
-                mode={store.mode}
-                agent={agentLabel()}
-                auto={local.permission.mode === "autoaccept"}
-                model={promptDisplay().modelLabel}
-                provider={promptDisplay().providerLabel}
-                variant={promptDisplay().variant}
-                limit={limit()}
-                muted={!!muted()}
-                highlight={highlight()}
-                agentAlpha={agentMetaAlpha()}
-                modelAlpha={modelMetaAlpha()}
-                variantAlpha={variantMetaAlpha()}
+                  r.stopPropagation()
+                }}
+                focusedBackgroundColor="transparent"
+                cursorColor={disabled() ? theme.background.raised.base : theme.text.base}
+                syntaxStyle={syntax()}
               />
             </box>
+            <box flexDirection="row" flexShrink={0} paddingTop={1} paddingBottom={1} gap={1} alignItems="center" justifyContent="space-between">
+              <box flexDirection="row" gap={1} alignItems="center" flexGrow={1} flexShrink={1} minWidth={0}>
+                <text fg={RGBA.fromHex("#10B981")} attributes={TextAttributes.BOLD} selectable={false}>
+                  │{" "}
+                </text>
+                <PromptMetadataRow
+                  mode={store.mode}
+                  agent={agentLabel()}
+                  auto={local.permission.mode === "autoaccept"}
+                  model={promptDisplay().modelLabel}
+                  provider={promptDisplay().providerLabel}
+                  variant={promptDisplay().variant}
+                  limit={limit()}
+                  muted={!!muted()}
+                  highlight={highlight()}
+                  agentAlpha={agentMetaAlpha()}
+                  modelAlpha={modelMetaAlpha()}
+                  variantAlpha={variantMetaAlpha()}
+                />
+              </box>
+            </box>
           </box>
-        </box>
-        <box
-          height={1}
-          border={["left"]}
-          borderColor={borderHighlight()}
-          customBorderChars={{
-            ...EmptyBorder,
-            vertical: promptBg().a !== 0 ? "╹" : " ",
-          }}
-        >
-          <box
-            height={1}
-            border={["bottom"]}
-            borderColor={promptBg()}
-            customBorderChars={
-              promptBg().a !== 0
-                ? {
-                    ...EmptyBorder,
-                    horizontal: "▀",
-                  }
-                : {
-                    ...EmptyBorder,
-                    horizontal: " ",
-                  }
-            }
-          />
         </box>
         <box width="100%" flexDirection="row" justifyContent="space-between" gap={2}>
           <Slot path="prompt.footer" input={footerInput()}>
