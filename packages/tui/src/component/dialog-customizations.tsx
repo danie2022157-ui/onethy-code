@@ -153,7 +153,7 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
       case "mcps":
         return `Servidores MCP (${count})`
       default:
-        return `Central de Personalizações OmniCode (${count} itens ativos)`
+        return `Central de Personalizações OnethyCode (${count} itens ativos)`
     }
   })
 
