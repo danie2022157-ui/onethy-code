@@ -64,6 +64,36 @@ function resolveOmniAllowedModels(): Set<string> | undefined {
   return undefined
 }
 
+function isThinkingRoutingEnabled(): boolean {
+  if (process.env.OMNICODE_THINKING_ROUTING === "0") return false
+  if (process.env.OMNICODE_THINKING_ROUTING === "1") return true
+
+  try {
+    const stateDir =
+      process.env.OMNICODE_STATE_DIR ||
+      (process.platform === "win32"
+        ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "omnicode", "state")
+        : path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"), "omnicode"))
+    const autoFile = path.join(stateDir, "auto-model.json")
+    if (fs.existsSync(autoFile)) {
+      const content = JSON.parse(fs.readFileSync(autoFile, "utf8"))
+      if (typeof content.thinkingRouting === "boolean") {
+        return content.thinkingRouting
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return true
+}
+
+function resolveAgentThinkingLevel(agentId: string): "off" | "low" | "medium" | "high" | "max" {
+  if (agentId === "explore" || agentId === "librarian") return "low"
+  if (agentId === "architect" || agentId === "reviewer") return "max"
+  return "medium"
+}
+
 export const Input = Schema.Struct({
   agent: Schema.String.annotate({
     description:
@@ -245,7 +275,13 @@ export const Plugin = {
                         (m) => m.providerID === selection.primary?.providerID && m.id === selection.primary?.id,
                       )
                     : undefined
-                  routedModel = matched ? { providerID: matched.providerID, id: matched.id } : undefined
+                  routedModel = matched
+                    ? {
+                        providerID: matched.providerID,
+                        id: matched.id,
+                        variant: isThinkingRoutingEnabled() ? selection.thinkingLevel : undefined,
+                      }
+                    : undefined
                 }
               }
 
@@ -265,10 +301,20 @@ export const Plugin = {
                 )
               }
 
+              const configuredWithThinking =
+                isAllowed(agent.model) && agent.model
+                  ? {
+                      ...agent.model,
+                      variant:
+                        agent.model.variant ??
+                        (isThinkingRoutingEnabled() ? resolveAgentThinkingLevel(agent.id) : undefined),
+                    }
+                  : undefined
+
               const model =
                 override ??
                 routedModel ??
-                (isAllowed(agent.model) ? agent.model : undefined) ??
+                configuredWithThinking ??
                 (isAllowed(parent.model) ? parent.model : undefined) ??
                 routedModel ??
                 parent.model

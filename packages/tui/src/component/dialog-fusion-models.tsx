@@ -47,6 +47,19 @@ export function DialogFusionModels() {
     }
 
     list.push({
+      value: "__thinking__",
+      title: local.model.auto.thinkingRouting()
+        ? "✓ 🧠 Roteamento de Thinking: [ATIVADO]"
+        : "○ 🧠 Roteamento de Thinking: [DESATIVADO]",
+      description: local.model.auto.thinkingRouting()
+        ? "Ajusta tokens de raciocínio dinamicamente (low em buscas, max em arquitetura) · Clique para desativar"
+        : "Variante de raciocínio estática · Clique para ativar roteamento dinâmico de thinking",
+      onSelect: () => {
+        local.model.auto.toggleThinkingRouting()
+      },
+    })
+
+    list.push({
       value: "__back__",
       title: "← Voltar para Opções de Variante",
       description: `Configuração atual: ${summary}`,

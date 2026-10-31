@@ -165,6 +165,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         explicitTier: "efficiency" | "balanced" | "intelligence" | undefined
         managedDefaultTier: "efficiency" | "balanced" | "intelligence"
         selectedModels: string[] | undefined
+        thinkingRouting: boolean
         lastDecision:
           | {
               complexity: "low" | "medium" | "high"
@@ -172,14 +173,16 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               providerID: string
               modelID: string
               modelName: string
+              thinking?: string
               fusion: boolean
             }
           | undefined
       }>({
-        enabled: process.env.OMNICODE_ACTIVE === "1",
-        explicitTier: undefined,
+        enabled: true,
+        explicitTier: "balanced",
         managedDefaultTier: "balanced",
         selectedModels: undefined,
+        thinkingRouting: true,
         lastDecision: undefined,
       })
 
@@ -189,6 +192,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         } else {
           delete process.env.OMNICODE_ALLOWED_MODELS
         }
+        process.env.OMNICODE_THINKING_ROUTING = autoStore.thinkingRouting ? "1" : "0"
+        process.env.OMNICODE_OPTIMIZE_TIER = autoStore.explicitTier ?? autoStore.managedDefaultTier
       }
 
       function saveAutoStore() {
@@ -196,13 +201,17 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           enabled: autoStore.enabled,
           explicitTier: autoStore.explicitTier,
           selectedModels: autoStore.selectedModels,
+          thinkingRouting: autoStore.thinkingRouting,
         }).catch(() => undefined)
         syncAllowedModelsEnv()
       }
 
       readJson<Record<string, unknown>>(autoFilePath)
         .then((saved) => {
-          if (!saved || typeof saved !== "object") return
+          if (!saved || typeof saved !== "object") {
+            syncAllowedModelsEnv()
+            return
+          }
           batch(() => {
             if (typeof saved.enabled === "boolean") setAutoStore("enabled", saved.enabled)
             if (
@@ -215,6 +224,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             }
             if (Array.isArray(saved.selectedModels) && saved.selectedModels.every((x) => typeof x === "string")) {
               setAutoStore("selectedModels", saved.selectedModels as string[])
+            }
+            if (typeof saved.thinkingRouting === "boolean") {
+              setAutoStore("thinkingRouting", saved.thinkingRouting)
             }
           })
           syncAllowedModelsEnv()
@@ -250,10 +262,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       }
 
       function tierLabelText(tier: "default" | "efficiency" | "balanced" | "intelligence"): string {
-        if (tier === "efficiency") return "Eficiência"
-        if (tier === "intelligence") return "Inteligente"
-        if (tier === "balanced") return "Balanceado"
-        return "Modo Auto"
+        const base =
+          tier === "efficiency" ? "Eficiência" : tier === "intelligence" ? "Inteligente" : tier === "balanced" ? "Balanceado" : "Modo Auto"
+        return autoStore.thinkingRouting ? `${base} · 🧠 Thinking` : base
       }
 
       function autoVariantValue(tier: "default" | "efficiency" | "balanced" | "intelligence"): string {
@@ -343,11 +354,27 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         return `${JSON.stringify([ref.directory, ref.workspaceID])}:${agentID}`
       }
 
-      function preferredSelection(model: ModelPreferenceModel): ModelSelection {
+      function resolveMatchingVariant(variants: string[] | undefined, targetLevel: string): string | undefined {
+        if (!variants || variants.length === 0) return undefined
+        if (targetLevel === "low") {
+          return variants.find((v) => /(low|none|off|1k|fast)/i.test(v)) ?? variants[0]
+        }
+        if (targetLevel === "max" || targetLevel === "high") {
+          return variants.find((v) => /(max|xhigh|32k|high)/i.test(v)) ?? variants[variants.length - 1]
+        }
+        return variants.find((v) => /(medium|mid|8k|high)/i.test(v)) ?? variants[Math.floor(variants.length / 2)]
+      }
+
+      function preferredSelection(model: ModelPreferenceModel, explicitVariant?: string): ModelSelection {
         const configured = agent.current()?.model
         const fallback = configuredModel()
         const preferred = preferences.variant[modelPreferenceKey(model)]
+        const info = models()?.find((item) => item.providerID === model.providerID && item.id === model.modelID)
+        const matched = explicitVariant
+          ? resolveMatchingVariant(info?.variants.map((v) => v.id), explicitVariant)
+          : undefined
         const variant = normalizeModelVariant(
+          matched ??
           preferred ??
             (configured?.providerID === model.providerID && configured.id === model.modelID
               ? configured.variant
@@ -356,7 +383,6 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               ? fallback.variant
               : undefined),
         )
-        const info = models()?.find((item) => item.providerID === model.providerID && item.id === model.modelID)
         return { ...model, variant: info?.variants.some((item) => item.id === variant) ? variant : undefined }
       }
 
@@ -412,21 +438,24 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         )
       }
 
-      function selectModel(model: ModelPreferenceModel) {
+      function selectModel(model: ModelPreferenceModel, explicitVariant?: string) {
         if (route.data.type === "session") {
           const sessionID = route.data.sessionID
           const current = sessionSelection(sessionID)
           setSessionDraft(
             sessionID,
-            current?.providerID === model.providerID && current.modelID === model.modelID
+            current?.providerID === model.providerID && current.modelID === model.modelID && !explicitVariant
               ? current
-              : preferredSelection(model),
+              : preferredSelection(model, explicitVariant),
           )
           return true
         }
         const current = agent.current()
         if (!current) return false
-        setSelectionState("newSessionModelByLocationAgent", locationAgentKey(current.id), model)
+        setSelectionState("newSessionModelByLocationAgent", locationAgentKey(current.id), {
+          ...model,
+          variant: explicitVariant,
+        })
         return true
       }
 
@@ -771,17 +800,44 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
                         ? "intelligence"
                         : "balanced"
             const picked = this.pickForBucket(targetBucket) ?? available[0]!
-            selectModel({ providerID: picked.providerID, modelID: picked.id })
+            const thinkingVariant = autoStore.thinkingRouting
+              ? complexity === "low"
+                ? "low"
+                : complexity === "high"
+                  ? "max"
+                  : "medium"
+              : undefined
+            selectModel({ providerID: picked.providerID, modelID: picked.id }, thinkingVariant)
             const decision = {
               complexity,
               tier: effective,
               providerID: picked.providerID,
               modelID: picked.id,
               modelName: picked.name,
+              thinking: thinkingVariant,
               fusion: available.length >= 2,
             }
             setAutoStore("lastDecision", decision)
             return decision
+          },
+          thinkingRouting(): boolean {
+            return autoStore.thinkingRouting
+          },
+          setThinkingRouting(enabled: boolean) {
+            batch(() => {
+              setAutoStore("thinkingRouting", enabled)
+              saveAutoStore()
+              toast.show({
+                variant: enabled ? "success" : "info",
+                message: enabled
+                  ? "🧠 Roteamento Inteligente de Thinking ATIVADO (low em buscas, max em arquitetura)"
+                  : "Roteamento de Thinking DESATIVADO",
+                duration: 3500,
+              })
+            })
+          },
+          toggleThinkingRouting() {
+            this.setThinkingRouting(!autoStore.thinkingRouting)
           },
         },
         toggleFavorite(model: { providerID: string; modelID: string }) {

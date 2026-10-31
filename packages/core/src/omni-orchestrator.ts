@@ -51,6 +51,7 @@ export interface RoutedModelSelection {
   readonly category: TaskCategory
   readonly primary?: ModelRef
   readonly fallback?: ModelRef
+  readonly thinkingLevel?: "off" | "low" | "medium" | "high" | "max"
 }
 
 export interface Interface {
@@ -464,7 +465,14 @@ const layer = Layer.effect(
         matched.find((m) => m.providerID !== primary?.providerID || m.id !== primary?.id) ??
         availableModels.find((m) => m !== primary)
 
-      return { category, primary, fallback }
+      const thinkingLevel: "off" | "low" | "medium" | "high" | "max" =
+        category === "fast_explore" || category === "external_research" || agentId === "explore" || agentId === "librarian"
+          ? "low"
+          : category === "deep_architecture" || category === "security_review" || agentId === "architect" || agentId === "reviewer"
+            ? "max"
+            : "medium"
+
+      return { category, primary, fallback, thinkingLevel }
     })
 
     const formatBoomerangContract = (agentId: string) =>

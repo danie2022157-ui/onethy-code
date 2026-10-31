@@ -1098,6 +1098,17 @@ function App() {
               },
             },
             {
+              name: "omnicode.thinking_routing",
+              title: "Omni Fusion — Roteamento Inteligente de Thinking (Ativar/Desativar)",
+              description: "Ajusta tokens de raciocínio dinamicamente (low em buscas, max em arquitetura)",
+              category: "OnethyCode",
+              suggested: true,
+              slash: { name: "thinking", aliases: ["thinking-routing", "raciocinio", "pensamento"] },
+              run: () => {
+                local.model.auto.toggleThinkingRouting()
+              },
+            },
+            {
               name: "omnicode.memory",
               title: "Memory Bank Persistente (.omnicode/memory-bank/)",
               description: "Abre painel visual com os arquivos de memória arquitetural do projeto",

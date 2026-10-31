@@ -59,6 +59,18 @@ export function DialogVariant() {
             dialog.replace(() => <DialogFusionModels />)
           },
         },
+        {
+          value: "thinking routing",
+          title: local.model.auto.thinkingRouting()
+            ? "✓ 🧠 Roteamento de Thinking: [ATIVADO]"
+            : "○ 🧠 Roteamento de Thinking: [DESATIVADO]",
+          description: local.model.auto.thinkingRouting()
+            ? "Ativo: ajusta raciocínio dinamicamente (low em buscas, max em arquitetura)"
+            : "Inativo: mantém variante fixa do modelo. Clique para ativar",
+          onSelect: () => {
+            local.model.auto.toggleThinkingRouting()
+          },
+        },
       ]
     }
 
