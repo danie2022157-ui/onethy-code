@@ -1,0 +1,221 @@
+{
+  "$schema": "https://opencode.ai/theme.json",
+  "defs": {
+    "pitchBlack": "#000000",
+    "oledPanel": "#08080C",
+    "oledElement": "#101018",
+    "oledBorder": "#20202E",
+    "laserCyan": "#00FFFF",
+    "laserSky": "#38BDF8",
+    "laserViolet": "#A855F7",
+    "laserPink": "#FF007F",
+    "laserGreen": "#00FF88",
+    "laserAmber": "#FFB703",
+    "laserCrimson": "#FF0055",
+    "laserWhite": "#FFFFFF",
+    "laserMuted": "#9CA3AF",
+    "laserDim": "#4B5563"
+  },
+  "theme": {
+    "primary": {
+      "dark": "laserCyan",
+      "light": "#0891B2"
+    },
+    "secondary": {
+      "dark": "laserViolet",
+      "light": "#7C3AED"
+    },
+    "accent": {
+      "dark": "laserPink",
+      "light": "#BE185D"
+    },
+    "error": {
+      "dark": "laserCrimson",
+      "light": "#DC2626"
+    },
+    "warning": {
+      "dark": "laserAmber",
+      "light": "#D97706"
+    },
+    "success": {
+      "dark": "laserGreen",
+      "light": "#059669"
+    },
+    "info": {
+      "dark": "laserSky",
+      "light": "#0284C7"
+    },
+    "text": {
+      "dark": "laserWhite",
+      "light": "#111827"
+    },
+    "textMuted": {
+      "dark": "laserMuted",
+      "light": "#6B7280"
+    },
+    "background": {
+      "dark": "pitchBlack",
+      "light": "#FFFFFF"
+    },
+    "backgroundPanel": {
+      "dark": "oledPanel",
+      "light": "#F9FAFB"
+    },
+    "backgroundElement": {
+      "dark": "oledElement",
+      "light": "#F3F4F6"
+    },
+    "border": {
+      "dark": "oledBorder",
+      "light": "#E5E7EB"
+    },
+    "borderActive": {
+      "dark": "laserCyan",
+      "light": "#0891B2"
+    },
+    "borderSubtle": {
+      "dark": "#12121A",
+      "light": "#F3F4F6"
+    },
+    "diffAdded": {
+      "dark": "laserGreen",
+      "light": "#059669"
+    },
+    "diffRemoved": {
+      "dark": "laserCrimson",
+      "light": "#DC2626"
+    },
+    "diffContext": {
+      "dark": "laserMuted",
+      "light": "#6B7280"
+    },
+    "diffHunkHeader": {
+      "dark": "laserViolet",
+      "light": "#7C3AED"
+    },
+    "diffHighlightAdded": {
+      "dark": "#00FF88",
+      "light": "#10B981"
+    },
+    "diffHighlightRemoved": {
+      "dark": "#FF0055",
+      "light": "#DC2626"
+    },
+    "diffAddedBg": {
+      "dark": "#022B17",
+      "light": "#ECFDF5"
+    },
+    "diffRemovedBg": {
+      "dark": "#360211",
+      "light": "#FFF1F2"
+    },
+    "diffContextBg": {
+      "dark": "oledPanel",
+      "light": "#F9FAFB"
+    },
+    "diffLineNumber": {
+      "dark": "laserDim",
+      "light": "#9CA3AF"
+    },
+    "diffAddedLineNumberBg": {
+      "dark": "#022B17",
+      "light": "#ECFDF5"
+    },
+    "diffRemovedLineNumberBg": {
+      "dark": "#360211",
+      "light": "#FFF1F2"
+    },
+    "markdownText": {
+      "dark": "laserWhite",
+      "light": "#111827"
+    },
+    "markdownHeading": {
+      "dark": "laserCyan",
+      "light": "#0891B2"
+    },
+    "markdownLink": {
+      "dark": "laserCyan",
+      "light": "#0891B2"
+    },
+    "markdownLinkText": {
+      "dark": "laserPink",
+      "light": "#BE185D"
+    },
+    "markdownCode": {
+      "dark": "laserGreen",
+      "light": "#059669"
+    },
+    "markdownBlockQuote": {
+      "dark": "laserMuted",
+      "light": "#6B7280"
+    },
+    "markdownEmph": {
+      "dark": "laserAmber",
+      "light": "#D97706"
+    },
+    "markdownStrong": {
+      "dark": "laserViolet",
+      "light": "#7C3AED"
+    },
+    "markdownHorizontalRule": {
+      "dark": "laserCyan",
+      "light": "#0891B2"
+    },
+    "markdownListItem": {
+      "dark": "laserCyan",
+      "light": "#0891B2"
+    },
+    "markdownListEnumeration": {
+      "dark": "laserViolet",
+      "light": "#7C3AED"
+    },
+    "markdownImage": {
+      "dark": "laserCyan",
+      "light": "#0891B2"
+    },
+    "markdownImageText": {
+      "dark": "laserPink",
+      "light": "#BE185D"
+    },
+    "markdownCodeBlock": {
+      "dark": "oledPanel",
+      "light": "#F9FAFB"
+    },
+    "syntaxComment": {
+      "dark": "laserDim",
+      "light": "#9CA3AF"
+    },
+    "syntaxKeyword": {
+      "dark": "laserPink",
+      "light": "#BE185D"
+    },
+    "syntaxFunction": {
+      "dark": "laserCyan",
+      "light": "#0891B2"
+    },
+    "syntaxVariable": {
+      "dark": "laserWhite",
+      "light": "#111827"
+    },
+    "syntaxString": {
+      "dark": "laserGreen",
+      "light": "#059669"
+    },
+    "syntaxNumber": {
+      "dark": "laserAmber",
+      "light": "#D97706"
+    },
+    "syntaxType": {
+      "dark": "laserViolet",
+      "light": "#7C3AED"
+    },
+    "syntaxOperator": {
+      "dark": "laserCrimson",
+      "light": "#DC2626"
+    },
+    "syntaxPunctuation": {
+      "dark": "laserMuted",
+      "light": "#6B7280"
+    }
+  }
+}

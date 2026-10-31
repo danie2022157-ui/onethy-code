@@ -32,12 +32,18 @@ import vercel from "./assets/vercel.json" with { type: "json" }
 import vesper from "./assets/vesper.json" with { type: "json" }
 import zenburn from "./assets/zenburn.json" with { type: "json" }
 import onethy from "./assets/onethy.json" with { type: "json" }
+import onethyLunar from "./assets/onethy-lunar.json" with { type: "json" }
+import onethyAurora from "./assets/onethy-aurora.json" with { type: "json" }
+import onethyEclipse from "./assets/onethy-eclipse.json" with { type: "json" }
 
 export type { ColorValue, Theme, ThemeColor, ThemeV1Json } from "@opencode/theme/tui/v1"
 
 export const DEFAULT_THEMES: Record<string, ThemeV1Json> = {
   onethy,
-  ["onethy-lunar"]: onethy,
+  ["onethy-cosmic"]: onethy,
+  ["onethy-lunar"]: onethyLunar,
+  ["onethy-aurora"]: onethyAurora,
+  ["onethy-eclipse"]: onethyEclipse,
   aura,
   ayu,
   catppuccin,

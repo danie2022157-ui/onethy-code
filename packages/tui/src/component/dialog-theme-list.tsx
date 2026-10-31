@@ -6,12 +6,26 @@ import { onCleanup } from "solid-js"
 /** `onClose` returns to the caller, e.g. Settings, instead of closing every dialog. */
 export function DialogThemeList(props: { onClose?: () => void }) {
   const themes = useThemes()
-  const options = Object.keys(themes.all())
+  const allNames = Object.keys(themes.all())
+  const onethyNames = allNames
+    .filter((k) => k.startsWith("onethy"))
+    .sort((a, b) => (a === "onethy" ? -1 : b === "onethy" ? 1 : a.localeCompare(b)))
+  const otherNames = allNames
+    .filter((k) => !k.startsWith("onethy"))
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
-    .map((value) => ({
-      title: value,
-      value: value,
-    }))
+
+  const options = [...onethyNames, ...otherNames].map((value) => {
+    let title = value
+    if (value === "onethy") title = `⚡ onethy (Oficial Cosmic Cyberpunk)`
+    else if (value === "onethy-cosmic") title = `⚡ onethy-cosmic (Cyberpunk)`
+    else if (value === "onethy-lunar") title = `🌙 onethy-lunar (Midnight Moon)`
+    else if (value === "onethy-aurora") title = `🌌 onethy-aurora (Aurora Borealis Mint)`
+    else if (value === "onethy-eclipse") title = `🌑 onethy-eclipse (OLED Pitch Black)`
+    return {
+      title,
+      value,
+    }
+  })
   const dialog = useDialog()
   let confirmed = false
   let ref: DialogSelectRef<string>
