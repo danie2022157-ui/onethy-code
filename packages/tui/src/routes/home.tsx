@@ -92,20 +92,84 @@ export function Home() {
     r.submit()
   })
 
-  const statsSummary = createMemo(() => {
+  const ecosystemStats = createMemo(() => {
     const loc = currentLocation()
     const agents = (data.location.agent.list(loc) ?? []).filter((a) => !a.hidden).length
-    const skills = (data.location.skill.list(loc) ?? []).length
+    const allSkills = data.location.skill.list(loc) ?? []
+    let skills = 0
+    let mods = 0
+    let hooks = 0
+    for (const s of allSkills) {
+      const p = s.path.replace(/\\/g, "/").toLowerCase()
+      const n = s.name.toLowerCase()
+      if (p.includes("/hooks/") || n.startsWith("hook-")) hooks++
+      else if (p.includes("/mods/") || p.includes("/plugins/") || n.startsWith("mod-")) mods++
+      else if (!p.includes("/settings/") && !n.startsWith("setting-")) skills++
+    }
+    const commands = (data.location.command.list(loc) ?? []).length
     const mcps = (data.location.mcp.server.list(loc) ?? []).length
-    return { agents, skills, mcps }
+    return [
+      {
+        icon: "👤",
+        label: "Agentes",
+        count: String(agents),
+        colorHex: "#00F5FF",
+        onClick: () => dialog.replace(() => <DialogAgent />),
+      },
+      {
+        icon: "📊",
+        label: "Skills",
+        count: String(skills),
+        colorHex: "#A855F7",
+        onClick: () => dialog.replace(() => <DialogCustomizations filter="skills" />),
+      },
+      {
+        icon: "🔗",
+        label: "Mods",
+        count: String(mods),
+        colorHex: "#10B981",
+        onClick: () => dialog.replace(() => <DialogCustomizations filter="mods" />),
+      },
+      {
+        icon: "</>",
+        label: "Hooks",
+        count: String(hooks),
+        colorHex: "#F59E0B",
+        onClick: () => dialog.replace(() => <DialogCustomizations filter="hooks" />),
+      },
+      {
+        icon: "⚡",
+        label: "Comandos",
+        count: String(commands),
+        colorHex: "#F43F5E",
+        onClick: () => dialog.replace(() => <DialogCustomizations filter="commands" />),
+      },
+      {
+        icon: "🔌",
+        label: "MCPs",
+        count: String(mcps),
+        colorHex: "#06B6D4",
+        onClick: () => dialog.replace(() => <DialogMcp />),
+      },
+      {
+        icon: "⚡",
+        label: local.model.auto.modeName(),
+        count: local.model.auto.enabled() ? local.model.auto.tierLabel() : "Auto",
+        colorHex: "#8B5CF6",
+        onClick: () => dialog.replace(() => <DialogModel />),
+      },
+    ]
   })
 
-  const quickCommands = [
+  const quickRow1 = [
     { cmd: "/ulw", desc: "Ultrawork", fg: RGBA.fromHex("#00F5FF") },
     { cmd: "/arena", desc: "Multi-Modelo", fg: RGBA.fromHex("#10B981") },
-    { cmd: "/raph", desc: "Loop", fg: RGBA.fromHex("#F43F5E") },
-    { cmd: "/bus", desc: "OmniBus", fg: RGBA.fromHex("#00D2FF") },
-    { cmd: "/auto", desc: "Omni Fusion", fg: RGBA.fromHex("#A855F7") },
+    { cmd: "/raph", desc: "Loop Verificador", fg: RGBA.fromHex("#F43F5E") },
+    { cmd: "/bus", desc: "OnethyBus", fg: RGBA.fromHex("#00D2FF") },
+  ]
+  const quickRow2 = [
+    { cmd: "/auto", desc: "Onethy Fusion", fg: RGBA.fromHex("#A855F7") },
+    { cmd: "/personalizacoes", desc: "Catálogo", fg: RGBA.fromHex("#F59E0B") },
   ]
 
   return (
@@ -131,88 +195,136 @@ export function Home() {
         <box width="100%" maxWidth={78} zIndex={1000} paddingTop={1} flexShrink={0} position="relative">
           <Prompt ref={bind} placeholders={placeholder} disabled={forms().length > 0} />
         </box>
-        <Show when={dimensions().height >= 22 && dimensions().width >= 60}>
+        <Show when={dimensions().height >= 22 && dimensions().width >= 64}>
           <box
             flexDirection="column"
             alignItems="center"
             paddingTop={1}
             gap={1}
             width="100%"
-            maxWidth={78}
+            maxWidth={84}
             flexShrink={0}
           >
-            {/* Linha discreta de estatísticas do ecossistema */}
-            <box
-              flexDirection="row"
-              alignItems="center"
-              justifyContent="center"
-              gap={1}
-              onMouseUp={() => dialog.replace(() => <DialogCustomizations />)}
-            >
-              <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
-                ✦ {statsSummary().agents}
-              </text>
-              <text fg={theme.text.muted} selectable={false}>
-                agentes
-              </text>
-              <text fg={theme.text.muted} selectable={false}>
-                ·
-              </text>
-              <text fg={RGBA.fromHex("#A855F7")} attributes={TextAttributes.BOLD} selectable={false}>
-                ✦ {statsSummary().skills}
-              </text>
-              <text fg={theme.text.muted} selectable={false}>
-                skills
-              </text>
-              <text fg={theme.text.muted} selectable={false}>
-                ·
-              </text>
-              <text fg={RGBA.fromHex("#06B6D4")} attributes={TextAttributes.BOLD} selectable={false}>
-                ✦ {statsSummary().mcps}
-              </text>
-              <text fg={theme.text.muted} selectable={false}>
-                MCPs
-              </text>
-              <text fg={theme.text.muted} selectable={false}>
-                ·
-              </text>
-              <text fg={RGBA.fromHex("#10B981")} attributes={TextAttributes.BOLD} selectable={false}>
-                /personalizacoes
-              </text>
-            </box>
-
-            {/* Linha única e limpa de atalhos rápidos essenciais */}
-            <Show when={dimensions().height >= 25}>
-              <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={2}>
-                <For each={quickCommands}>
-                  {(chip) => {
+            <box flexDirection="column" alignItems="center" gap={1}>
+              <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={1}>
+                <For each={ecosystemStats().slice(0, 5)}>
+                  {(badge) => {
+                    const fg = () => RGBA.fromHex(badge.colorHex)
                     const [hovered, setHovered] = createSignal(false)
+                    const bg = () => (hovered() ? tint(theme.background.base, fg(), 0.35) : tint(theme.background.base, fg(), 0.16))
                     return (
                       <box
                         flexDirection="row"
+                        paddingLeft={1}
+                        paddingRight={1}
+                        backgroundColor={bg()}
                         onMouseOver={() => setHovered(true)}
                         onMouseOut={() => setHovered(false)}
-                        onMouseUp={() => {
-                          const composer = ref()
-                          if (!composer) return
-                          composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
-                        }}
+                        onMouseUp={badge.onClick}
                       >
-                        <text
-                          fg={chip.fg}
-                          attributes={hovered() ? TextAttributes.BOLD | TextAttributes.UNDERLINE : TextAttributes.BOLD}
-                          selectable={false}
-                        >
-                          {chip.cmd}
+                        <text fg={fg()} attributes={TextAttributes.BOLD} selectable={false}>
+                          {badge.icon} {badge.count}{" "}
                         </text>
-                        <text fg={hovered() ? theme.text.base : theme.text.muted} selectable={false}>
-                          {" "}
-                          {chip.desc}
+                        <text fg={theme.text.base} selectable={false}>
+                          {badge.label}
                         </text>
                       </box>
                     )
                   }}
                 </For>
+              </box>
+              <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={1}>
+                <For each={ecosystemStats().slice(5)}>
+                  {(badge) => {
+                    const fg = () => RGBA.fromHex(badge.colorHex)
+                    const [hovered, setHovered] = createSignal(false)
+                    const bg = () => (hovered() ? tint(theme.background.base, fg(), 0.35) : tint(theme.background.base, fg(), 0.16))
+                    return (
+                      <box
+                        flexDirection="row"
+                        paddingLeft={1}
+                        paddingRight={1}
+                        backgroundColor={bg()}
+                        onMouseOver={() => setHovered(true)}
+                        onMouseOut={() => setHovered(false)}
+                        onMouseUp={badge.onClick}
+                      >
+                        <text fg={fg()} attributes={TextAttributes.BOLD} selectable={false}>
+                          {badge.icon} {badge.count}{" "}
+                        </text>
+                        <text fg={theme.text.base} selectable={false}>
+                          {badge.label}
+                        </text>
+                      </box>
+                    )
+                  }}
+                </For>
+              </box>
+            </box>
+            <Show when={dimensions().height >= 26}>
+              <box flexDirection="column" alignItems="center" gap={1}>
+                <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={2}>
+                  <For each={quickRow1}>
+                    {(chip) => {
+                      const [hovered, setHovered] = createSignal(false)
+                      return (
+                        <box
+                          flexDirection="row"
+                          onMouseOver={() => setHovered(true)}
+                          onMouseOut={() => setHovered(false)}
+                          onMouseUp={() => {
+                            const composer = ref()
+                            if (!composer) return
+                            composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
+                          }}
+                        >
+                          <text
+                            fg={chip.fg}
+                            attributes={hovered() ? TextAttributes.BOLD | TextAttributes.UNDERLINE : TextAttributes.BOLD}
+                            selectable={false}
+                          >
+                            {chip.cmd}
+                          </text>
+                          <text fg={hovered() ? theme.text.base : theme.text.muted} selectable={false}>
+                            {" "}
+                            {chip.desc}
+                          </text>
+                        </box>
+                      )
+                    }}
+                  </For>
+                </box>
+                <box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={2}>
+                  <For each={quickRow2}>
+                    {(chip) => {
+                      const [hovered, setHovered] = createSignal(false)
+                      return (
+                        <box
+                          flexDirection="row"
+                          onMouseOver={() => setHovered(true)}
+                          onMouseOut={() => setHovered(false)}
+                          onMouseUp={() => {
+                            const composer = ref()
+                            if (!composer) return
+                            composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
+                          }}
+                        >
+                          <text
+                            fg={chip.fg}
+                            attributes={hovered() ? TextAttributes.BOLD | TextAttributes.UNDERLINE : TextAttributes.BOLD}
+                            selectable={false}
+                          >
+                            {chip.cmd}
+                          </text>
+                          <text fg={hovered() ? theme.text.base : theme.text.muted} selectable={false}>
+                            {" "}
+                            {chip.desc}
+                          </text>
+                        </box>
+                      )
+                    }}
+                  </For>
+                </box>
               </box>
             </Show>
           </box>

@@ -1101,15 +1101,12 @@ function App() {
             {
               name: "omnicode.thinking_routing",
               title: "Omni Fusion — Roteamento Inteligente de Thinking (Ativar/Desativar)",
-              description: "Ajusta tokens de raciocínio dinamicamente (low em buscas, max em arquitetura) ou abre seleção manual",
+              description: "Ajusta tokens de raciocínio dinamicamente (low em buscas, max em arquitetura)",
               category: "OnethyCode",
               suggested: true,
               slash: { name: "thinking", aliases: ["thinking-routing", "raciocinio", "pensamento"] },
               run: () => {
                 local.model.auto.toggleThinkingRouting()
-                if (!local.model.auto.thinkingRouting()) {
-                  dialog.replace(() => <DialogVariant />)
-                }
               },
             },
             {
@@ -1336,23 +1333,22 @@ function App() {
         },
         category: "System",
       },
-      ...(updater.open || (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")
-        ? [
-            {
-              name: "opencode.update",
-              title: (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1") ? "Atualizar OnethyCode" : "Update OpenCode",
-              slash: { name: "update", aliases: ["atualizar", "upgrade"] },
-              run: () => {
-                if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")) {
-                  dialog.replace(() => <DialogOmniUpdate />)
-                  return
-                }
-                updater.open?.("manual")
-              },
-              category: "System",
-            },
-          ]
-        : []),
+      {
+        name: "opencode.update",
+        title: (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1" || !updater.open)
+          ? "Atualizar OnethyCode"
+          : "Update OpenCode",
+        description: "Verifica e instala atualizações do OnethyCode via GitHub",
+        slash: { name: "update", aliases: ["atualizar", "upgrade"] },
+        run: () => {
+          if (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1" || !updater.open) {
+            dialog.replace(() => <DialogOmniUpdate />)
+            return
+          }
+          updater.open("manual")
+        },
+        category: "System",
+      },
       {
         name: "server.pair",
         title: "Pair device",

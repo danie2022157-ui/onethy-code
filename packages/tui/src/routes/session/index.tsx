@@ -3521,7 +3521,6 @@ function Edit(props: ToolProps) {
           <BlockTool path={{ label: "← Edit", value: pathFormatter.format(path()) }} part={props.part}>
             <box paddingLeft={1}>
               <PatchDiff
-                scroll={() => scroll}
                 diff={item().patch}
                 hunkFg={theme.diff.text.hunkHeader}
                 view={view()}
@@ -3612,7 +3611,6 @@ function ApplyPatch(props: ToolProps) {
                 >
                   <box paddingLeft={1}>
                     <PatchDiff
-                      scroll={() => scroll}
                       diff={file.patch}
                       hunkFg={theme.diff.text.hunkHeader}
                       view={view()}

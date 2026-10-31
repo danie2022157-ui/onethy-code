@@ -166,7 +166,6 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         managedDefaultTier: "efficiency" | "balanced" | "intelligence"
         selectedModels: string[] | undefined
         thinkingRouting: boolean
-        manualThinking: "off" | "low" | "medium" | "high" | "max"
         lastDecision:
           | {
               complexity: "low" | "medium" | "high"
@@ -184,7 +183,6 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         managedDefaultTier: "balanced",
         selectedModels: undefined,
         thinkingRouting: true,
-        manualThinking: "medium",
         lastDecision: undefined,
       })
 
@@ -195,7 +193,6 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           delete process.env.OMNICODE_ALLOWED_MODELS
         }
         process.env.OMNICODE_THINKING_ROUTING = autoStore.thinkingRouting ? "1" : "0"
-        process.env.OMNICODE_MANUAL_THINKING = autoStore.manualThinking || "medium"
         process.env.OMNICODE_OPTIMIZE_TIER = autoStore.explicitTier ?? autoStore.managedDefaultTier
       }
 
@@ -205,7 +202,6 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           explicitTier: autoStore.explicitTier,
           selectedModels: autoStore.selectedModels,
           thinkingRouting: autoStore.thinkingRouting,
-          manualThinking: autoStore.manualThinking,
         }).catch(() => undefined)
         syncAllowedModelsEnv()
       }
@@ -231,15 +227,6 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             }
             if (typeof saved.thinkingRouting === "boolean") {
               setAutoStore("thinkingRouting", saved.thinkingRouting)
-            }
-            if (
-              saved.manualThinking === "off" ||
-              saved.manualThinking === "low" ||
-              saved.manualThinking === "medium" ||
-              saved.manualThinking === "high" ||
-              saved.manualThinking === "max"
-            ) {
-              setAutoStore("manualThinking", saved.manualThinking)
             }
           })
           syncAllowedModelsEnv()
@@ -465,10 +452,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         }
         const current = agent.current()
         if (!current) return false
-        setSelectionState("newSessionModelByLocationAgent", locationAgentKey(current.id), {
-          ...model,
-          variant: explicitVariant,
-        })
+        setSelectionState("newSessionModelByLocationAgent", locationAgentKey(current.id), model)
         return true
       }
 
@@ -558,12 +542,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           const baseModelName = info?.name ?? `${value.modelID} (unavailable)`
           const availableCount = (models() ?? []).filter((m) => m.status !== "deprecated").length
           const modeTitle = availableCount >= 2 ? "Omni Fusion" : "Auto"
-          const tier = autoStore.explicitTier ?? autoStore.managedDefaultTier
-          const tierLabel =
-            tier === "efficiency" ? "Eficiência" : tier === "intelligence" ? "Inteligente" : "Balanceado"
           return {
-            provider: autoStore.enabled ? "" : (provider?.name ?? value.providerID),
-            model: autoStore.enabled ? `⚡ ${modeTitle} (${tierLabel})` : baseModelName,
+            provider: provider?.name ?? value.providerID,
+            model: autoStore.enabled ? `⚡ ${modeTitle} → ${baseModelName}` : baseModelName,
             reasoning: autoStore.enabled ? true : (info?.variants?.length ?? 0) !== 0,
           }
         }),
@@ -855,30 +836,6 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           toggleThinkingRouting() {
             this.setThinkingRouting(!autoStore.thinkingRouting)
           },
-          manualThinking(): "off" | "low" | "medium" | "high" | "max" {
-            return autoStore.manualThinking || "medium"
-          },
-          setManualThinking(level: "off" | "low" | "medium" | "high" | "max") {
-            batch(() => {
-              setAutoStore("manualThinking", level)
-              saveAutoStore()
-              toast.show({
-                variant: "success",
-                message: `🧠 Nível de Thinking Manual: ${level.toUpperCase()}`,
-                duration: 3000,
-              })
-            })
-          },
-          cycleTier() {
-            const current = autoStore.explicitTier ?? autoStore.managedDefaultTier
-            const next =
-              current === "efficiency"
-                ? "balanced"
-                : current === "balanced"
-                  ? "intelligence"
-                  : "efficiency"
-            this.setTier(next)
-          },
         },
         toggleFavorite(model: { providerID: string; modelID: string }) {
           batch(() => {
@@ -893,10 +850,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         variant: {
           selected() {
             if (autoStore.enabled) {
-              if (!autoStore.thinkingRouting) {
-                return autoStore.manualThinking || "medium"
-              }
-              return undefined
+              return autoVariantValue(autoStore.explicitTier ?? "default")
             }
             return currentSelection()?.variant
           },
@@ -905,9 +859,6 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           },
           list() {
             if (autoStore.enabled) {
-              if (!autoStore.thinkingRouting) {
-                return ["low", "medium", "high", "max", "off"]
-              }
               return ["modo auto", "eficiência", "balanceado", "inteligente"]
             }
             const m = currentSelection()
@@ -918,12 +869,6 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           set(value: string | undefined) {
             if (autoStore.enabled) {
               const norm = (value ?? "").toLowerCase().trim()
-              if (!autoStore.thinkingRouting) {
-                if (norm === "off" || norm === "low" || norm === "medium" || norm === "high" || norm === "max") {
-                  local.model.auto.setManualThinking(norm as any)
-                  return
-                }
-              }
               if (norm === "eficiência" || norm === "eficiencia" || norm === "efficiency") {
                 this.autoSetTier("efficiency")
               } else if (norm === "balanceado" || norm === "balanced") {

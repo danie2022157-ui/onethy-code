@@ -248,7 +248,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
               flexDirection="row"
               gap={1}
               alignItems="center"
-              onMouseUp={() => setOpenFusion((prev) => !prev)}
+              onMouseUp={() => setOpenFusion((prev: boolean) => !prev)}
             >
               <text fg={theme.text.base}>
                 <b>{openFusion() ? "▾" : "▸"} ⚡ Omni Fusion ({fusion().modelCount} {fusion().isFiltered ? "selecionados" : "modelos"})</b>
@@ -291,7 +291,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
             flexDirection="row"
             gap={1}
             alignItems="center"
-            onMouseUp={() => setOpenSubagentModels((prev) => !prev)}
+            onMouseUp={() => setOpenSubagentModels((prev: boolean) => !prev)}
           >
             <text fg={theme.text.base}>
               <b>{openSubagentModels() ? "▾" : "▸"} Modelos por Subagente</b>
@@ -315,7 +315,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
               flexDirection="row"
               gap={1}
               alignItems="center"
-              onMouseUp={() => setOpenCustomizations((prev) => !prev)}
+              onMouseUp={() => setOpenCustomizations((prev: boolean) => !prev)}
             >
               <text fg={theme.text.base}>
                 <b>{openCustomizations() ? "▾" : "▸"} Personalizações ({summary().skills + summary().mods + summary().hooks + summary().settings} itens)</b>

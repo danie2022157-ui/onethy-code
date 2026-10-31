@@ -109,7 +109,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
   createEffect(() => {
     const sid = props.sessionID
     const s = status()
-    const msgCount = messages().length
+    void messages().length
     if (sid) {
       scheduleLoadDiff(s === "running" ? 600 : 200)
     } else {
@@ -121,8 +121,8 @@ export function PromptReviewBar(props: { sessionID?: string }) {
   onMount(() => {
     scheduleLoadDiff(100)
 
-    const unsub = client.event.listen((evt) => {
-      const type = evt.type
+    const unsub = client.event.listen((evt: any) => {
+      const type = (evt?.details?.type ?? evt?.type ?? "") as string
       // Filter out high-frequency streaming deltas
       if (
         type.includes(".delta") ||

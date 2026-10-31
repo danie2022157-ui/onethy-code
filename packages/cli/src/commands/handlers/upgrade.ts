@@ -13,7 +13,30 @@ export default Runtime.handler(
     function* (input) {
       intro("Upgrade")
       if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")) {
-        log.warn("OnethyCode has no standalone update channel yet. Update its source checkout manually.")
+        const s = spinner()
+        s.start("Atualizando OnethyCode (git pull origin main)...")
+        const pullResult = yield* Effect.tryPromise(async () => {
+          const { execSync } = await import("node:child_process")
+          const { fileURLToPath } = await import("node:url")
+          const path = await import("node:path")
+          const fs = await import("node:fs")
+          let curr = path.dirname(fileURLToPath(import.meta.url))
+          for (let i = 0; i < 8; i++) {
+            if (fs.existsSync(path.join(curr, ".git")) && fs.existsSync(path.join(curr, "package.json"))) break
+            const parent = path.dirname(curr)
+            if (parent === curr) break
+            curr = parent
+          }
+          return execSync("git pull origin main", { cwd: curr, encoding: "utf8" })
+        }).pipe(Effect.option)
+
+        if (Option.isSome(pullResult)) {
+          s.stop("✓ OnethyCode atualizado!")
+          log.success(pullResult.value.trim())
+        } else {
+          s.stop("Falha ao atualizar via git.")
+          log.warn("Execute 'git pull origin main' no diretório do OnethyCode.")
+        }
         outro("Done")
         return
       }

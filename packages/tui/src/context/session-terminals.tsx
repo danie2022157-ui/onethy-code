@@ -53,20 +53,24 @@ export const { use: useSessionTerminals, provider: SessionTerminalsProvider } = 
       })
     }
 
-    for (const type of ["persistent-pty.added", "persistent-pty.removed"] as const) {
-      onCleanup(
-        event.on(type, (evt) => {
-          if (type === "persistent-pty.removed") {
-            pending.delete(evt.data.ptyID)
-            writers.delete(evt.data.ptyID)
-          }
-          if (!available() || !terminals[evt.data.sessionID]) return
-          void refresh(evt.data.sessionID).catch((error) =>
-            console.error("Failed to refresh persistent terminal panes", error),
-          )
-        }),
-      )
-    }
+    onCleanup(
+      event.on("persistent-pty.removed", (evt) => {
+        pending.delete(evt.data.ptyID)
+        writers.delete(evt.data.ptyID)
+        if (!available() || !terminals[evt.data.sessionID]) return
+        void refresh(evt.data.sessionID).catch((error) =>
+          console.error("Failed to refresh persistent terminal panes", error),
+        )
+      }),
+    )
+    onCleanup(
+      event.on("persistent-pty.added", (evt) => {
+        if (!available() || !terminals[evt.data.sessionID]) return
+        void refresh(evt.data.sessionID).catch((error) =>
+          console.error("Failed to refresh persistent terminal panes", error),
+        )
+      }),
+    )
     // The event stream opens with server.connected, so this runs for the first connection and every reconnect.
     onCleanup(
       event.on("server.connected", () => {
