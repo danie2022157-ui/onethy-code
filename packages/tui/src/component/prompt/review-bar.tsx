@@ -1,9 +1,10 @@
 import { RGBA, TextAttributes, type MouseEvent } from "@opentui/core"
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { useClient } from "../../context/client"
 import { useData } from "../../context/data"
 import { useTheme } from "../../context/theme"
 import { Keymap } from "../../context/keymap"
+import { useToast } from "../../ui/toast"
 
 export interface ChangedFile {
   readonly file: string
@@ -17,54 +18,119 @@ export function PromptReviewBar(props: { sessionID?: string }) {
   const data = useData()
   const theme = useTheme()
   const keymap = Keymap.use()
+  const toast = useToast()
 
   const [files, setFiles] = createSignal<readonly ChangedFile[]>([])
   const [expanded, setExpanded] = createSignal(false)
   const [dismissedSession, setDismissedSession] = createSignal<string | null>(null)
-  const [dismissedCount, setDismissedCount] = createSignal<number>(0)
+  const [dismissedFingerprint, setDismissedFingerprint] = createSignal<string>("")
 
   const status = createMemo(() => (props.sessionID ? data.session.status(props.sessionID) : undefined))
+  const messages = createMemo(() => (props.sessionID ? data.session.message.list(props.sessionID) : []))
 
   const loadDiff = async () => {
-    if (!props.sessionID) {
+    const sid = props.sessionID
+    if (!sid) {
       setFiles([])
       return
     }
+
     try {
-      const rawList = await client.api.session.diff({ sessionID: props.sessionID })
-      const list: ChangedFile[] = (rawList ?? []).map((item) => ({
-        file: item.file ?? "",
-        additions: typeof item.additions === "number" ? item.additions : 0,
-        deletions: typeof item.deletions === "number" ? item.deletions : 0,
-        status: item.status ?? "modified",
-      }))
-      setFiles(list)
+      let resolved: ChangedFile[] = []
+
+      // 1. Try session.diff first
+      try {
+        const sessionDiff = await client.api.session.diff({ sessionID: sid })
+        if (Array.isArray(sessionDiff) && sessionDiff.length > 0) {
+          resolved = sessionDiff.map((item) => ({
+            file: item.file ?? "",
+            additions: typeof item.additions === "number" ? item.additions : 0,
+            deletions: typeof item.deletions === "number" ? item.deletions : 0,
+            status: item.status ?? "modified",
+          }))
+        }
+      } catch {
+        // session.diff may not have snapshots recorded yet; fallback to vcs
+      }
+
+      // 2. Fallback to vcs.diff("working")
+      if (resolved.length === 0) {
+        try {
+          const vcsRes: any = await client.api.vcs.diff({ mode: "working" })
+          const vcsList = Array.isArray(vcsRes) ? vcsRes : (vcsRes?.data ?? [])
+          if (Array.isArray(vcsList) && vcsList.length > 0) {
+            resolved = vcsList.map((item: any) => ({
+              file: item.file ?? "",
+              additions: typeof item.additions === "number" ? item.additions : 0,
+              deletions: typeof item.deletions === "number" ? item.deletions : 0,
+              status: item.status ?? "modified",
+            }))
+          }
+        } catch {
+          // vcs not available
+        }
+      }
+
+      // Filter out empty file names
+      resolved = resolved.filter((f) => f.file.trim().length > 0)
+      setFiles(resolved)
     } catch {
       setFiles([])
     }
   }
 
-  // Reload diff when session finishes running (becomes idle) or sessionID changes
-  createEffect((prevStatus) => {
-    const cur = status()
-    if (props.sessionID) {
-      if (prevStatus === "running" && cur === "idle") {
-        void loadDiff()
-      } else if (prevStatus === undefined) {
-        void loadDiff()
-      }
+  // React to status changes and message list updates in real time
+  createEffect(() => {
+    const sid = props.sessionID
+    const s = status()
+    const msgCount = messages().length
+    if (sid) {
+      void loadDiff()
     } else {
       setFiles([])
     }
-    return cur
+  })
+
+  // Listen to client events and polling fallback during active generation
+  onMount(() => {
+    void loadDiff()
+
+    const unsub = client.event.listen((evt) => {
+      const type = evt.type
+      if (
+        type.startsWith("session.") ||
+        type.startsWith("message.") ||
+        type.startsWith("tool.") ||
+        type.startsWith("vcs.")
+      ) {
+        void loadDiff()
+      }
+    })
+
+    const timer = setInterval(() => {
+      if (props.sessionID && status() === "running") {
+        void loadDiff()
+      }
+    }, 1500)
+
+    onCleanup(() => {
+      unsub()
+      clearInterval(timer)
+    })
   })
 
   const totalAdditions = createMemo(() => files().reduce((acc, f) => acc + f.additions, 0))
   const totalDeletions = createMemo(() => files().reduce((acc, f) => acc + f.deletions, 0))
 
+  const currentFingerprint = createMemo(() => {
+    return files()
+      .map((f) => `${f.file}:${f.additions}:${f.deletions}`)
+      .join("|")
+  })
+
   const visible = createMemo(() => {
     if (!props.sessionID || files().length === 0) return false
-    if (dismissedSession() === props.sessionID && dismissedCount() === files().length) return false
+    if (dismissedSession() === props.sessionID && dismissedFingerprint() === currentFingerprint()) return false
     return true
   })
 
@@ -72,13 +138,30 @@ export function PromptReviewBar(props: { sessionID?: string }) {
     e.stopPropagation()
     if (props.sessionID) {
       setDismissedSession(props.sessionID)
-      setDismissedCount(files().length)
+      setDismissedFingerprint(currentFingerprint())
+      toast.show({
+        variant: "success",
+        message: `✓ Alterações mantidas (${files().length} ${files().length === 1 ? "arquivo" : "arquivos"})`,
+        duration: 3000,
+      })
     }
   }
 
-  const handleUndo = (e: MouseEvent) => {
+  const handleUndo = async (e: MouseEvent) => {
     e.stopPropagation()
-    keymap.dispatch("session.undo")
+    try {
+      keymap.dispatch("session.undo")
+      toast.show({
+        variant: "info",
+        message: "⏪ Revertendo alterações...",
+        duration: 2500,
+      })
+      setTimeout(() => {
+        void loadDiff()
+      }, 600)
+    } catch {
+      // ignore
+    }
   }
 
   const toggleExpand = (e: MouseEvent) => {
@@ -93,9 +176,9 @@ export function PromptReviewBar(props: { sessionID?: string }) {
         flexDirection="column"
         border
         borderStyle="rounded"
-        borderColor={RGBA.fromHex("#0099FF")}
-        backgroundColor={theme.decrease(theme.background.raised.base)}
-        marginBottom={1}
+        borderColor={RGBA.fromHex("#00D2FF")}
+        backgroundColor={RGBA.fromHex("#080D1A")}
+        marginBottom={0}
         paddingLeft={1}
         paddingRight={1}
         paddingTop={0}
@@ -119,8 +202,8 @@ export function PromptReviewBar(props: { sessionID?: string }) {
             minWidth={0}
             onMouseUp={toggleExpand}
           >
-            <text fg={RGBA.fromHex("#00D2FF")} attributes={TextAttributes.BOLD} selectable={false}>
-              {expanded() ? "▾" : "▸"}
+            <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
+              {expanded() ? "▾" : ">"}
             </text>
             <text fg={RGBA.fromHex("#F8FAFC")} attributes={TextAttributes.BOLD} selectable={false}>
               {files().length} {files().length === 1 ? "file changed" : "files changed"}
@@ -151,7 +234,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               paddingRight={1}
               onMouseUp={handleUndo}
             >
-              <text fg={RGBA.fromHex("#CBD5E1")} attributes={TextAttributes.BOLD} selectable={false}>
+              <text fg={RGBA.fromHex("#E2E8F0")} attributes={TextAttributes.BOLD} selectable={false}>
                 Undo
               </text>
             </box>
@@ -160,7 +243,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               paddingRight={1}
               onMouseUp={toggleExpand}
             >
-              <text fg={RGBA.fromHex("#38BDF8")} attributes={TextAttributes.BOLD} selectable={false}>
+              <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
                 📄
               </text>
             </box>
@@ -179,7 +262,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
                         ? RGBA.fromHex("#10B981")
                         : item.status === "deleted"
                           ? RGBA.fromHex("#F43F5E")
-                          : RGBA.fromHex("#38BDF8")
+                          : RGBA.fromHex("#00D2FF")
                     }
                     attributes={TextAttributes.BOLD}
                     selectable={false}

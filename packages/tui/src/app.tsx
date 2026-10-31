@@ -1109,6 +1109,21 @@ function App() {
               },
             },
             {
+              name: "omnicode.keep",
+              title: "ReviewBar — Manter / Confirmar Alterações (Keep)",
+              description: "Confirma as alterações de arquivos realizadas pelo agente na sessão",
+              category: "OnethyCode",
+              suggested: true,
+              slash: { name: "keep", aliases: ["manter", "confirmar", "aceitar"] },
+              run: () => {
+                toast.show({
+                  variant: "success",
+                  message: "✓ Alterações confirmadas e mantidas!",
+                  duration: 3000,
+                })
+              },
+            },
+            {
               name: "omnicode.memory",
               title: "Memory Bank Persistente (.omnicode/memory-bank/)",
               description: "Abre painel visual com os arquivos de memória arquitetural do projeto",
