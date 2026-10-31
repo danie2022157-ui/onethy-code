@@ -1,7 +1,9 @@
 import { RGBA, TextAttributes, type MouseEvent } from "@opentui/core"
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { execFile } from "node:child_process"
 import { useClient } from "../../context/client"
 import { useData } from "../../context/data"
+import { useLocation } from "../../context/location"
 import { useTheme } from "../../context/theme"
 import { Keymap } from "../../context/keymap"
 import { useToast } from "../../ui/toast"
@@ -25,6 +27,7 @@ export const ReviewBarSignals = {
 export function PromptReviewBar(props: { sessionID?: string }) {
   const client = useClient()
   const data = useData()
+  const location = useLocation()
   const theme = useTheme()
   const keymap = Keymap.use()
   const toast = useToast()
@@ -255,6 +258,30 @@ export function PromptReviewBar(props: { sessionID?: string }) {
     setExpanded((prev) => !prev)
   }
 
+  const undoSingleFile = (e: MouseEvent, item: ChangedFile) => {
+    e.stopPropagation()
+    const cwd = location.ref?.directory || process.cwd()
+    execFile("git", ["checkout", "HEAD", "--", item.file], { cwd }, (err) => {
+      if (err && item.status === "added") {
+        execFile("git", ["clean", "-f", "--", item.file], { cwd }, () => {
+          toast.show({
+            variant: "info",
+            message: `⏪ Arquivo revertido: ${item.file}`,
+            duration: 2400,
+          })
+          scheduleLoadDiff(150)
+        })
+        return
+      }
+      toast.show({
+        variant: err ? "warning" : "info",
+        message: err ? `Não foi possível reverter ${item.file} via git` : `⏪ Arquivo revertido: ${item.file}`,
+        duration: 2400,
+      })
+      scheduleLoadDiff(150)
+    })
+  }
+
   return (
     <Show when={visible()}>
       <box
@@ -353,7 +380,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
                     attributes={TextAttributes.BOLD}
                     selectable={false}
                   >
-                    {item.status === "added" ? "+" : item.status === "deleted" ? "-" : "~"}
+                    {item.status === "added" ? "[A]" : item.status === "deleted" ? "[D]" : "[M]"}
                   </text>
                   <text fg={theme.text.base} wrapMode="none" truncate flexGrow={1} minWidth={0}>
                     {item.file}
@@ -368,6 +395,16 @@ export function PromptReviewBar(props: { sessionID?: string }) {
                       -{item.deletions}
                     </text>
                   </Show>
+                  <box
+                    paddingLeft={1}
+                    paddingRight={1}
+                    backgroundColor={RGBA.fromHex("#1E293B")}
+                    onMouseUp={(e) => undoSingleFile(e, item)}
+                  >
+                    <text fg={RGBA.fromHex("#38BDF8")} selectable={false}>
+                      [Undo file]
+                    </text>
+                  </box>
                 </box>
               )}
             </For>

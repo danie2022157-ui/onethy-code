@@ -71,6 +71,9 @@ import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
 import { truncateFilePath } from "../../ui/file-path"
 import { PromptMetadataRow } from "./metadata"
 import { PromptReviewBar } from "./review-bar"
+import { DialogModel } from "../dialog-model"
+import { DialogVariant } from "../dialog-variant"
+import { DialogFusionModels } from "../dialog-fusion-models"
 import { limitLabel, useUsageLimits } from "../usage"
 
 export type PromptProps = {
@@ -1885,6 +1888,11 @@ export function Prompt(props: PromptProps) {
                   agentAlpha={agentMetaAlpha()}
                   modelAlpha={modelMetaAlpha()}
                   variantAlpha={variantMetaAlpha()}
+                  onClickAgent={() => local.agent.move(1)}
+                  onClickModel={() => dialog.replace(() => <DialogModel />)}
+                  onClickVariant={() =>
+                    dialog.replace(() => (local.model.auto.enabled() ? <DialogFusionModels /> : <DialogVariant />))
+                  }
                 />
               </box>
             </box>

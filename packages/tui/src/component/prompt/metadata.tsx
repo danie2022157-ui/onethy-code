@@ -19,6 +19,9 @@ export function PromptMetadataRow(props: {
   agentAlpha: number
   modelAlpha: number
   variantAlpha: number
+  onClickAgent?: () => void
+  onClickModel?: () => void
+  onClickVariant?: () => void
 }) {
   const theme = useTheme()
   const dimensions = useTerminalDimensions()
@@ -44,7 +47,16 @@ export function PromptMetadataRow(props: {
       >
         <Show when={layout().agent}>
           {(agent) => (
-            <box flexDirection="row" gap={1} alignItems="center">
+            <box
+              flexDirection="row"
+              gap={1}
+              alignItems="center"
+              onMouseUp={(e) => {
+                if (!props.onClickAgent) return
+                e.stopPropagation()
+                props.onClickAgent()
+              }}
+            >
               <text fg={RGBA.fromHex("#E0F2FE")} attributes={TextAttributes.BOLD} selectable={false}>
                 ✦
               </text>
@@ -64,36 +76,58 @@ export function PromptMetadataRow(props: {
                 •
               </text>
             </Show>
-            <text
+            <box
+              flexDirection="row"
+              gap={1}
               flexShrink={1}
               minWidth={0}
-              wrapMode="none"
-              truncate
-              fg={fade(props.muted ? theme.text.muted : RGBA.fromHex("#FFFFFF"), props.modelAlpha)}
-              attributes={TextAttributes.BOLD}
+              alignItems="center"
+              onMouseUp={(e) => {
+                if (!props.onClickModel) return
+                e.stopPropagation()
+                props.onClickModel()
+              }}
             >
-              {layout().model}
-            </text>
-            <Show when={layout().provider}>
-              {(provider) => (
-                <text flexShrink={0} fg={fade(RGBA.fromHex("#94A3B8"), props.modelAlpha)}>
-                  {provider()}
-                </text>
-              )}
-            </Show>
+              <text
+                flexShrink={1}
+                minWidth={0}
+                wrapMode="none"
+                truncate
+                fg={fade(props.muted ? theme.text.muted : RGBA.fromHex("#FFFFFF"), props.modelAlpha)}
+                attributes={TextAttributes.BOLD}
+                selectable={false}
+              >
+                {layout().model}
+              </text>
+              <Show when={layout().provider}>
+                {(provider) => (
+                  <text flexShrink={0} fg={fade(RGBA.fromHex("#94A3B8"), props.modelAlpha)} selectable={false}>
+                    {provider()}
+                  </text>
+                )}
+              </Show>
+            </box>
             <Show when={layout().variant}>
               {(variant) => (
                 <>
                   <text fg={RGBA.fromHex("#38BDF8")} attributes={TextAttributes.BOLD} selectable={false}>
                     •
                   </text>
-                  <text
-                    fg={fade(RGBA.fromHex("#F59E0B"), props.variantAlpha)}
-                    attributes={TextAttributes.BOLD}
-                    selectable={false}
+                  <box
+                    onMouseUp={(e) => {
+                      if (!props.onClickVariant) return
+                      e.stopPropagation()
+                      props.onClickVariant()
+                    }}
                   >
-                    {variant()}
-                  </text>
+                    <text
+                      fg={fade(RGBA.fromHex("#F59E0B"), props.variantAlpha)}
+                      attributes={TextAttributes.BOLD}
+                      selectable={false}
+                    >
+                      {variant()}
+                    </text>
+                  </box>
                 </>
               )}
             </Show>

@@ -166,6 +166,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         managedDefaultTier: "efficiency" | "balanced" | "intelligence"
         selectedModels: string[] | undefined
         thinkingRouting: boolean
+        cooldowns: Record<string, number>
         lastDecision:
           | {
               complexity: "low" | "medium" | "high"
@@ -183,6 +184,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         managedDefaultTier: "balanced",
         selectedModels: undefined,
         thinkingRouting: true,
+        cooldowns: {},
         lastDecision: undefined,
       })
 
@@ -202,6 +204,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           explicitTier: autoStore.explicitTier,
           selectedModels: autoStore.selectedModels,
           thinkingRouting: autoStore.thinkingRouting,
+          cooldowns: autoStore.cooldowns,
         }).catch(() => undefined)
         syncAllowedModelsEnv()
       }
@@ -227,6 +230,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             }
             if (typeof saved.thinkingRouting === "boolean") {
               setAutoStore("thinkingRouting", saved.thinkingRouting)
+            }
+            if (saved.cooldowns && typeof saved.cooldowns === "object") {
+              const now = Date.now()
+              const active: Record<string, number> = {}
+              for (const [k, v] of Object.entries(saved.cooldowns as Record<string, unknown>)) {
+                if (typeof v === "number" && v > now) active[k] = v
+              }
+              setAutoStore("cooldowns", active)
             }
           })
           syncAllowedModelsEnv()
@@ -633,12 +644,36 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           },
           connectedModels() {
             const raw = this.rawConnectedModels()
-            if (!autoStore.selectedModels || autoStore.selectedModels.length === 0) {
-              return raw
-            }
-            const set = new Set(autoStore.selectedModels)
-            const filtered = raw.filter((m) => set.has(`${m.providerID}/${m.id}`))
-            return filtered.length > 0 ? filtered : raw
+            const allowed =
+              !autoStore.selectedModels || autoStore.selectedModels.length === 0
+                ? raw
+                : (() => {
+                    const set = new Set(autoStore.selectedModels)
+                    const f = raw.filter((m) => set.has(`${m.providerID}/${m.id}`))
+                    return f.length > 0 ? f : raw
+                  })()
+            const now = Date.now()
+            const healthy = allowed.filter((m) => {
+              const until = autoStore.cooldowns[`${m.providerID}/${m.id}`]
+              return !until || until <= now
+            })
+            return healthy.length > 0 ? healthy : allowed
+          },
+          isModelInCooldown(providerID: string, modelID: string): boolean {
+            const until = autoStore.cooldowns[`${providerID}/${modelID}`]
+            return typeof until === "number" && until > Date.now()
+          },
+          markCooldown(providerID: string, modelID: string, durationMs = 5 * 60_000) {
+            batch(() => {
+              setAutoStore("cooldowns", `${providerID}/${modelID}`, Date.now() + durationMs)
+              saveAutoStore()
+            })
+          },
+          clearCooldowns() {
+            batch(() => {
+              setAutoStore("cooldowns", {})
+              saveAutoStore()
+            })
           },
           selectedModels(): string[] | undefined {
             return autoStore.selectedModels
@@ -984,6 +1019,30 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     }
 
     const model = createModel()
+
+    onCleanup(
+      event.subscribe((evt) => {
+        try {
+          if (!model.auto.enabled()) return
+          const raw = JSON.stringify(evt)
+          if (!/(429|FreeUsageLimitError|free-limit|rate[_\s-]?limit|quota|Too Many Requests)/i.test(raw)) return
+          const cur = model.current()
+          if (!cur) return
+          if (model.auto.isModelInCooldown(cur.providerID, cur.modelID)) return
+          model.auto.markCooldown(cur.providerID, cur.modelID, 5 * 60_000)
+          const next = model.auto.routeForPrompt("")
+          if (next && (next.providerID !== cur.providerID || next.modelID !== cur.modelID)) {
+            toast.show({
+              variant: "warning",
+              message: `⚡ Auto-Failover Anti-429: ${cur.providerID}/${cur.modelID} em cooldown (5m) → Redirecionado para ${next.modelName}`,
+              duration: 5000,
+            })
+          }
+        } catch {
+          // ignore
+        }
+      }),
+    )
 
     function createSession() {
       const [sessionStore, setSessionStore] = createStore<{

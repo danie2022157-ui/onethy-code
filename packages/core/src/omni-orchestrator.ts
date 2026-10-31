@@ -1,11 +1,75 @@
 export * as OmniOrchestrator from "./omni-orchestrator.js"
 
 import crypto from "node:crypto"
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
 import { Context, Effect, Layer } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Location } from "./location.js"
 import { OmniBus } from "./omni-bus.js"
 import { OmniConfig } from "./omni-config.js"
+
+const memoryCooldowns = new Map<string, number>()
+let diskCooldownCache: { data: Record<string, number>; ts: number } | undefined
+
+function getAutoModelFilePath(): string {
+  const stateDir =
+    process.env.OMNICODE_STATE_DIR ||
+    (process.platform === "win32"
+      ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "omnicode", "state")
+      : path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"), "omnicode"))
+  return path.join(stateDir, "auto-model.json")
+}
+
+export function markModelCooldown(providerID: string, modelID: string, durationMs = 5 * 60_000): void {
+  const key = `${providerID}/${modelID}`
+  const until = Date.now() + durationMs
+  memoryCooldowns.set(key, until)
+  try {
+    const file = getAutoModelFilePath()
+    const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {}
+    const cooldowns: Record<string, number> =
+      existing && typeof existing.cooldowns === "object" && existing.cooldowns ? { ...existing.cooldowns } : {}
+    cooldowns[key] = until
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, JSON.stringify({ ...existing, cooldowns }, null, 2), "utf8")
+    diskCooldownCache = { data: cooldowns, ts: Date.now() }
+  } catch {
+    // ignore disk errors
+  }
+}
+
+export function isModelInCooldown(providerID: string, modelID: string): boolean {
+  const key = `${providerID}/${modelID}`
+  const now = Date.now()
+  const memUntil = memoryCooldowns.get(key)
+  if (memUntil !== undefined) {
+    if (memUntil > now) return true
+    memoryCooldowns.delete(key)
+  }
+  try {
+    if (!diskCooldownCache || now - diskCooldownCache.ts > 3000) {
+      const file = getAutoModelFilePath()
+      if (fs.existsSync(file)) {
+        const parsed = JSON.parse(fs.readFileSync(file, "utf8"))
+        diskCooldownCache = {
+          data: parsed && typeof parsed.cooldowns === "object" && parsed.cooldowns ? parsed.cooldowns : {},
+          ts: now,
+        }
+      } else {
+        diskCooldownCache = { data: {}, ts: now }
+      }
+    }
+    const diskUntil = diskCooldownCache.data[key]
+    if (typeof diskUntil === "number" && diskUntil > now) {
+      return true
+    }
+  } catch {
+    // ignore
+  }
+  return false
+}
 
 export type TaskCategory =
   | "fast_explore"
@@ -456,7 +520,10 @@ const layer = Layer.effect(
                 ? "intelligence"
                 : "balanced"
 
-      const pool = availableModels
+      const healthyPool = availableModels.filter((m) => !isModelInCooldown(m.providerID, m.id))
+      const pool = healthyPool.length > 0 ? healthyPool : availableModels
+      const healthyMatched = matched.filter((m) => !isModelInCooldown(m.providerID, m.id))
+      const effectiveMatched = healthyMatched.length > 0 ? healthyMatched : matched
 
       const bucketOrder: ("efficiency" | "balanced" | "intelligence")[] =
         targetBucket === "efficiency"
@@ -467,15 +534,19 @@ const layer = Layer.effect(
 
       for (const bucket of bucketOrder) {
         for (const m of pool) {
-          if (classifyAvailableModelBucket(m) === bucket && !matched.some((x) => x.providerID === m.providerID && x.id === m.id)) {
-            matched.push(m)
+          if (
+            classifyAvailableModelBucket(m) === bucket &&
+            !effectiveMatched.some((x) => x.providerID === m.providerID && x.id === m.id)
+          ) {
+            effectiveMatched.push(m)
           }
         }
       }
 
-      const primary = matched[0] ?? pool[0] ?? availableModels[0]
+      const primary = effectiveMatched[0] ?? pool[0] ?? availableModels[0]
       const fallback =
-        matched.find((m) => m.providerID !== primary?.providerID || m.id !== primary?.id) ??
+        effectiveMatched.find((m) => m.providerID !== primary?.providerID || m.id !== primary?.id) ??
+        pool.find((m) => m !== primary) ??
         availableModels.find((m) => m !== primary)
 
       const thinkingLevel: "off" | "low" | "medium" | "high" | "max" =

@@ -3,6 +3,7 @@ import { useDialog, DialogLayout, DialogHeader } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { useTheme } from "../context/theme"
 import { useClient } from "../context/client"
+import { useLocal } from "../context/local"
 import { useExit } from "../context/exit"
 import { Keymap } from "../context/keymap"
 import { openUrl } from "@opencode/util/open"
@@ -62,6 +63,7 @@ export function DialogOmniUpdate() {
   const toast = useToast()
   const theme = useTheme().surface("dialog")
   const client = useClient()
+  const local = useLocal()
   const exit = useExit()
   const repoUrl = "https://github.com/danie2022157-ui/onethy-code"
 
@@ -190,6 +192,18 @@ export function DialogOmniUpdate() {
     }
   }
 
+  const repairSessionAndCache = () => {
+    local.model.auto.clearCooldowns()
+    const decision = local.model.auto.routeForPrompt("")
+    toast.show({
+      variant: "success",
+      message: decision
+        ? `🩺 Sessão & Cache reparados! Modelo ativo: ${decision.modelName} (${decision.providerID})`
+        : "🩺 Cache de rate-limit (429) e estado da sessão reparados!",
+      duration: 3800,
+    })
+  }
+
   Keymap.createLayer(() => ({
     mode: "modal",
     commands: [
@@ -204,6 +218,12 @@ export function DialogOmniUpdate() {
           else if (s === "success") void restartApp()
           else if (s === "error") void checkUpdates()
         },
+      },
+      {
+        bind: "d",
+        title: "Reparar Sessão e Cache",
+        group: "Dialog",
+        run: () => repairSessionAndCache(),
       },
       {
         bind: "escape",
@@ -248,6 +268,16 @@ export function DialogOmniUpdate() {
               </box>
             </Match>
             <Match when={step() === "up-to-date"}>
+              <box
+                paddingLeft={1}
+                paddingRight={1}
+                backgroundColor={RGBA.fromInts(56, 189, 248, 45)}
+                onMouseUp={() => repairSessionAndCache()}
+              >
+                <text fg={RGBA.fromHex("#38BDF8")} attributes={TextAttributes.BOLD} selectable={false}>
+                  🩺 Reparar Sessão & Cache [D]
+                </text>
+              </box>
               <box
                 paddingLeft={1}
                 paddingRight={1}

@@ -281,7 +281,9 @@ export const Plugin = {
               const allowedSet = process.env.OMNICODE_ACTIVE === "1" ? resolveOmniAllowedModels() : undefined
               const hasAllowedConstraint = allowedSet !== undefined && allowedSet.size > 0
               const isAllowed = (m: typeof parent.model) =>
-                m !== undefined && (!hasAllowedConstraint || allowedSet.has(`${m.providerID}/${m.id}`))
+                m !== undefined &&
+                (!hasAllowedConstraint || allowedSet.has(`${m.providerID}/${m.id}`)) &&
+                !OmniOrchestrator.isModelInCooldown(m.providerID, m.id)
 
               let routedModel: typeof parent.model = undefined
               if (
@@ -290,10 +292,12 @@ export const Plugin = {
                 override === undefined
               ) {
                 const availableList = yield* models.available()
-                const candidatePool = hasAllowedConstraint
+                const allowedCandidates = hasAllowedConstraint
                   ? availableList.filter((m) => allowedSet.has(`${m.providerID}/${m.id}`))
                   : availableList
-                const pool = candidatePool.length > 0 ? candidatePool : availableList
+                const basePool = allowedCandidates.length > 0 ? allowedCandidates : availableList
+                const healthyPool = basePool.filter((m) => !OmniOrchestrator.isModelInCooldown(m.providerID, m.id))
+                const pool = healthyPool.length > 0 ? healthyPool : basePool
 
                 const agentModelAllowed =
                   agent.model !== undefined &&
