@@ -79,7 +79,7 @@ export function ReasoningPart(props: {
           border={!inMinimal() || expanded() ? ["left"] : undefined}
           customBorderChars={SplitBorder.customBorderChars}
           borderColor={theme.decrease(theme.background.base)}
-          paddingLeft={!inMinimal() || expanded() ? 1 : 0}
+          paddingLeft={1}
         >
           <box onMouseUp={toggle}>
             <ReasoningHeader
@@ -97,7 +97,7 @@ export function ReasoningPart(props: {
               border={["left"]}
               customBorderChars={SplitBorder.customBorderChars}
               borderColor={theme.decrease(theme.background.base)}
-              paddingLeft={inMinimal() ? 3 : 1}
+              paddingLeft={1}
             >
               <code
                 filetype="markdown"
@@ -271,7 +271,7 @@ export function InlineToolRow(props: {
       </Switch>
       <Show when={props.failed && props.errorExpanded}>
         <box paddingLeft={INLINE_TOOL_ICON_WIDTH}>
-          <text fg={props.errorColor}>{props.error}</text>
+          <text fg={props.errorColor} wrapMode="word">{props.error}</text>
         </box>
       </Show>
     </box>

@@ -1,6 +1,6 @@
 import { Plugin } from "@opencode/plugin/tui"
 import type { SessionInfo } from "@opencode/client"
-import { createMemo, createSignal, For, Show } from "solid-js"
+import { createMemo, For, Show } from "solid-js"
 import { Locale } from "../../util/locale"
 import { contextUsage, sessionFamily } from "../../util/session"
 import { useLocal } from "../../context/local"
@@ -187,9 +187,18 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
     })
   })
 
-  const [openFusion, setOpenFusion] = createSignal(false)
-  const [openSubagentModels, setOpenSubagentModels] = createSignal(false)
-  const [openCustomizations, setOpenCustomizations] = createSignal(false)
+  const [accordion, setAccordion] = props.context.storage.store("accordion", {
+    initial: {
+      fusion: true,
+      customizations: false,
+    },
+  })
+
+  const toggleSection = (key: "fusion" | "customizations") => {
+    void setAccordion((draft) => {
+      draft[key] = !draft[key]
+    }).catch(() => undefined)
+  }
 
   return (
     <>
@@ -215,6 +224,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
           </Show>
         </box>
       </Show>
+
       <box paddingBottom={1}>
         <text fg={theme.text.base}>
           <b>🧠 Memory Bank</b>
@@ -226,10 +236,11 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
           Use /memory para gerenciar
         </text>
       </box>
+
       <Show when={activeSubagents().length > 0}>
         <box paddingBottom={1}>
           <text fg={theme.text.base}>
-            <b>Subagentes ({activeSubagents().length})</b>
+            <b>Subagentes Ativos ({activeSubagents().length})</b>
           </text>
           <For each={activeSubagents()}>
             {(item) => (
@@ -241,6 +252,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
           </For>
         </box>
       </Show>
+
       <Show when={fusionSummary()}>
         {(fusion) => (
           <box paddingBottom={1}>
@@ -248,13 +260,14 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
               flexDirection="row"
               gap={1}
               alignItems="center"
-              onMouseUp={() => setOpenFusion((prev: boolean) => !prev)}
+              onMouseUp={() => toggleSection("fusion")}
             >
               <text fg={theme.text.base}>
-                <b>{openFusion() ? "▾" : "▸"} ⚡ Omni Fusion ({fusion().modelCount} {fusion().isFiltered ? "selecionados" : "modelos"})</b>
+                {accordion.fusion ? "▼" : "▶"}{" "}
+                <b>⚡ Omni Fusion & Modelos ({fusion().modelCount} {fusion().isFiltered ? "selecionados" : "modelos"})</b>
               </text>
             </box>
-            <Show when={openFusion()}>
+            <Show when={accordion.fusion}>
               <text fg={theme.text.muted} wrapMode="none">
                 Provedores: {truncateMiddle(fusion().providers)}
               </text>
@@ -272,42 +285,25 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
               <text fg={theme.text.muted} wrapMode="none">
                 🧠 Inteligência: {truncateMiddle(fusion().intelligence)}
               </text>
-              <Show when={fusion().isFiltered && fusion().modelCount <= 6}>
-                <For each={fusion().selectedList}>
-                  {(m) => (
-                    <text fg={theme.text.muted} wrapMode="none">
-                      • {truncateMiddle(m)}
-                    </text>
-                  )}
-                </For>
+              <Show when={configuredSubagents().length > 0}>
+                <box paddingTop={1} paddingBottom={0}>
+                  <text fg={theme.text.base}>
+                    <b>Modelos dos Subagentes:</b>
+                  </text>
+                  <For each={configuredSubagents()}>
+                    {(item) => (
+                      <text fg={theme.text.muted} wrapMode="none">
+                        • @{item.id}: {truncateMiddle(item.model, 32)}
+                      </text>
+                    )}
+                  </For>
+                </box>
               </Show>
             </Show>
           </box>
         )}
       </Show>
-      <Show when={configuredSubagents().length > 0}>
-        <box paddingBottom={1}>
-          <box
-            flexDirection="row"
-            gap={1}
-            alignItems="center"
-            onMouseUp={() => setOpenSubagentModels((prev: boolean) => !prev)}
-          >
-            <text fg={theme.text.base}>
-              <b>{openSubagentModels() ? "▾" : "▸"} Modelos por Subagente</b>
-            </text>
-          </box>
-          <Show when={openSubagentModels()}>
-            <For each={configuredSubagents()}>
-              {(item) => (
-                <text fg={theme.text.muted} wrapMode="none">
-                  @{item.id}: {item.model}
-                </text>
-              )}
-            </For>
-          </Show>
-        </box>
-      </Show>
+
       <Show when={customizationsSummary()}>
         {(summary) => (
           <box>
@@ -315,13 +311,14 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
               flexDirection="row"
               gap={1}
               alignItems="center"
-              onMouseUp={() => setOpenCustomizations((prev: boolean) => !prev)}
+              onMouseUp={() => toggleSection("customizations")}
             >
               <text fg={theme.text.base}>
-                <b>{openCustomizations() ? "▾" : "▸"} Personalizações ({summary().skills + summary().mods + summary().hooks + summary().settings} itens)</b>
+                {accordion.customizations ? "▼" : "▶"}{" "}
+                <b>Personalizações ({summary().skills + summary().mods + summary().hooks + summary().settings} itens)</b>
               </text>
             </box>
-            <Show when={openCustomizations()}>
+            <Show when={accordion.customizations}>
               <text fg={theme.text.muted} wrapMode="none">
                 Agentes (@): {summary().agents} · Skills: {summary().skills}
               </text>

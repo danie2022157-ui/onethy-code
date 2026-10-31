@@ -103,7 +103,7 @@ function SidebarFooter(props: { context: Plugin.Context; sessionID: string }) {
           >
             <FilePath
               value={value()}
-              maxWidth={38}
+              maxWidth={34}
               fg={actions.hovered() ? props.context.theme.text.base : props.context.theme.text.muted}
             />
           </box>

@@ -391,8 +391,11 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
           bottom={0}
           alignItems="flex-end"
           backgroundColor={RGBA.fromInts(0, 0, 0, 70)}
+          onMouseUp={toggleSidebar}
         >
-          <Sidebar sessionID={props.sessionID} />
+          <box onMouseUp={(e: { stopPropagation(): void }) => e.stopPropagation()} height="100%">
+            <Sidebar sessionID={props.sessionID} />
+          </box>
         </box>
       </Show>
     </box>

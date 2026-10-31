@@ -48,6 +48,7 @@ function ToastSurface(props: {
       position="absolute"
       top={1}
       right={2}
+      zIndex={4000}
       maxWidth={Math.min(60, dimensions().width - 6)}
       justifyContent="center"
       alignItems="flex-start"
@@ -93,7 +94,7 @@ function ToastSurface(props: {
         </Show>
         <Show when={props.pending}>
           <text fg={theme.text.muted} marginTop={1}>
-            +{props.pending} more
+            +{props.pending} mais
           </text>
         </Show>
       </box>

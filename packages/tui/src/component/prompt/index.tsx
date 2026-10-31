@@ -1741,7 +1741,7 @@ export function Prompt(props: PromptProps) {
                           when={!failed()}
                           fallback={
                             <box width="100%" height="100%" alignItems="center" justifyContent="center">
-                              <text fg={theme.text.muted}>No preview</text>
+                              <text fg={theme.text.muted}>Sem prévia</text>
                             </box>
                           }
                         >
@@ -1774,14 +1774,14 @@ export function Prompt(props: PromptProps) {
                     }}
                   >
                     <text fg={theme.text.muted} wrapMode="none" truncate>
-                      +{imageAttachments().length - visibleImageAttachments().length} more
+                      +{imageAttachments().length - visibleImageAttachments().length} mais
                     </text>
                   </box>
                 </Show>
               </box>
             </Show>
             <box flexDirection="row" width="100%" alignItems="flex-start" paddingTop={0}>
-              <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
+              <text fg={theme.text.action.primary.base} attributes={TextAttributes.BOLD} selectable={false}>
                 {"> "}
               </text>
               <textarea

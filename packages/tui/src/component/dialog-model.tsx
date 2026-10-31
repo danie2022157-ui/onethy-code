@@ -129,12 +129,12 @@ function DialogConnectedModels(props: {
       })
     }
 
-    const favoriteOptions = toOptions(favorites, "Favorites")
+    const favoriteOptions = toOptions(favorites, "Favoritos")
     const recentOptions = toOptions(
       recents.filter(
         (item) => !favorites.some((fav) => fav.providerID === item.providerID && fav.modelID === item.modelID),
       ),
-      "Recent",
+      "Recentes",
     )
 
     const modelOptions = sortModelOptions(
@@ -153,7 +153,7 @@ function DialogConnectedModels(props: {
             title: model.name,
             releaseDate: model.time.released,
             description: newDesigns() ? undefined : favorite ? "(Favorite)" : undefined,
-            category: connected() ? (freeGroup(model) ? "Free" : (provider?.name ?? model.providerID)) : undefined,
+            category: connected() ? (freeGroup(model) ? "Gratuitos" : (provider?.name ?? model.providerID)) : undefined,
             footer: trailing(model, favorite),
             free: isFreeModel(model),
             detail: newDesigns() ? () => <ModelDetail model={model} usage={usage(model)} /> : undefined,
@@ -228,8 +228,8 @@ function DialogConnectedModels(props: {
       ...autoOptions,
       ...favoriteOptions,
       ...recentOptions,
-      ...modelOptions.filter((option) => option.category !== "Free"),
-      ...modelOptions.filter((option) => option.category === "Free"),
+      ...modelOptions.filter((option) => option.category !== "Gratuitos"),
+      ...modelOptions.filter((option) => option.category === "Gratuitos"),
     ]
   })
 
@@ -237,7 +237,7 @@ function DialogConnectedModels(props: {
 
   const title = createMemo(() => {
     const value = provider()
-    if (!value) return "Select model"
+    if (!value) return "Selecionar modelo"
     return value.name
   })
 
@@ -251,17 +251,17 @@ function DialogConnectedModels(props: {
           command: "model.dialog.provider",
           title: newDesigns()
             ? connected()
-              ? "connect integration"
-              : "view all integrations"
+              ? "conectar integração"
+              : "ver integrações"
             : connected()
-              ? "Connect an integration"
-              : "View all integrations",
+              ? "Conectar integração"
+              : "Ver integrações",
           selection: "none",
           onTrigger: props.onConnect,
         },
         {
           command: "model.dialog.usage",
-          title: newDesigns() ? "usage" : "Usage",
+          title: newDesigns() ? "uso & limites" : "Uso & Limites",
           selection: "none",
           hidden: !limits.info(),
           onTrigger: () => dialog.replace(() => <DialogUsage />),
@@ -277,7 +277,7 @@ function DialogConnectedModels(props: {
         },
         {
           command: "model.dialog.favorite",
-          title: newDesigns() ? (option) => (isFavorite(option?.value) ? "unfavorite" : "favorite") : "Favorite",
+          title: newDesigns() ? (option) => (isFavorite(option?.value) ? "desfavoritar" : "favoritar") : "Favoritar",
           hidden: !connected(),
           onTrigger: (option) => {
             local.model.toggleFavorite(option.value as { providerID: string; modelID: string })

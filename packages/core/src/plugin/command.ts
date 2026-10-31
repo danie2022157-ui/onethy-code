@@ -95,8 +95,8 @@ export const Plugin = define({
         })
 
         editor.add({
-          name: "memory",
-          description: "Memória Durável OmniCode: visualiza e registra decisões em .omnicode/memory.md",
+          name: "memory-note",
+          description: "Nota Rápida de Memória: registra decisões arquiteturais em .omnicode/memory.md",
           execute: (input) =>
             Effect.gen(function* () {
               const note = input.prompt.text.trim()

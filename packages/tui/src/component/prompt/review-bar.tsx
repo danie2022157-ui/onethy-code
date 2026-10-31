@@ -319,7 +319,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               {expanded() ? "▾" : ">"}
             </text>
             <text fg={RGBA.fromHex("#F8FAFC")} attributes={TextAttributes.BOLD} selectable={false}>
-              {files().length} {files().length === 1 ? "file changed" : "files changed"}
+              {files().length} {files().length === 1 ? "arquivo alterado" : "arquivos alterados"}
             </text>
             <text fg={RGBA.fromHex("#10B981")} attributes={TextAttributes.BOLD} selectable={false}>
               +{totalAdditions()}
@@ -338,7 +338,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               onMouseUp={handleKeep}
             >
               <text fg={RGBA.fromHex("#FFFFFF")} attributes={TextAttributes.BOLD} selectable={false}>
-                Keep [Alt+K]
+                Manter [Alt+K]
               </text>
             </box>
             <box
@@ -348,7 +348,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               onMouseUp={handleUndo}
             >
               <text fg={RGBA.fromHex("#E2E8F0")} attributes={TextAttributes.BOLD} selectable={false}>
-                Undo [Alt+U]
+                Desfazer [Alt+U]
               </text>
             </box>
             <box
@@ -357,7 +357,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               onMouseUp={toggleExpand}
             >
               <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
-                {expanded() ? "[Files ▴]" : "[Files ▾ Alt+D]"}
+                {expanded() ? "[Arquivos ▴]" : "[Arquivos ▾ Alt+D]"}
               </text>
             </box>
           </box>
@@ -402,7 +402,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
                     onMouseUp={(e) => undoSingleFile(e, item)}
                   >
                     <text fg={RGBA.fromHex("#38BDF8")} selectable={false}>
-                      [Undo file]
+                      [Desfazer arquivo]
                     </text>
                   </box>
                 </box>
