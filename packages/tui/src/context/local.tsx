@@ -236,7 +236,10 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       function classifyModelBucket(id: string, name: string): "efficiency" | "balanced" | "intelligence" {
         const combined = `${id} ${name}`.toLowerCase()
         if (/(flash|mini|haiku|nano|lite|small|instant|fast|8b)/.test(combined)) return "efficiency"
-        if (/(opus|gpt-5|o3|o1|pro|sonnet-4|claude-4|r1|reasoning|max|large)/.test(combined)) return "intelligence"
+        if (
+          /(opus|gpt-6|gpt-5|luna|argon|zen-coder|o3|o1|pro|sonnet-4|claude-4|r1|reasoning|max|large)/.test(combined)
+        )
+          return "intelligence"
         return "balanced"
       }
 
@@ -676,6 +679,61 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           setAllowAllModels() {
             batch(() => {
               setAutoStore("selectedModels", undefined)
+              saveAutoStore()
+            })
+          },
+          toggleProviderModels(providerID: string) {
+            const raw = this.rawConnectedModels()
+            const provKeys = raw.filter((m) => m.providerID === providerID).map((m) => `${m.providerID}/${m.id}`)
+            if (provKeys.length === 0) return
+            const provSet = new Set(provKeys)
+            batch(() => {
+              const current =
+                !autoStore.selectedModels || autoStore.selectedModels.length === 0
+                  ? raw.map((m) => `${m.providerID}/${m.id}`)
+                  : [...autoStore.selectedModels]
+              const allProvSelected = provKeys.every((k) => current.includes(k))
+              if (allProvSelected) {
+                const next = current.filter((k) => !provSet.has(k))
+                // If unchecking this provider leaves at least 1 model, apply it; otherwise select ONLY this provider
+                if (next.length > 0) {
+                  setAutoStore("selectedModels", next)
+                } else {
+                  setAutoStore("selectedModels", provKeys.length >= raw.length ? undefined : provKeys)
+                }
+              } else {
+                const merged = Array.from(new Set([...current, ...provKeys]))
+                setAutoStore("selectedModels", merged.length >= raw.length ? undefined : merged)
+              }
+              saveAutoStore()
+            })
+          },
+          applyRecommendedPreset() {
+            const raw = this.rawConnectedModels()
+            if (raw.length === 0) return
+            const picked = new Set<string>()
+            const findPreferred = (patterns: RegExp[], fallbackBucket: "efficiency" | "balanced" | "intelligence") => {
+              for (const pat of patterns) {
+                const match = raw.find((m) => pat.test(`${m.providerID}/${m.id} ${m.name}`.toLowerCase()))
+                if (match) return `${match.providerID}/${match.id}`
+              }
+              const byBucket = raw.find(
+                (m) => classifyModelBucket(m.id, m.name) === fallbackBucket && !picked.has(`${m.providerID}/${m.id}`),
+              )
+              return byBucket ? `${byBucket.providerID}/${byBucket.id}` : undefined
+            }
+            const fastKey = findPreferred([/gemini-3\.8-flash/, /sol-fast/, /flash/, /fast/, /mini/], "efficiency")
+            if (fastKey) picked.add(fastKey)
+            const smartKey = findPreferred(
+              [/gpt-6-luna/, /gpt-5\.6-luna/, /gemini-4-argon/, /sonnet/, /zen-coder/, /luna/, /argon/],
+              "intelligence",
+            )
+            if (smartKey) picked.add(smartKey)
+            const backupKey = findPreferred([/nemotron/, /codex/, /sol/, /free/], "balanced")
+            if (backupKey) picked.add(backupKey)
+            const list = Array.from(picked)
+            batch(() => {
+              setAutoStore("selectedModels", list.length > 0 && list.length < raw.length ? list : undefined)
               saveAutoStore()
             })
           },
