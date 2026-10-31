@@ -56,6 +56,10 @@ export const { use: useSessionTerminals, provider: SessionTerminalsProvider } = 
     for (const type of ["persistent-pty.added", "persistent-pty.removed"] as const) {
       onCleanup(
         event.on(type, (evt) => {
+          if (type === "persistent-pty.removed") {
+            pending.delete(evt.data.ptyID)
+            writers.delete(evt.data.ptyID)
+          }
           if (!available() || !terminals[evt.data.sessionID]) return
           void refresh(evt.data.sessionID).catch((error) =>
             console.error("Failed to refresh persistent terminal panes", error),
@@ -115,7 +119,12 @@ export const { use: useSessionTerminals, provider: SessionTerminalsProvider } = 
       write(ptyID: string, data: Uint8Array) {
         const writer = writers.get(ptyID)
         if (writer) return writer(data)
-        pending.set(ptyID, [...(pending.get(ptyID) ?? []), data])
+        let queue = pending.get(ptyID)
+        if (!queue) {
+          queue = []
+          pending.set(ptyID, queue)
+        }
+        queue.push(data)
       },
       attachWriter(ptyID: string, writer: (data: Uint8Array) => void) {
         writers.set(ptyID, writer)

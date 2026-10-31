@@ -108,6 +108,7 @@ import { DialogVariant } from "./component/dialog-variant"
 import { DialogFusionModels } from "./component/dialog-fusion-models"
 import { DialogOmniUpdate } from "./component/dialog-omni-update"
 import { DialogMemoryBank } from "./component/dialog-memory-bank"
+import { ReviewBarSignals } from "./component/prompt/review-bar"
 import { destroyRenderer, setTerminalTitle } from "./util/renderer"
 import { cliErrorMessage, errorFormat } from "./util/error"
 import { AttentionProvider } from "./context/attention"
@@ -1116,11 +1117,18 @@ function App() {
               suggested: true,
               slash: { name: "keep", aliases: ["manter", "confirmar", "aceitar"] },
               run: () => {
-                toast.show({
-                  variant: "success",
-                  message: "✓ Alterações confirmadas e mantidas!",
-                  duration: 3000,
-                })
+                ReviewBarSignals.dismiss(route.data.type === "session" ? route.data.sessionID : undefined)
+              },
+            },
+            {
+              name: "omnicode.cycle_tier",
+              title: "Omni Fusion — Ciclar Modo de Otimização (Eficiência / Balanceado / Inteligente)",
+              description: "Alterna rapidamente o perfil de seleção automática de modelos (Atalho: Alt+O)",
+              category: "OnethyCode",
+              suggested: true,
+              slash: { name: "tier", aliases: ["cycle-tier", "modo", "perfil"] },
+              run: () => {
+                local.model.auto.cycleTier()
               },
             },
             {
@@ -1260,7 +1268,7 @@ function App() {
         title: "Switch model variant",
         category: "Agent",
         palette: local.model.variant.list().length === 0 ? undefined : (true as const),
-        slash: { name: "variants", aliases: ["thinking", "effort"] },
+        slash: { name: "variants", aliases: ["variant", "effort"] },
         run: () => {
           if (local.model.variant.list().length === 0) {
             return toast.show({

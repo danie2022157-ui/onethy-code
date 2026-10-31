@@ -839,6 +839,16 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           toggleThinkingRouting() {
             this.setThinkingRouting(!autoStore.thinkingRouting)
           },
+          cycleTier() {
+            const current = autoStore.explicitTier ?? autoStore.managedDefaultTier
+            const next =
+              current === "efficiency"
+                ? "balanced"
+                : current === "balanced"
+                  ? "intelligence"
+                  : "efficiency"
+            this.setTier(next)
+          },
         },
         toggleFavorite(model: { providerID: string; modelID: string }) {
           batch(() => {

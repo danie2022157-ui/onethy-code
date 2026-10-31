@@ -1779,7 +1779,7 @@ export function Prompt(props: PromptProps) {
             </Show>
             <box flexDirection="row" width="100%" alignItems="flex-start" paddingTop={0}>
               <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
-                {"│ > "}
+                {"> "}
               </text>
               <textarea
                 width="100%"
@@ -1872,9 +1872,6 @@ export function Prompt(props: PromptProps) {
             </box>
             <box flexDirection="row" flexShrink={0} paddingTop={0} paddingBottom={0} gap={1} alignItems="center" justifyContent="space-between">
               <box flexDirection="row" gap={0} alignItems="center" flexGrow={1} flexShrink={1} minWidth={0}>
-                <text fg={RGBA.fromHex("#10B981")} attributes={TextAttributes.BOLD} selectable={false}>
-                  │{" "}
-                </text>
                 <PromptMetadataRow
                   mode={store.mode}
                   agent={agentLabel()}

@@ -13,6 +13,15 @@ export interface ChangedFile {
   readonly status: "added" | "modified" | "deleted" | string
 }
 
+// Global dismiss trigger for the review bar
+export const ReviewBarSignals = {
+  dismiss: (sessionID?: string) => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("omnicode:review:dismiss", { detail: { sessionID } }))
+    }
+  },
+}
+
 export function PromptReviewBar(props: { sessionID?: string }) {
   const client = useClient()
   const data = useData()
@@ -28,12 +37,18 @@ export function PromptReviewBar(props: { sessionID?: string }) {
   const status = createMemo(() => (props.sessionID ? data.session.status(props.sessionID) : undefined))
   const messages = createMemo(() => (props.sessionID ? data.session.message.list(props.sessionID) : []))
 
-  const loadDiff = async () => {
+  let diffRequestId = 0
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined
+
+  const executeLoadDiff = async () => {
     const sid = props.sessionID
     if (!sid) {
       setFiles([])
       return
     }
+
+    const currentRequestId = ++diffRequestId
+    const isRunning = status() === "running"
 
     try {
       let resolved: ChangedFile[] = []
@@ -50,11 +65,11 @@ export function PromptReviewBar(props: { sessionID?: string }) {
           }))
         }
       } catch {
-        // session.diff may not have snapshots recorded yet; fallback to vcs
+        // session.diff may not have snapshot records
       }
 
-      // 2. Fallback to vcs.diff("working")
-      if (resolved.length === 0) {
+      // 2. Fallback to vcs.diff("working") if idle or step completed (avoid hammering during streaming)
+      if (resolved.length === 0 && (!isRunning || resolved.length > 0)) {
         try {
           const vcsRes: any = await client.api.vcs.diff({ mode: "working" })
           const vcsList = Array.isArray(vcsRes) ? vcsRes : (vcsRes?.data ?? [])
@@ -71,51 +86,107 @@ export function PromptReviewBar(props: { sessionID?: string }) {
         }
       }
 
-      // Filter out empty file names
-      resolved = resolved.filter((f) => f.file.trim().length > 0)
-      setFiles(resolved)
+      // Guard against out-of-order resolution
+      if (currentRequestId === diffRequestId) {
+        resolved = resolved.filter((f) => f.file && f.file.trim().length > 0)
+        setFiles(resolved)
+      }
     } catch {
-      setFiles([])
+      if (currentRequestId === diffRequestId) {
+        setFiles([])
+      }
     }
   }
 
-  // React to status changes and message list updates in real time
+  const scheduleLoadDiff = (delay = 400) => {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      void executeLoadDiff()
+    }, delay)
+  }
+
+  // React to status changes and message length changes
   createEffect(() => {
     const sid = props.sessionID
     const s = status()
     const msgCount = messages().length
     if (sid) {
-      void loadDiff()
+      scheduleLoadDiff(s === "running" ? 600 : 200)
     } else {
       setFiles([])
     }
   })
 
-  // Listen to client events and polling fallback during active generation
+  // Listen to meaningful client events (filtering out streaming delta deluges)
   onMount(() => {
-    void loadDiff()
+    scheduleLoadDiff(100)
 
     const unsub = client.event.listen((evt) => {
       const type = evt.type
+      // Filter out high-frequency streaming deltas
       if (
-        type.startsWith("session.") ||
-        type.startsWith("message.") ||
-        type.startsWith("tool.") ||
-        type.startsWith("vcs.")
+        type.includes(".delta") ||
+        type.includes(".chunk") ||
+        type.includes(".token")
       ) {
-        void loadDiff()
+        return
+      }
+
+      if (
+        type.startsWith("vcs.") ||
+        type.startsWith("tool.") ||
+        type === "session.idle" ||
+        type === "session.status" ||
+        type === "session.step.completed" ||
+        type === "session.step.failed" ||
+        type === "session.updated"
+      ) {
+        scheduleLoadDiff(type.startsWith("vcs.") ? 150 : 400)
       }
     })
 
-    const timer = setInterval(() => {
-      if (props.sessionID && status() === "running") {
-        void loadDiff()
+    // Listen to global dismiss events from /keep command
+    const handleGlobalDismiss = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (!detail?.sessionID || detail.sessionID === props.sessionID) {
+        dismissCurrent()
       }
-    }, 1500)
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("omnicode:review:dismiss", handleGlobalDismiss)
+    }
+
+    // Keyboard shortcuts for ReviewBar (Alt+K: Keep, Alt+U / Alt+Z: Undo, Alt+D: Diff drawer)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!visible()) return
+
+      if (e.altKey && (e.key === "k" || e.key === "K")) {
+        e.preventDefault()
+        e.stopPropagation()
+        dismissCurrent()
+      } else if (e.altKey && (e.key === "u" || e.key === "U" || e.key === "z" || e.key === "Z")) {
+        e.preventDefault()
+        e.stopPropagation()
+        triggerUndo()
+      } else if (e.altKey && (e.key === "d" || e.key === "D")) {
+        e.preventDefault()
+        e.stopPropagation()
+        setExpanded((prev) => !prev)
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("keydown", handleKeyDown, true)
+    }
 
     onCleanup(() => {
       unsub()
-      clearInterval(timer)
+      if (debounceTimer) clearTimeout(debounceTimer)
+      if (typeof window !== "undefined") {
+        window.removeEventListener("omnicode:review:dismiss", handleGlobalDismiss)
+        window.removeEventListener("keydown", handleKeyDown, true)
+      }
     })
   })
 
@@ -134,8 +205,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
     return true
   })
 
-  const handleKeep = (e: MouseEvent) => {
-    e.stopPropagation()
+  const dismissCurrent = () => {
     if (props.sessionID) {
       setDismissedSession(props.sessionID)
       setDismissedFingerprint(currentFingerprint())
@@ -147,8 +217,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
     }
   }
 
-  const handleUndo = async (e: MouseEvent) => {
-    e.stopPropagation()
+  const triggerUndo = async () => {
     try {
       keymap.dispatch("session.undo")
       toast.show({
@@ -157,11 +226,21 @@ export function PromptReviewBar(props: { sessionID?: string }) {
         duration: 2500,
       })
       setTimeout(() => {
-        void loadDiff()
-      }, 600)
+        scheduleLoadDiff(300)
+      }, 500)
     } catch {
       // ignore
     }
+  }
+
+  const handleKeep = (e: MouseEvent) => {
+    e.stopPropagation()
+    dismissCurrent()
+  }
+
+  const handleUndo = async (e: MouseEvent) => {
+    e.stopPropagation()
+    await triggerUndo()
   }
 
   const toggleExpand = (e: MouseEvent) => {
@@ -216,7 +295,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
             </text>
           </box>
 
-          {/* Action buttons: Keep and Undo */}
+          {/* Action buttons with Keyboard Affordance */}
           <box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
             <box
               backgroundColor={RGBA.fromHex("#0066FF")}
@@ -225,7 +304,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               onMouseUp={handleKeep}
             >
               <text fg={RGBA.fromHex("#FFFFFF")} attributes={TextAttributes.BOLD} selectable={false}>
-                Keep
+                Keep [Alt+K]
               </text>
             </box>
             <box
@@ -235,7 +314,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               onMouseUp={handleUndo}
             >
               <text fg={RGBA.fromHex("#E2E8F0")} attributes={TextAttributes.BOLD} selectable={false}>
-                Undo
+                Undo [Alt+U]
               </text>
             </box>
             <box
@@ -244,7 +323,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               onMouseUp={toggleExpand}
             >
               <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
-                📄
+                {expanded() ? "[Files ▴]" : "[Files ▾ Alt+D]"}
               </text>
             </box>
           </box>

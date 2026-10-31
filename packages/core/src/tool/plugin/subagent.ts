@@ -64,9 +64,16 @@ function resolveOmniAllowedModels(): Set<string> | undefined {
   return undefined
 }
 
+let cachedThinkingEnabled: { value: boolean; timestamp: number } | undefined
+
 function isThinkingRoutingEnabled(): boolean {
   if (process.env.OMNICODE_THINKING_ROUTING === "0") return false
   if (process.env.OMNICODE_THINKING_ROUTING === "1") return true
+
+  const now = Date.now()
+  if (cachedThinkingEnabled && now - cachedThinkingEnabled.timestamp < 3000) {
+    return cachedThinkingEnabled.value
+  }
 
   try {
     const stateDir =
@@ -78,6 +85,7 @@ function isThinkingRoutingEnabled(): boolean {
     if (fs.existsSync(autoFile)) {
       const content = JSON.parse(fs.readFileSync(autoFile, "utf8"))
       if (typeof content.thinkingRouting === "boolean") {
+        cachedThinkingEnabled = { value: content.thinkingRouting, timestamp: now }
         return content.thinkingRouting
       }
     }
@@ -85,6 +93,7 @@ function isThinkingRoutingEnabled(): boolean {
     // ignore
   }
 
+  cachedThinkingEnabled = { value: true, timestamp: now }
   return true
 }
 
@@ -92,6 +101,33 @@ function resolveAgentThinkingLevel(agentId: string): "off" | "low" | "medium" | 
   if (agentId === "explore" || agentId === "librarian") return "low"
   if (agentId === "architect" || agentId === "reviewer") return "max"
   return "medium"
+}
+
+function safeVariantForModel(
+  modelInfo: Model.Info | undefined,
+  level: "off" | "low" | "medium" | "high" | "max" | undefined,
+): Model.VariantID | undefined {
+  if (!level || !modelInfo || !modelInfo.variants || modelInfo.variants.length === 0) {
+    return undefined
+  }
+
+  if (level === "off") {
+    const offMatch = modelInfo.variants.find((v) => /^(none|off|disabled|0)$/i.test(v.id))
+    return offMatch?.id ?? undefined
+  }
+
+  if (level === "low") {
+    const lowMatch = modelInfo.variants.find((v) => /^(low|1k|fast|min)/i.test(v.id))
+    return lowMatch?.id ?? modelInfo.variants[0]?.id
+  }
+
+  if (level === "max" || level === "high") {
+    const maxMatch = modelInfo.variants.find((v) => /^(max|high|xhigh|32k|thinking)/i.test(v.id))
+    return maxMatch?.id ?? modelInfo.variants[modelInfo.variants.length - 1]?.id
+  }
+
+  const medMatch = modelInfo.variants.find((v) => /^(medium|mid|8k|thinking)/i.test(v.id))
+  return medMatch?.id ?? modelInfo.variants[Math.floor(modelInfo.variants.length / 2)]?.id
 }
 
 export const Input = Schema.Struct({
@@ -279,7 +315,9 @@ export const Plugin = {
                     ? {
                         providerID: matched.providerID,
                         id: matched.id,
-                        variant: isThinkingRoutingEnabled() ? selection.thinkingLevel : undefined,
+                        variant: isThinkingRoutingEnabled()
+                          ? safeVariantForModel(matched, selection.thinkingLevel)
+                          : undefined,
                       }
                     : undefined
                 }
@@ -301,13 +339,18 @@ export const Plugin = {
                 )
               }
 
+              const configuredModelInfo =
+                agent.model ? pool.find((m) => m.providerID === agent.model?.providerID && m.id === agent.model?.id) : undefined
+
               const configuredWithThinking =
                 isAllowed(agent.model) && agent.model
                   ? {
                       ...agent.model,
                       variant:
                         agent.model.variant ??
-                        (isThinkingRoutingEnabled() ? resolveAgentThinkingLevel(agent.id) : undefined),
+                        (isThinkingRoutingEnabled()
+                          ? safeVariantForModel(configuredModelInfo, resolveAgentThinkingLevel(agent.id))
+                          : undefined),
                     }
                   : undefined
 

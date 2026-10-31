@@ -187,6 +187,10 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
     })
   })
 
+  const [openFusion, setOpenFusion] = createSignal(false)
+  const [openSubagentModels, setOpenSubagentModels] = createSignal(false)
+  const [openCustomizations, setOpenCustomizations] = createSignal(false)
+
   return (
     <>
       <Show when={state() || cost() > 0}>
@@ -240,70 +244,97 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
       <Show when={fusionSummary()}>
         {(fusion) => (
           <box paddingBottom={1}>
-            <text fg={theme.text.base}>
-              <b>⚡ Omni Fusion ({fusion().modelCount} {fusion().isFiltered ? "selecionados" : "modelos"})</b>
-            </text>
-            <text fg={theme.text.muted} wrapMode="none">
-              Provedores: {truncateMiddle(fusion().providers)}
-            </text>
-            <Show when={fusion().isFiltered}>
-              <text fg={theme.text.feedback.info.base} wrapMode="none">
-                Filtro: {fusion().modelCount} de {fusion().totalConnectedCount} modelos
+            <box
+              flexDirection="row"
+              gap={1}
+              alignItems="center"
+              onMouseUp={() => setOpenFusion((prev) => !prev)}
+            >
+              <text fg={theme.text.base}>
+                <b>{openFusion() ? "▾" : "▸"} ⚡ Omni Fusion ({fusion().modelCount} {fusion().isFiltered ? "selecionados" : "modelos"})</b>
               </text>
-            </Show>
-            <text fg={theme.text.muted} wrapMode="none">
-              🌱 Eficiência: {truncateMiddle(fusion().efficiency)}
-            </text>
-            <text fg={theme.text.muted} wrapMode="none">
-              ⚖️ Balanceado: {truncateMiddle(fusion().balanced)}
-            </text>
-            <text fg={theme.text.muted} wrapMode="none">
-              🧠 Inteligência: {truncateMiddle(fusion().intelligence)}
-            </text>
-            <Show when={fusion().isFiltered && fusion().modelCount <= 6}>
-              <For each={fusion().selectedList}>
-                {(m) => (
-                  <text fg={theme.text.muted} wrapMode="none">
-                    • {truncateMiddle(m)}
-                  </text>
-                )}
-              </For>
+            </box>
+            <Show when={openFusion()}>
+              <text fg={theme.text.muted} wrapMode="none">
+                Provedores: {truncateMiddle(fusion().providers)}
+              </text>
+              <Show when={fusion().isFiltered}>
+                <text fg={theme.text.feedback.info.base} wrapMode="none">
+                  Filtro: {fusion().modelCount} de {fusion().totalConnectedCount} modelos
+                </text>
+              </Show>
+              <text fg={theme.text.muted} wrapMode="none">
+                🌱 Eficiência: {truncateMiddle(fusion().efficiency)}
+              </text>
+              <text fg={theme.text.muted} wrapMode="none">
+                ⚖️ Balanceado: {truncateMiddle(fusion().balanced)}
+              </text>
+              <text fg={theme.text.muted} wrapMode="none">
+                🧠 Inteligência: {truncateMiddle(fusion().intelligence)}
+              </text>
+              <Show when={fusion().isFiltered && fusion().modelCount <= 6}>
+                <For each={fusion().selectedList}>
+                  {(m) => (
+                    <text fg={theme.text.muted} wrapMode="none">
+                      • {truncateMiddle(m)}
+                    </text>
+                  )}
+                </For>
+              </Show>
             </Show>
           </box>
         )}
       </Show>
       <Show when={configuredSubagents().length > 0}>
-        <box>
-          <text fg={theme.text.base}>
-            <b>Modelos por Subagente</b>
-          </text>
-          <For each={configuredSubagents()}>
-            {(item) => (
-              <text fg={theme.text.muted} wrapMode="none">
-                @{item.id}: {item.model}
-              </text>
-            )}
-          </For>
+        <box paddingBottom={1}>
+          <box
+            flexDirection="row"
+            gap={1}
+            alignItems="center"
+            onMouseUp={() => setOpenSubagentModels((prev) => !prev)}
+          >
+            <text fg={theme.text.base}>
+              <b>{openSubagentModels() ? "▾" : "▸"} Modelos por Subagente</b>
+            </text>
+          </box>
+          <Show when={openSubagentModels()}>
+            <For each={configuredSubagents()}>
+              {(item) => (
+                <text fg={theme.text.muted} wrapMode="none">
+                  @{item.id}: {item.model}
+                </text>
+              )}
+            </For>
+          </Show>
         </box>
       </Show>
       <Show when={customizationsSummary()}>
         {(summary) => (
           <box>
-            <text fg={theme.text.base}>
-              <b>Personalizações Ativas</b>
-            </text>
-            <text fg={theme.text.muted} wrapMode="none">
-              Agentes (@): {summary().agents} · Skills: {summary().skills}
-            </text>
-            <text fg={theme.text.muted} wrapMode="none">
-              Mods/Plugins: {summary().mods} · Hooks: {summary().hooks}
-            </text>
-            <text fg={theme.text.muted} wrapMode="none">
-              Modos: {summary().settings} · Cmds (/): {summary().commands}
-            </text>
-            <text fg={theme.text.muted} wrapMode="none">
-              MCPs: {summary().mcps} · /personalizacoes
-            </text>
+            <box
+              flexDirection="row"
+              gap={1}
+              alignItems="center"
+              onMouseUp={() => setOpenCustomizations((prev) => !prev)}
+            >
+              <text fg={theme.text.base}>
+                <b>{openCustomizations() ? "▾" : "▸"} Personalizações ({summary().skills + summary().mods + summary().hooks + summary().settings} itens)</b>
+              </text>
+            </box>
+            <Show when={openCustomizations()}>
+              <text fg={theme.text.muted} wrapMode="none">
+                Agentes (@): {summary().agents} · Skills: {summary().skills}
+              </text>
+              <text fg={theme.text.muted} wrapMode="none">
+                Mods/Plugins: {summary().mods} · Hooks: {summary().hooks}
+              </text>
+              <text fg={theme.text.muted} wrapMode="none">
+                Modos: {summary().settings} · Cmds (/): {summary().commands}
+              </text>
+              <text fg={theme.text.muted} wrapMode="none">
+                MCPs: {summary().mcps} · /personalizacoes
+              </text>
+            </Show>
           </box>
         )}
       </Show>
