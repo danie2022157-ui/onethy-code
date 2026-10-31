@@ -76,6 +76,7 @@ import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogAgent } from "./component/dialog-agent"
 import { DialogCustomizations } from "./component/dialog-customizations"
+import { DialogAutoCustomizations } from "./component/dialog-auto-customizations"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogOpen, DialogOpenKey, moveOpenSession } from "./component/dialog-open"
 import { SessionTabs } from "./component/session-tabs"
@@ -1072,6 +1073,17 @@ function App() {
               slash: { name: "commands", aliases: ["comandos", "loops"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="commands" />)
+              },
+            },
+            {
+              name: "omnicode.auto_customizations",
+              title: "Auto-Uso de Recursos (Skills, Agentes, MCPs, Hooks, Mods & Settings)",
+              description: "Configura quais customizações a IA deve usar automaticamente de acordo com a tarefa",
+              category: "OnethyCode",
+              suggested: true,
+              slash: { name: "auto-customizations", aliases: ["customizations-auto", "auto-skills", "auto-recursos"] },
+              run: () => {
+                dialog.replace(() => <DialogAutoCustomizations />)
               },
             },
             {

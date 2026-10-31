@@ -4,6 +4,7 @@ import { DialogSelect } from "../ui/dialog-select"
 import { useDialog } from "../ui/dialog"
 import { useNewDesigns } from "../config"
 import { DialogFusionModels } from "./dialog-fusion-models"
+import { DialogAutoCustomizations } from "./dialog-auto-customizations"
 
 export function DialogVariant() {
   const local = useLocal()
@@ -75,6 +76,15 @@ export function DialogVariant() {
             : "Inativo: mantém variante fixa do modelo. Clique para ativar",
           onSelect: () => {
             local.model.auto.toggleThinkingRouting()
+          },
+        },
+        {
+          value: "auto customizations",
+          title: `⚙️ Auto-Uso de Recursos: [${local.customizations.summary()}]`,
+          category: "Ajustes do Omni Fusion",
+          description: "Configurar quais skills, agentes, MCPs, hooks e mods a IA usa automaticamente",
+          onSelect: () => {
+            dialog.replace(() => <DialogAutoCustomizations />)
           },
         },
       ]

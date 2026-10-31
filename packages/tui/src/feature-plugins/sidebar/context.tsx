@@ -331,6 +331,9 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
               <text fg={theme.text.muted} wrapMode="none">
                 MCPs: {summary().mcps} · /personalizacoes
               </text>
+              <text fg={theme.text.base} wrapMode="none">
+                ⚙️ Auto-Uso: {local?.customizations?.summary() ?? "Ativo"}
+              </text>
             </Show>
           </box>
         )}

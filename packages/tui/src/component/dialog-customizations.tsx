@@ -7,6 +7,7 @@ import { DialogHeader, DialogLayout, useDialog } from "../ui/dialog"
 import { useTheme } from "../context/theme"
 import { useToast } from "../ui/toast"
 import { DialogMcp } from "./dialog-mcp"
+import { DialogAutoCustomizations } from "./dialog-auto-customizations"
 
 export type CustomizationFilter =
   | "all"
@@ -42,6 +43,17 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
   const allItems = createMemo((): CustomizationItem[] => {
     const items: CustomizationItem[] = []
     const filter = props.filter ?? "all"
+
+    if (filter === "all" || filter === "settings" || filter === "agents") {
+      items.push({
+        id: "cfg:auto-customizations",
+        kind: "setting",
+        title: "⚙️ Configurar Auto-Uso de Recursos...",
+        description: `Status: ${local.customizations.summary()} · Escolher quais skills, agentes, MCPs, hooks e mods a IA usa automaticamente`,
+        category: "⚡ Orquestração Automática",
+        footer: "[Configurar]",
+      })
+    }
 
     if (filter === "all" || filter === "agents") {
       const agents = local.agent.all ? local.agent.all() : local.agent.list()
@@ -179,6 +191,10 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
           onSelect={(opt) => {
             const found = allItems().find((i) => i.id === opt.value)
             if (!found) return
+            if (found.id === "cfg:auto-customizations") {
+              dialog.replace(() => <DialogAutoCustomizations />)
+              return
+            }
             if (found.kind === "agent") {
               const agentId = found.id.replace(/^agent:/, "")
               local.agent.set(agentId)

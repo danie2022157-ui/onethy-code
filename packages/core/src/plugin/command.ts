@@ -353,6 +353,31 @@ export const Plugin = define({
               })
             }).pipe(Effect.asVoid),
         })
+
+        editor.add({
+          name: "auto-customizations",
+          description: "Configuração de Auto-Uso: define quais skills, agentes, MCPs, hooks e mods são usados de acordo com o trabalho",
+          execute: (input) =>
+            Effect.gen(function* () {
+              const cfg = OmniOrchestrator.getAutoCustomizationsConfig()
+              const summary = [
+                `Status Geral: ${cfg.enabled ? "ATIVADO" : "DESATIVADO"}`,
+                `- Skills Especializadas: ${cfg.useSkills ? "Sim" : "Não"}`,
+                `- Subagentes (@architect, @coder, etc.): ${cfg.useAgents ? "Sim" : "Não"}`,
+                `- Servidores MCP Conectados: ${cfg.useMcps ? "Sim" : "Não"}`,
+                `- Ganchos & Hooks: ${cfg.useHooks ? "Sim" : "Não"}`,
+                `- Mods e Plugins: ${cfg.useMods ? "Sim" : "Não"}`,
+                `- Comandos Slash & Loops: ${cfg.useCommands ? "Sim" : "Não"}`,
+                `- Modos e Settings: ${cfg.useSettings ? "Sim" : "Não"}`,
+              ].join("\n")
+              yield* ctx.session.prompt({
+                ...input.prompt,
+                sessionID: input.sessionID,
+                text: `⚙️ [CONFIGURAÇÃO DE AUTO-USO DE RECURSOS]\n${summary}\n\nDica: Para alterar essas opções visualmente com 1 tecla, abra o seletor em /variantes ou /agentes, ou alterne no menu de customizações.\n\n$ARGUMENTS`,
+                delivery: input.delivery,
+              })
+            }).pipe(Effect.asVoid),
+        })
       }
 
       editor.add({

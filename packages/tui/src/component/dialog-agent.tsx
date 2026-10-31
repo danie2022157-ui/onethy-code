@@ -3,6 +3,7 @@ import { useLocal } from "../context/local"
 import { useData } from "../context/data"
 import { DialogSelect } from "../ui/dialog-select"
 import { useDialog } from "../ui/dialog"
+import { DialogAutoCustomizations } from "./dialog-auto-customizations"
 
 export function DialogAgent() {
   const local = useLocal()
@@ -13,7 +14,7 @@ export function DialogAgent() {
     const models = data.location.model.list() ?? []
     const currentModel = local.model.current()
     const allAgents = local.agent.all ? local.agent.all() : local.agent.list()
-    return allAgents.map((item) => {
+    const agentOptions = allAgents.map((item) => {
       const ref = item.model ?? (currentModel ? { providerID: currentModel.providerID, id: currentModel.modelID } : undefined)
       const modelName = ref
         ? (models.find((m) => m.providerID === ref.providerID && m.id === ref.id)?.name ?? `${ref.providerID}/${ref.id}`)
@@ -26,6 +27,17 @@ export function DialogAgent() {
         footer: modelName ? `[${modelName}]` : undefined,
       }
     })
+
+    return [
+      {
+        value: "cfg:auto-customizations",
+        title: "⚙️ Configurar Auto-Uso de Customizações & Skills...",
+        description: `Status: ${local.customizations.summary()} · Definir se a IA deve usar agentes e skills automaticamente`,
+        category: "⚡ Orquestração Automática",
+        footer: "[Configurar]",
+      },
+      ...agentOptions,
+    ]
   })
 
   return (
@@ -36,6 +48,10 @@ export function DialogAgent() {
       current={local.agent.current()?.id}
       options={options()}
       onSelect={(option) => {
+        if (option.value === "cfg:auto-customizations") {
+          dialog.replace(() => <DialogAutoCustomizations />)
+          return
+        }
         local.agent.set(option.value)
         dialog.clear()
       }}

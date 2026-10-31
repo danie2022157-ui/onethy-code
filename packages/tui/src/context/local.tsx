@@ -167,6 +167,16 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         selectedModels: string[] | undefined
         thinkingRouting: boolean
         cooldowns: Record<string, number>
+        autoCustomizations: {
+          enabled: boolean
+          useSkills: boolean
+          useAgents: boolean
+          useMcps: boolean
+          useHooks: boolean
+          useMods: boolean
+          useCommands: boolean
+          useSettings: boolean
+        }
         lastDecision:
           | {
               complexity: "low" | "medium" | "high"
@@ -185,6 +195,16 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         selectedModels: undefined,
         thinkingRouting: true,
         cooldowns: {},
+        autoCustomizations: {
+          enabled: true,
+          useSkills: true,
+          useAgents: true,
+          useMcps: true,
+          useHooks: true,
+          useMods: true,
+          useCommands: true,
+          useSettings: true,
+        },
         lastDecision: undefined,
       })
 
@@ -196,6 +216,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         }
         process.env.OMNICODE_THINKING_ROUTING = autoStore.thinkingRouting ? "1" : "0"
         process.env.OMNICODE_OPTIMIZE_TIER = autoStore.explicitTier ?? autoStore.managedDefaultTier
+        process.env.OMNICODE_AUTO_CUSTOMIZATIONS = JSON.stringify(autoStore.autoCustomizations)
       }
 
       function saveAutoStore() {
@@ -205,6 +226,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           selectedModels: autoStore.selectedModels,
           thinkingRouting: autoStore.thinkingRouting,
           cooldowns: autoStore.cooldowns,
+          autoCustomizations: autoStore.autoCustomizations,
         }).catch(() => undefined)
         syncAllowedModelsEnv()
       }
@@ -238,6 +260,19 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
                 if (typeof v === "number" && v > now) active[k] = v
               }
               setAutoStore("cooldowns", active)
+            }
+            if (saved.autoCustomizations && typeof saved.autoCustomizations === "object") {
+              const c = saved.autoCustomizations as Record<string, unknown>
+              setAutoStore("autoCustomizations", {
+                enabled: typeof c.enabled === "boolean" ? c.enabled : true,
+                useSkills: typeof c.useSkills === "boolean" ? c.useSkills : true,
+                useAgents: typeof c.useAgents === "boolean" ? c.useAgents : true,
+                useMcps: typeof c.useMcps === "boolean" ? c.useMcps : true,
+                useHooks: typeof c.useHooks === "boolean" ? c.useHooks : true,
+                useMods: typeof c.useMods === "boolean" ? c.useMods : true,
+                useCommands: typeof c.useCommands === "boolean" ? c.useCommands : true,
+                useSettings: typeof c.useSettings === "boolean" ? c.useSettings : true,
+              })
             }
           })
           syncAllowedModelsEnv()
@@ -1015,6 +1050,54 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             this.set(cycleModelVariant(this.current(), variants))
           },
         },
+        customizations: {
+          config() {
+            return autoStore.autoCustomizations
+          },
+          enabled() {
+            return autoStore.autoCustomizations.enabled
+          },
+          toggleEnabled() {
+            batch(() => {
+              setAutoStore("autoCustomizations", "enabled", !autoStore.autoCustomizations.enabled)
+              saveAutoStore()
+            })
+          },
+          toggle(key: "useSkills" | "useAgents" | "useMcps" | "useHooks" | "useMods" | "useCommands" | "useSettings") {
+            batch(() => {
+              setAutoStore("autoCustomizations", key, !autoStore.autoCustomizations[key])
+              saveAutoStore()
+            })
+          },
+          setAll(value: boolean) {
+            batch(() => {
+              setAutoStore("autoCustomizations", {
+                enabled: value,
+                useSkills: value,
+                useAgents: value,
+                useMcps: value,
+                useHooks: value,
+                useMods: value,
+                useCommands: value,
+                useSettings: value,
+              })
+              saveAutoStore()
+            })
+          },
+          summary() {
+            if (!autoStore.autoCustomizations.enabled) return "Desativado"
+            const count = [
+              autoStore.autoCustomizations.useSkills,
+              autoStore.autoCustomizations.useAgents,
+              autoStore.autoCustomizations.useMcps,
+              autoStore.autoCustomizations.useHooks,
+              autoStore.autoCustomizations.useMods,
+              autoStore.autoCustomizations.useCommands,
+              autoStore.autoCustomizations.useSettings,
+            ].filter(Boolean).length
+            return `Ativo (${count}/7 recursos)`
+          },
+        },
       }
     }
 
@@ -1150,6 +1233,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       agent,
       session,
       permission,
+      customizations: model.customizations,
     }
     return result
   },

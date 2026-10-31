@@ -71,6 +71,81 @@ export function isModelInCooldown(providerID: string, modelID: string): boolean 
   return false
 }
 
+export interface AutoCustomizationsConfig {
+  enabled: boolean
+  useSkills: boolean
+  useAgents: boolean
+  useMcps: boolean
+  useHooks: boolean
+  useMods: boolean
+  useCommands: boolean
+  useSettings: boolean
+}
+
+export const DEFAULT_AUTO_CUSTOMIZATIONS: AutoCustomizationsConfig = {
+  enabled: true,
+  useSkills: true,
+  useAgents: true,
+  useMcps: true,
+  useHooks: true,
+  useMods: true,
+  useCommands: true,
+  useSettings: true,
+}
+
+export function getAutoCustomizationsConfig(): AutoCustomizationsConfig {
+  if (process.env.OMNICODE_AUTO_CUSTOMIZATIONS) {
+    try {
+      const parsed = JSON.parse(process.env.OMNICODE_AUTO_CUSTOMIZATIONS)
+      if (parsed && typeof parsed === "object") {
+        return {
+          enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : true,
+          useSkills: typeof parsed.useSkills === "boolean" ? parsed.useSkills : true,
+          useAgents: typeof parsed.useAgents === "boolean" ? parsed.useAgents : true,
+          useMcps: typeof parsed.useMcps === "boolean" ? parsed.useMcps : true,
+          useHooks: typeof parsed.useHooks === "boolean" ? parsed.useHooks : true,
+          useMods: typeof parsed.useMods === "boolean" ? parsed.useMods : true,
+          useCommands: typeof parsed.useCommands === "boolean" ? parsed.useCommands : true,
+          useSettings: typeof parsed.useSettings === "boolean" ? parsed.useSettings : true,
+        }
+      }
+    } catch {}
+  }
+  try {
+    const file = getAutoModelFilePath()
+    if (fs.existsSync(file)) {
+      const parsed = JSON.parse(fs.readFileSync(file, "utf8"))
+      if (parsed && typeof parsed.autoCustomizations === "object" && parsed.autoCustomizations) {
+        const c = parsed.autoCustomizations
+        return {
+          enabled: typeof c.enabled === "boolean" ? c.enabled : true,
+          useSkills: typeof c.useSkills === "boolean" ? c.useSkills : true,
+          useAgents: typeof c.useAgents === "boolean" ? c.useAgents : true,
+          useMcps: typeof c.useMcps === "boolean" ? c.useMcps : true,
+          useHooks: typeof c.useHooks === "boolean" ? c.useHooks : true,
+          useMods: typeof c.useMods === "boolean" ? c.useMods : true,
+          useCommands: typeof c.useCommands === "boolean" ? c.useCommands : true,
+          useSettings: typeof c.useSettings === "boolean" ? c.useSettings : true,
+        }
+      }
+    }
+  } catch {}
+  return DEFAULT_AUTO_CUSTOMIZATIONS
+}
+
+export function setAutoCustomizationsConfig(config: Partial<AutoCustomizationsConfig>): AutoCustomizationsConfig {
+  const current = getAutoCustomizationsConfig()
+  const updated: AutoCustomizationsConfig = { ...current, ...config }
+  try {
+    const file = getAutoModelFilePath()
+    const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {}
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, JSON.stringify({ ...existing, autoCustomizations: updated }, null, 2), "utf8")
+    process.env.OMNICODE_AUTO_CUSTOMIZATIONS = JSON.stringify(updated)
+  } catch {}
+  return updated
+}
+
 export type TaskCategory =
   | "fast_explore"
   | "external_research"

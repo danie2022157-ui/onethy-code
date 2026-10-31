@@ -7,6 +7,7 @@ import { Context, DateTime, Effect, Layer, Schema } from "effect"
 import { Global } from "@opencode/util/global"
 import { Location } from "../location.js"
 import { Instructions } from "./index.js"
+import { OmniOrchestrator } from "../omni-orchestrator.js"
 
 export interface Interface {
   readonly load: () => Effect.Effect<Instructions.List>
@@ -58,6 +59,59 @@ function readMemoryBank(directory: string): string {
   ].join("\n")
 }
 
+function renderAutoCustomizationsDirective(_directory: string): string {
+  const config = OmniOrchestrator.getAutoCustomizationsConfig()
+  if (!config.enabled) {
+    return ""
+  }
+
+  const activeFeatures: string[] = []
+  if (config.useSkills) {
+    activeFeatures.push(
+      "- [SKILLS]: Quando o trabalho envolver testes, arquitetura, design, UI, git, segurança, documentação, vídeo, SEO, banco de dados ou refatoração, invoque imediatamente a skill apropriada através da ferramenta 'skill' ou execute seu fluxo de trabalho recomendado. Nunca hesite em carregar skills disponíveis.",
+    )
+  }
+  if (config.useAgents) {
+    activeFeatures.push(
+      "- [SUBAGENTES]: Para investigações aprofundadas, tarefas paralelas de codebase, revisões de segurança ou exploração rápida, delegue subtarefas para subagentes especializados adequados (@architect, @researcher, @coder, @reviewer, @librarian) utilizando a ferramenta 'subagent'.",
+    )
+  }
+  if (config.useMcps) {
+    activeFeatures.push(
+      "- [SERVIDORES MCP]: Utilize ativamente as ferramentas dos servidores MCP conectados (serviços externos, navegadores, análise, bases de dados) de acordo com o trabalho solicitado.",
+    )
+  }
+  if (config.useHooks) {
+    activeFeatures.push(
+      "- [GANCHOS & HOOKS]: Execute e respeite ganchos pré/pós tarefa (como hook-pre-commit, hook-verify) e regras de integridade do projeto.",
+    )
+  }
+  if (config.useMods) {
+    activeFeatures.push("- [MODS & PLUGINS]: Aproveite as extensões e integrações ativas no workspace.")
+  }
+  if (config.useCommands) {
+    activeFeatures.push(
+      "- [COMANDOS SLASH & LOOPS]: Sugira ou acione loops de verificação e comandos dedicados (/loop-*, /plan, /review) quando o fluxo exigir verificação contínua.",
+    )
+  }
+  if (config.useSettings) {
+    activeFeatures.push(
+      "- [MODOS & SETTINGS]: Respeite estritamente o modo de autonomia e as configurações definidas pelo usuário.",
+    )
+  }
+
+  if (activeFeatures.length === 0) return ""
+
+  return [
+    "<auto_customizations_orchestrator>",
+    "  Status: ATIVO (Configuração do Usuário: sempre usar recursos de acordo com a tarefa)",
+    "  Diretrizes de Execução Proativa:",
+    ...activeFeatures.map((f) => `  ${f}`),
+    "  Instrução Geral: Como assistente proativo da OnethyCode, não aguarde passivamente. Selecione e aplique os recursos acima de acordo com o que o usuário estiver construindo ou reparando.",
+    "</auto_customizations_orchestrator>",
+  ].join("\n")
+}
+
 export class Service extends Context.Service<Service, Interface>()("@opencode/InstructionBuiltIns") {}
 
 const layer = Layer.effect(
@@ -106,6 +160,15 @@ const layer = Layer.effect(
               render: {
                 initial: (memory) => memory,
                 changed: (_previous, memory) => memory,
+              },
+            }),
+            Instructions.make({
+              key: Instructions.Key.make("omnicode/auto-customizations"),
+              codec: Schema.toCodecJson(Schema.String),
+              read: Effect.sync(() => renderAutoCustomizationsDirective(location.directory)),
+              render: {
+                initial: (directive) => directive,
+                changed: (_previous, directive) => directive,
               },
             }),
           ]),
