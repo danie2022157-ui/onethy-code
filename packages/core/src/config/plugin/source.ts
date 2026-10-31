@@ -149,6 +149,12 @@ const scan = Effect.fn("ConfigPluginSource.scan")(function* (
     Effect.gen(function* () {
       if (operation.type === "remove" || !path.isAbsolute(operation.target)) return Option.some(operation)
       if (yield* fs.isFile(operation.target)) {
+        const found = yield* fs
+          .up({ targets: ["package.json"], start: path.dirname(operation.target), mode: "first" })
+          .pipe(Effect.option)
+        if (Option.isSome(found) && found.value.length > 0) {
+          return Option.some<Operation>({ ...operation, target: path.dirname(found.value[0]!) })
+        }
         yield* Effect.logWarning("configured plugin path must be a directory", { target: operation.target })
         return Option.none<Operation>()
       }

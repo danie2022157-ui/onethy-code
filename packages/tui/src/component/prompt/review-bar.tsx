@@ -122,26 +122,33 @@ export function PromptReviewBar(props: { sessionID?: string }) {
     scheduleLoadDiff(100)
 
     const unsub = client.event.listen((evt: any) => {
-      const type = (evt?.details?.type ?? evt?.type ?? "") as string
-      // Filter out high-frequency streaming deltas
-      if (
-        type.includes(".delta") ||
-        type.includes(".chunk") ||
-        type.includes(".token")
-      ) {
-        return
-      }
+      try {
+        const raw = evt?.details?.type ?? evt?.type ?? evt?.name
+        if (typeof raw !== "string" || !raw) return
 
-      if (
-        type.startsWith("vcs.") ||
-        type.startsWith("tool.") ||
-        type === "session.idle" ||
-        type === "session.status" ||
-        type === "session.step.completed" ||
-        type === "session.step.failed" ||
-        type === "session.updated"
-      ) {
-        scheduleLoadDiff(type.startsWith("vcs.") ? 150 : 400)
+        // Filter out high-frequency streaming deltas
+        if (
+          raw.includes(".delta") ||
+          raw.includes(".chunk") ||
+          raw.includes(".token") ||
+          raw.includes(".diff")
+        ) {
+          return
+        }
+
+        if (
+          raw.startsWith("vcs.") ||
+          raw.startsWith("tool.") ||
+          raw === "session.idle" ||
+          raw === "session.status" ||
+          raw === "session.step.completed" ||
+          raw === "session.step.failed" ||
+          raw === "session.updated"
+        ) {
+          scheduleLoadDiff(raw.startsWith("vcs.") ? 150 : 400)
+        }
+      } catch {
+        // never throw in event listener
       }
     })
 
