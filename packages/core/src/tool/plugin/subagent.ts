@@ -103,6 +103,34 @@ function resolveAgentThinkingLevel(agentId: string): "off" | "low" | "medium" | 
   return "medium"
 }
 
+function getManualThinkingLevel(): "off" | "low" | "medium" | "high" | "max" {
+  if (process.env.OMNICODE_MANUAL_THINKING) {
+    const val = process.env.OMNICODE_MANUAL_THINKING.toLowerCase()
+    if (val === "off" || val === "low" || val === "medium" || val === "high" || val === "max") {
+      return val as any
+    }
+  }
+
+  try {
+    const stateDir =
+      process.env.OMNICODE_STATE_DIR ||
+      (process.platform === "win32"
+        ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "omnicode", "state")
+        : path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"), "omnicode"))
+    const autoFile = path.join(stateDir, "auto-model.json")
+    if (fs.existsSync(autoFile)) {
+      const content = JSON.parse(fs.readFileSync(autoFile, "utf8"))
+      if (typeof content.manualThinking === "string") {
+        return content.manualThinking as any
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return "medium"
+}
+
 function safeVariantForModel(
   modelInfo: Model.Info | undefined,
   level: "off" | "low" | "medium" | "high" | "max" | undefined,
@@ -317,7 +345,7 @@ export const Plugin = {
                         id: matched.id,
                         variant: isThinkingRoutingEnabled()
                           ? safeVariantForModel(matched, selection.thinkingLevel)
-                          : undefined,
+                          : safeVariantForModel(matched, getManualThinkingLevel()),
                       }
                     : undefined
                 }
@@ -350,7 +378,7 @@ export const Plugin = {
                         agent.model.variant ??
                         (isThinkingRoutingEnabled()
                           ? safeVariantForModel(configuredModelInfo, resolveAgentThinkingLevel(agent.id))
-                          : undefined),
+                          : safeVariantForModel(configuredModelInfo, getManualThinkingLevel())),
                     }
                   : undefined
 

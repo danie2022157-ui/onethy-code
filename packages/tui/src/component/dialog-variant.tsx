@@ -14,7 +14,71 @@ export function DialogVariant() {
     if (local.model.auto.enabled()) {
       const pool = local.model.auto.tierPool()
       const summary = local.model.auto.allowedModelsSummary()
+      const autoThinking = local.model.auto.thinkingRouting()
+      const manualLevel = local.model.auto.manualThinking()
+
       return [
+        {
+          value: "thinking routing",
+          title: autoThinking
+            ? "✓ 🧠 Auto Thinking: [ATIVADO (Dinâmico)]"
+            : "○ 🧠 Auto Thinking: [DESATIVADO (Manual)]",
+          description: autoThinking
+            ? "Raciocínio dinâmico por agente (low em buscas, max em arquitetura). Clique para desativar."
+            : "Raciocínio manual ativo. Escolha o nível fixo desejado abaixo.",
+          onSelect: () => {
+            local.model.auto.toggleThinkingRouting()
+          },
+        },
+        ...(!autoThinking
+          ? [
+              {
+                value: "low",
+                title: manualLevel === "low" ? "● 🧠 low (Raciocínio Rápido)" : "○ 🧠 low (Raciocínio Rápido)",
+                description: "Menor latência e consumo reduzido de tokens",
+                onSelect: () => {
+                  local.model.auto.setManualThinking("low")
+                  dialog.clear()
+                },
+              },
+              {
+                value: "medium",
+                title: manualLevel === "medium" ? "● 🧠 medium (Balanceado)" : "○ 🧠 medium (Balanceado)",
+                description: "Equilíbrio ideal entre raciocínio e velocidade",
+                onSelect: () => {
+                  local.model.auto.setManualThinking("medium")
+                  dialog.clear()
+                },
+              },
+              {
+                value: "high",
+                title: manualLevel === "high" ? "● 🧠 high (Aprofundado)" : "○ 🧠 high (Aprofundado)",
+                description: "Raciocínio profundo para código seguro e depuração complexa",
+                onSelect: () => {
+                  local.model.auto.setManualThinking("high")
+                  dialog.clear()
+                },
+              },
+              {
+                value: "max",
+                title: manualLevel === "max" ? "● 🧠 max (Máximo)" : "○ 🧠 max (Máximo)",
+                description: "Raciocínio máximo para arquitetura profunda e problemas difíceis",
+                onSelect: () => {
+                  local.model.auto.setManualThinking("max")
+                  dialog.clear()
+                },
+              },
+              {
+                value: "off",
+                title: manualLevel === "off" ? "● 🚫 off (Desligado)" : "○ 🚫 off (Desligado)",
+                description: "Desativa o thinking (resposta direta sem raciocínio prévio)",
+                onSelect: () => {
+                  local.model.auto.setManualThinking("off")
+                  dialog.clear()
+                },
+              },
+            ]
+          : []),
         {
           value: "modo auto",
           title: "Modo Auto",
@@ -57,18 +121,6 @@ export function DialogVariant() {
           description: `${summary} · Marcar modelos ou usar todos`,
           onSelect: () => {
             dialog.replace(() => <DialogFusionModels />)
-          },
-        },
-        {
-          value: "thinking routing",
-          title: local.model.auto.thinkingRouting()
-            ? "✓ 🧠 Roteamento de Thinking: [ATIVADO]"
-            : "○ 🧠 Roteamento de Thinking: [DESATIVADO]",
-          description: local.model.auto.thinkingRouting()
-            ? "Ativo: ajusta raciocínio dinamicamente (low em buscas, max em arquitetura)"
-            : "Inativo: mantém variante fixa do modelo. Clique para ativar",
-          onSelect: () => {
-            local.model.auto.toggleThinkingRouting()
           },
         },
       ]

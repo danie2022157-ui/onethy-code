@@ -109,7 +109,11 @@ export function PromptMetadataRow(props: {
                     attributes={TextAttributes.BOLD}
                     selectable={false}
                   >
-                    {variant()}
+                    {/^(low|medium|high|max)$/i.test(variant())
+                      ? `🧠 ${variant()}`
+                      : /^off$/i.test(variant())
+                        ? `🚫 ${variant()}`
+                        : variant()}
                   </text>
                 </>
               )}

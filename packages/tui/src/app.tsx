@@ -1101,12 +1101,15 @@ function App() {
             {
               name: "omnicode.thinking_routing",
               title: "Omni Fusion — Roteamento Inteligente de Thinking (Ativar/Desativar)",
-              description: "Ajusta tokens de raciocínio dinamicamente (low em buscas, max em arquitetura)",
+              description: "Ajusta tokens de raciocínio dinamicamente (low em buscas, max em arquitetura) ou abre seleção manual",
               category: "OnethyCode",
               suggested: true,
               slash: { name: "thinking", aliases: ["thinking-routing", "raciocinio", "pensamento"] },
               run: () => {
                 local.model.auto.toggleThinkingRouting()
+                if (!local.model.auto.thinkingRouting()) {
+                  dialog.replace(() => <DialogVariant />)
+                }
               },
             },
             {
