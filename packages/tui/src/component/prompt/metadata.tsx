@@ -1,6 +1,6 @@
-import { RGBA, TextAttributes } from "@opentui/core"
+import { RGBA, TextAttributes, type BoxRenderable } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
-import { createMemo, Show } from "solid-js"
+import { createMemo, createSignal, Show } from "solid-js"
 import { useTheme } from "../../context/theme"
 import { Locale } from "../../util/locale"
 import { stringWidth } from "../../util/string-width"
@@ -22,22 +22,39 @@ export function PromptMetadataRow(props: {
 }) {
   const theme = useTheme()
   const dimensions = useTerminalDimensions()
+  const [boxWidth, setBoxWidth] = createSignal(72)
+
   const layout = createMemo(() => {
     if (props.mode === "shell") return { agent: props.agent ?? "Shell", model: "" }
+    const targetWidth = Math.min(boxWidth(), Math.max(0, dimensions().width - (dimensions().width < 44 ? 9 : 14)))
     return promptMetadataLayout({
-      width: Math.max(0, dimensions().width - (dimensions().width < 44 ? 9 : 13)),
+      width: Math.max(20, targetWidth),
       terminalWidth: dimensions().width,
       agent: props.agent ?? "",
-      auto: props.auto,
+      auto: props.auto && !props.model.startsWith("⚡"),
       model: props.model,
-      provider: props.provider,
-      variant: props.variant,
+      provider: props.model.startsWith("⚡") ? "" : props.provider,
+      variant: props.variant === "modo auto" ? undefined : props.variant,
       limit: props.limit?.text,
     })
   })
 
   return (
-    <box flexDirection="row" gap={1} flexGrow={1} flexShrink={1} minWidth={0} alignItems="center">
+    <box
+      flexDirection="row"
+      gap={1}
+      flexGrow={1}
+      flexShrink={1}
+      minWidth={0}
+      height={1}
+      overflow="hidden"
+      alignItems="center"
+      onSizeChange={function (this: BoxRenderable) {
+        if (this.width > 10 && this.width !== boxWidth()) {
+          setBoxWidth(this.width)
+        }
+      }}
+    >
       <Show
         when={(props.mode === "shell" || props.agent) && (layout().agent || layout().model)}
         fallback={<box height={1} />}
@@ -54,7 +71,7 @@ export function PromptMetadataRow(props: {
             </box>
           )}
         </Show>
-        <Show when={props.mode === "normal" && layout().auto}>
+        <Show when={props.mode === "normal" && layout().auto && !props.model.startsWith("⚡")}>
           <text fg={fade(RGBA.fromHex("#34D399"), props.agentAlpha)}>auto</text>
         </Show>
         <Show when={props.mode === "normal" && layout().model}>
@@ -74,14 +91,14 @@ export function PromptMetadataRow(props: {
             >
               {layout().model}
             </text>
-            <Show when={layout().provider}>
+            <Show when={layout().provider && !layout().model.startsWith("⚡")}>
               {(provider) => (
                 <text flexShrink={0} fg={fade(RGBA.fromHex("#94A3B8"), props.modelAlpha)}>
                   {provider()}
                 </text>
               )}
             </Show>
-            <Show when={layout().variant}>
+            <Show when={layout().variant && layout().variant !== "modo auto"}>
               {(variant) => (
                 <>
                   <text fg={RGBA.fromHex("#38BDF8")} attributes={TextAttributes.BOLD} selectable={false}>

@@ -545,9 +545,12 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           const baseModelName = info?.name ?? `${value.modelID} (unavailable)`
           const availableCount = (models() ?? []).filter((m) => m.status !== "deprecated").length
           const modeTitle = availableCount >= 2 ? "Omni Fusion" : "Auto"
+          const tier = autoStore.explicitTier ?? autoStore.managedDefaultTier
+          const tierLabel =
+            tier === "efficiency" ? "Eficiência" : tier === "intelligence" ? "Inteligente" : "Balanceado"
           return {
-            provider: provider?.name ?? value.providerID,
-            model: autoStore.enabled ? `⚡ ${modeTitle} → ${baseModelName}` : baseModelName,
+            provider: autoStore.enabled ? "" : (provider?.name ?? value.providerID),
+            model: autoStore.enabled ? `⚡ ${modeTitle} (${tierLabel})` : baseModelName,
             reasoning: autoStore.enabled ? true : (info?.variants?.length ?? 0) !== 0,
           }
         }),
@@ -863,7 +866,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         variant: {
           selected() {
             if (autoStore.enabled) {
-              return autoVariantValue(autoStore.explicitTier ?? "default")
+              return undefined
             }
             return currentSelection()?.variant
           },
