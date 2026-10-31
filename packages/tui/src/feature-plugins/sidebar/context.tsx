@@ -1,6 +1,6 @@
 import { Plugin } from "@opencode/plugin/tui"
 import type { SessionInfo } from "@opencode/client"
-import { createMemo, For, Show } from "solid-js"
+import { createMemo, createSignal, For, Show } from "solid-js"
 import { Locale } from "../../util/locale"
 import { contextUsage, sessionFamily } from "../../util/session"
 import { useLocal } from "../../context/local"
