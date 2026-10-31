@@ -29,6 +29,7 @@ const child = spawn(bunBin, ["run", "--cwd", cliDir, "src/index.ts", ...process.
     ...makeOmniEnvironment(process.env, bunBin),
     ONETHY_ACTIVE: "1",
     OPENCODE_CLI_NAME: "onethy",
+    OPENCODE_THEME: process.env.OPENCODE_THEME || "onethy",
   },
   cwd: process.cwd(),
 })
