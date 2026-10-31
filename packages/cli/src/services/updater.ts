@@ -142,7 +142,7 @@ const make = Effect.gen(function* () {
   const appProcess = yield* AppProcess.Service
   const flock = yield* EffectFlock.Service
   const installedVersion = yield* Ref.make(OPENCODE_VERSION)
-  const omniUpdateMessage = "OmniCode has no standalone update channel yet. Update its source checkout manually."
+  const omniUpdateMessage = "OnethyCode has no standalone update channel yet. Update its source checkout manually."
   const channel = OPENCODE_CHANNEL.replace(/[^a-zA-Z0-9._-]/g, "-")
   const executable = yield* fs.realPath(process.execPath).pipe(Effect.orElseSucceed(() => process.execPath))
   const installedPackage = yield* Effect.gen(function* () {
@@ -360,7 +360,7 @@ const make = Effect.gen(function* () {
   })
 
   const latest = (selected?: Method) => {
-    if (process.env.OMNICODE_ACTIVE === "1") return Effect.fail(new Error(omniUpdateMessage))
+    if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")) return Effect.fail(new Error(omniUpdateMessage))
     return (selected ? Effect.succeed(selected) : method()).pipe(
       Effect.flatMap((method) =>
         method === "winget" ? wingetVersion() : release(method).pipe(Effect.map((data) => data.version)),
@@ -426,7 +426,7 @@ const make = Effect.gen(function* () {
   }
 
   const upgrade = Effect.fnUntraced(function* (method: Method, input: string) {
-    if (process.env.OMNICODE_ACTIVE === "1") return yield* Effect.fail(new Error(omniUpdateMessage))
+    if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")) return yield* Effect.fail(new Error(omniUpdateMessage))
     if (!parseReleaseVersion(input)) return yield* Effect.fail(new Error(`Invalid version: ${input}`))
     const version = input.trim().replace(/^v/, "")
     const packageName =
@@ -535,7 +535,7 @@ const make = Effect.gen(function* () {
   })
 
   const inspect = Effect.fnUntraced(function* () {
-    if (process.env.OMNICODE_ACTIVE === "1") {
+    if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")) {
       yield* Effect.logInfo("update check skipped", { reason: "omnicode", version: OPENCODE_VERSION })
       return undefined
     }
@@ -569,7 +569,7 @@ const make = Effect.gen(function* () {
   })
 
   const install = Effect.fnUntraced(function* (version: string) {
-    if (process.env.OMNICODE_ACTIVE === "1") return yield* Effect.fail(new Error(omniUpdateMessage))
+    if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")) return yield* Effect.fail(new Error(omniUpdateMessage))
     const detected = yield* method()
     if (!detected) {
       yield* Effect.logWarning("update skipped: installation method not found")
@@ -592,7 +592,7 @@ const make = Effect.gen(function* () {
   })
 
   const check = Effect.fn("cli.updater.check")(function* () {
-    if (process.env.OMNICODE_ACTIVE === "1")
+    if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1"))
       return {
         type: "unavailable" as const,
         message: omniUpdateMessage,

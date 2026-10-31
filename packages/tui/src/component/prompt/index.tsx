@@ -1,6 +1,7 @@
 import {
   BoxRenderable,
   RGBA,
+  TextAttributes,
   TextareaRenderable,
   MouseEvent,
   PasteEvent,
@@ -15,7 +16,6 @@ import { useLocal } from "../../context/local"
 import { useTheme, useThemes } from "../../context/theme"
 import { tint } from "../../theme/color"
 import { createAnimatable, tween } from "../../ui/animation"
-import { EmptyBorder, SplitBorder } from "../../ui/border"
 import { useTuiPaths, useTuiTerminalEnvironment } from "../../context/runtime"
 import { useClipboard } from "../../context/clipboard"
 import { Spinner } from "../spinner"
@@ -70,6 +70,7 @@ import { directoryRecentValue } from "../../prompt/directory-completion"
 import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
 import { truncateFilePath } from "../../ui/file-path"
 import { PromptMetadataRow } from "./metadata"
+import { PromptReviewBar } from "./review-bar"
 import { limitLabel, useUsageLimits } from "../usage"
 
 export type PromptProps = {
@@ -1614,7 +1615,7 @@ export function Prompt(props: PromptProps) {
   })
   const borderHighlight = createMemo(() => {
     if (muted()) return theme.border.base
-    return theme.borderActive ?? RGBA.fromHex("#0099FF")
+    return RGBA.fromHex("#0099FF")
   })
   const footerInput = () => ({
     sessionID: props.sessionID,
@@ -1688,14 +1689,17 @@ export function Prompt(props: PromptProps) {
   return (
     <>
       <box ref={(r: BoxRenderable) => (anchor = r)} visible={props.visible !== false} width="100%">
+        <Show when={props.sessionID}>
+          <PromptReviewBar sessionID={props.sessionID} />
+        </Show>
         <box
           width="100%"
           border
           borderStyle="rounded"
           borderColor={borderHighlight()}
           backgroundColor={promptBg()}
-          paddingLeft={dimensions().width < 44 ? 1 : 2}
-          paddingRight={dimensions().width < 44 ? 1 : 2}
+          paddingLeft={1}
+          paddingRight={1}
           paddingTop={0}
           paddingBottom={0}
           flexShrink={0}
@@ -1773,9 +1777,9 @@ export function Prompt(props: PromptProps) {
                 </Show>
               </box>
             </Show>
-            <box flexDirection="row" width="100%" alignItems="flex-start" paddingTop={1}>
+            <box flexDirection="row" width="100%" alignItems="flex-start" paddingTop={0}>
               <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
-                │ >{" "}
+                {"│ > "}
               </text>
               <textarea
                 width="100%"
@@ -1866,8 +1870,8 @@ export function Prompt(props: PromptProps) {
                 syntaxStyle={syntax()}
               />
             </box>
-            <box flexDirection="row" flexShrink={0} paddingTop={1} paddingBottom={1} gap={1} alignItems="center" justifyContent="space-between">
-              <box flexDirection="row" gap={1} alignItems="center" flexGrow={1} flexShrink={1} minWidth={0}>
+            <box flexDirection="row" flexShrink={0} paddingTop={0} paddingBottom={0} gap={1} alignItems="center" justifyContent="space-between">
+              <box flexDirection="row" gap={0} alignItems="center" flexGrow={1} flexShrink={1} minWidth={0}>
                 <text fg={RGBA.fromHex("#10B981")} attributes={TextAttributes.BOLD} selectable={false}>
                   │{" "}
                 </text>

@@ -45,14 +45,14 @@ const PermissionParams = {
   ),
 }
 
-const isOmni = process.env.OMNICODE_ACTIVE === "1";
-const Root = Spec.make(isOmni ? "omnicode" : (typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME : "opencode"), {
-  description: "Interface de linha de comando do OmniCode",
+const isOmni = process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1";
+const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME : (isOmni ? "onethy" : "opencode"), {
+  description: "Interface de linha de comando do OnethyCode",
   params: {
     ...ServerParams,
     ...PermissionParams,
     directory: Argument.String("directory").pipe(
-      Argument.withDescription("Diretório para iniciar o OmniCode"),
+      Argument.withDescription("Diretório para iniciar o OnethyCode"),
       Argument.optional,
     ),
     continue: Flag.Boolean("continue").pipe(
@@ -69,7 +69,7 @@ const Root = Spec.make(isOmni ? "omnicode" : (typeof OPENCODE_CLI_NAME === "stri
   },
   commands: [
     Spec.make("upgrade", {
-      description: "Atualizar o OmniCode para a versão mais recente ou específica",
+      description: "Atualizar o OnethyCode para a versão mais recente ou específica",
       aliases: ["update"],
       params: {
         target: Argument.String("target").pipe(
@@ -84,7 +84,7 @@ const Root = Spec.make(isOmni ? "omnicode" : (typeof OPENCODE_CLI_NAME === "stri
       },
     }),
     Spec.make("uninstall", {
-      description: "Desinstalar o OmniCode, mantendo dados de sessão e configurações",
+      description: "Desinstalar o OnethyCode, mantendo dados de sessão e configurações",
       params: {
         dryRun: Flag.Boolean("dry-run").pipe(
           Flag.withDescription("Show what would be removed without removing"),

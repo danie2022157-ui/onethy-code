@@ -1,12 +1,11 @@
-import { createMemo, createSignal, onMount } from "solid-js"
+import { createMemo, createSignal } from "solid-js"
 import fs from "fs"
 import path from "path"
 import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
 import { useDialog } from "../ui/dialog"
-import { useLocation } from "../context/location"
+import { useTuiPaths } from "../context/runtime"
 import { useToast } from "../ui/toast"
 import { openEditor } from "../editor"
-import { useTuiTerminalEnvironment } from "../context/runtime"
 
 interface MemoryBankFile {
   name: string
@@ -47,18 +46,17 @@ const MEMORY_FILES = [
 
 export function DialogMemoryBank() {
   const dialog = useDialog()
-  const location = useLocation()
+  const paths = useTuiPaths()
   const toast = useToast()
-  const terminalEnv = useTuiTerminalEnvironment()
   const [version, setVersion] = createSignal(0)
 
   const dir = () => {
-    const root = location.directory() ?? process.cwd()
+    const root = paths.cwd ?? process.cwd()
     return path.join(root, ".omnicode", "memory-bank")
   }
 
   const rootMemoryPath = () => {
-    const root = location.directory() ?? process.cwd()
+    const root = paths.cwd ?? process.cwd()
     return path.join(root, ".omnicode", "memory.md")
   }
 
@@ -169,7 +167,8 @@ export function DialogMemoryBank() {
             }
           } else {
             dialog.clear()
-            void openEditor(f.path, terminalEnv)
+            // open file path in editor
+            void openEditor({ value: f.path, renderer: null as any, cwd: paths.cwd })
           }
         },
       })

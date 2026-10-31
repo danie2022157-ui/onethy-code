@@ -92,17 +92,6 @@ export function Home() {
     r.submit()
   })
 
-  const palette = () => {
-    const scales = theme.categorical
-    if (scales.length === 0) return [theme.text.base]
-    return scales.map((scale) => scale[400])
-  }
-
-  const colorAt = (index: number) => {
-    const list = palette()
-    return list[index % list.length] ?? theme.text.base
-  }
-
   const ecosystemStats = createMemo(() => {
     const loc = currentLocation()
     const agents = (data.location.agent.list(loc) ?? []).filter((a) => !a.hidden).length
@@ -176,10 +165,10 @@ export function Home() {
     { cmd: "/ulw", desc: "Ultrawork", fg: RGBA.fromHex("#00F5FF") },
     { cmd: "/arena", desc: "Multi-Modelo", fg: RGBA.fromHex("#10B981") },
     { cmd: "/raph", desc: "Loop Verificador", fg: RGBA.fromHex("#F43F5E") },
-    { cmd: "/bus", desc: "OmniBus", fg: RGBA.fromHex("#00D2FF") },
+    { cmd: "/bus", desc: "OnethyBus", fg: RGBA.fromHex("#00D2FF") },
   ]
   const quickRow2 = [
-    { cmd: "/auto", desc: "Omni Fusion", fg: RGBA.fromHex("#A855F7") },
+    { cmd: "/auto", desc: "Onethy Fusion", fg: RGBA.fromHex("#A855F7") },
     { cmd: "/personalizacoes", desc: "Catálogo", fg: RGBA.fromHex("#F59E0B") },
   ]
 

@@ -41,13 +41,13 @@ export default Runtime.handler(Commands, (input) =>
         if (reason === "version-mismatch" && preflight.begin(previousVersion)) return
         process.stderr.write(
           reason === "version-mismatch"
-            ? "Reiniciando servidor em segundo plano do OmniCode (incompatibilidade de versão)...\n"
-            : "Iniciando servidor em segundo plano do OmniCode...\n",
+            ? "Reiniciando servidor em segundo plano do OnethyCode (incompatibilidade de versão)...\n"
+            : "Iniciando servidor em segundo plano do OnethyCode...\n",
         )
       },
     }).pipe(
       Effect.tapError(() =>
-        Effect.promise(() => preflight.fail("A atualização do OmniCode não pôde iniciar o novo serviço em segundo plano")),
+        Effect.promise(() => preflight.fail("A atualização do OnethyCode não pôde iniciar o novo serviço em segundo plano")),
       ),
     )
     const session = Option.getOrUndefined(input.session)

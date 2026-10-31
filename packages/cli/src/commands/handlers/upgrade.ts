@@ -12,8 +12,8 @@ export default Runtime.handler(
   Effect.fn("cli.upgrade")(
     function* (input) {
       intro("Upgrade")
-      if (process.env.OMNICODE_ACTIVE === "1") {
-        log.warn("OmniCode has no standalone update channel yet. Update its source checkout manually.")
+      if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")) {
+        log.warn("OnethyCode has no standalone update channel yet. Update its source checkout manually.")
         outro("Done")
         return
       }

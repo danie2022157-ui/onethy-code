@@ -24,8 +24,9 @@ export function makeOmniEnvironment(env, bunBin) {
   const pathKey = Object.keys(env).find((key) => key.toUpperCase() === "PATH") || "PATH"
   return {
     ...Object.fromEntries(Object.entries(env).filter(([key]) => !key.toUpperCase().startsWith("OPENCODE_"))),
+    ONETHY_ACTIVE: "1",
     OMNICODE_ACTIVE: "1",
-    OPENCODE_CLI_NAME: "omnicode",
+    OPENCODE_CLI_NAME: "onethy",
     BUN_BIN: bunBin,
     [pathKey]: [path.dirname(bunBin), env[pathKey]].filter(Boolean).join(path.delimiter),
   }

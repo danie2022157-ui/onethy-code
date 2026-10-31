@@ -17,6 +17,7 @@ import { useDialog } from "../ui/dialog"
 import { DialogExperiments } from "./dialog-experiments"
 import { usePlugin } from "../plugin/context"
 import { errorMessage } from "../util/error"
+import { useTuiApp } from "../context/runtime"
 
 const graphWidth = 23
 const sampleIntervalMilliseconds = 2_000
@@ -27,6 +28,7 @@ type ProcessSample = Readonly<{ cpu: number; memory: number; delay: number; time
 export type RuntimeStatus = "normal" | "medium" | "high"
 
 export function DevToolsBar() {
+  const app = useTuiApp()
   const client = useClient()
   const config = useConfig()
   const dialog = useDialog()
@@ -437,6 +439,9 @@ export function DevToolsBar() {
       </BarItem>
       <box flexGrow={1} minWidth={0}>
         <TimeToFirstDraw visible={timing()} width="100%" fg={theme.text.muted} label="Time to first draw" />
+      </box>
+      <box paddingRight={1} flexShrink={0}>
+        <text fg={theme.text.muted}>{app.version} (OnethyCode)</text>
       </box>
     </box>
   )

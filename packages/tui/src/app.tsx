@@ -949,24 +949,24 @@ function App() {
           local.model.cycleFavorite(-1)
         },
       },
-      ...(process.env.OMNICODE_ACTIVE === "1"
+      ...((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")
         ? [
             {
               name: "omnicode.orchestrator",
-              title: "OmniCode Orchestrator (Multi-Agent)",
-              category: "OmniCode",
+              title: "OnethyCode Orchestrator (Multi-Agent)",
+              category: "OnethyCode",
               suggested: true,
               slash: { name: "orchestrator", aliases: ["omni", "orquestrador"] },
               run: () => {
                 local.agent.set("omni")
                 dialog.clear()
-                toast.show({ variant: "info", message: "OmniCode Orchestrator ativo (@omni / @orchestrator)" })
+                toast.show({ variant: "info", message: "OnethyCode Orchestrator ativo (@omni / @orchestrator)" })
               },
             },
             {
               name: "omnicode.plan",
-              title: "OmniCode Plan Mode",
-              category: "OmniCode",
+              title: "OnethyCode Plan Mode",
+              category: "OnethyCode",
               slash: { name: "plan", aliases: ["planejar"] },
               run: () => {
                 local.agent.set("plan")
@@ -976,8 +976,8 @@ function App() {
             },
             {
               name: "omnicode.review",
-              title: "OmniCode Especialista Revisor (@reviewer)",
-              category: "OmniCode",
+              title: "OnethyCode Especialista Revisor (@reviewer)",
+              category: "OnethyCode",
               slash: { name: "reviewer", aliases: ["revisar"] },
               run: () => {
                 local.agent.set("reviewer")
@@ -987,8 +987,8 @@ function App() {
             },
             {
               name: "omnicode.architect",
-              title: "OmniCode Software Architect",
-              category: "OmniCode",
+              title: "OnethyCode Software Architect",
+              category: "OnethyCode",
               slash: { name: "architect", aliases: ["arquiteto"] },
               run: () => {
                 local.agent.set("architect")
@@ -998,8 +998,8 @@ function App() {
             },
             {
               name: "omnicode.coder",
-              title: "OmniCode Coder",
-              category: "OmniCode",
+              title: "OnethyCode Coder",
+              category: "OnethyCode",
               slash: { name: "coder", aliases: ["dev"] },
               run: () => {
                 local.agent.set("coder")
@@ -1009,8 +1009,8 @@ function App() {
             },
             {
               name: "omnicode.librarian",
-              title: "OmniCode Especialista Bibliotecário (@librarian)",
-              category: "OmniCode",
+              title: "OnethyCode Especialista Bibliotecário (@librarian)",
+              category: "OnethyCode",
               slash: { name: "librarian", aliases: ["bibliotecario"] },
               run: () => {
                 local.agent.set("librarian")
@@ -1021,7 +1021,7 @@ function App() {
             {
               name: "omnicode.customizations",
               title: "Central de Personalizações (Agentes, Skills, Plugins, Mods, Hooks, Comandos e MCPs)",
-              category: "OmniCode",
+              category: "OnethyCode",
               suggested: true,
               slash: { name: "personalizacoes", aliases: ["customizations", "catalogo", "tudo"] },
               run: () => {
@@ -1031,7 +1031,7 @@ function App() {
             {
               name: "omnicode.skills",
               title: "Skills Instaladas e do Usuário (@skill)",
-              category: "OmniCode",
+              category: "OnethyCode",
               slash: { name: "skills", aliases: ["habilidades"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="skills" />)
@@ -1040,7 +1040,7 @@ function App() {
             {
               name: "omnicode.hooks",
               title: "Ganchos / Hooks Instalados e do Usuário",
-              category: "OmniCode",
+              category: "OnethyCode",
               slash: { name: "hooks", aliases: ["ganchos"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="hooks" />)
@@ -1049,7 +1049,7 @@ function App() {
             {
               name: "omnicode.mods",
               title: "Mods e Plugins Instalados e do Usuário",
-              category: "OmniCode",
+              category: "OnethyCode",
               slash: { name: "mods", aliases: ["plugins"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="mods" />)
@@ -1058,7 +1058,7 @@ function App() {
             {
               name: "omnicode.modes",
               title: "Settings, Presets e Modos Operacionais",
-              category: "OmniCode",
+              category: "OnethyCode",
               slash: { name: "modes", aliases: ["modos", "presets"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="settings" />)
@@ -1067,7 +1067,7 @@ function App() {
             {
               name: "omnicode.commands",
               title: "Comandos Slash e Loops Instalados (/)",
-              category: "OmniCode",
+              category: "OnethyCode",
               slash: { name: "commands", aliases: ["comandos", "loops"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="commands" />)
@@ -1077,7 +1077,7 @@ function App() {
               name: "omnicode.auto_model",
               title: "Omni Fusion — Selecionar Variante (Modo Auto / Eficiência / Balanceado / Inteligente)",
               description: "Alterna tiers de inteligência e roteamento dinâmico entre modelos conectados",
-              category: "OmniCode",
+              category: "OnethyCode",
               suggested: true,
               slash: { name: "auto", aliases: ["fusion", "omnfusion", "omnifusion", "otimizar", "optimize"] },
               run: () => {
@@ -1089,7 +1089,7 @@ function App() {
               name: "omnicode.fusion_models",
               title: "Omni Fusion — Configurar Modelos Permitidos (Marcar modelos ou Usar Todos)",
               description: "Abre checklist interativo para permitir ou restringir modelos no Omni Fusion",
-              category: "OmniCode",
+              category: "OnethyCode",
               suggested: true,
               slash: { name: "fusion-models", aliases: ["modelos-fusion", "fusionmodels", "allowed-models"] },
               run: () => {
@@ -1101,7 +1101,7 @@ function App() {
               name: "omnicode.memory",
               title: "Memory Bank Persistente (.omnicode/memory-bank/)",
               description: "Abre painel visual com os arquivos de memória arquitetural do projeto",
-              category: "OmniCode",
+              category: "OnethyCode",
               suggested: true,
               slash: { name: "memory", aliases: ["memory-bank", "lembrar", "memoria"] },
               run: () => {
@@ -1112,7 +1112,7 @@ function App() {
               name: "omnicode.checkpoint",
               title: "Workspace Checkpoints (Salvar Snapshot Git)",
               description: "Salva snapshot do workspace para permitir time-travel e rollback",
-              category: "OmniCode",
+              category: "OnethyCode",
               suggested: true,
               slash: { name: "checkpoint", aliases: ["checkpoints", "salvar-ponto"] },
               run: () => {
@@ -1127,7 +1127,7 @@ function App() {
               name: "omnicode.undo",
               title: "Time-Travel Checkpoint Undo (Reverter Workspace para Snapshot Anterior)",
               description: "Reverte alterações de código feitas pela IA para o snapshot git anterior",
-              category: "OmniCode",
+              category: "OnethyCode",
               suggested: true,
               slash: { name: "checkpoint-undo", aliases: ["desfazer-checkpoint", "reverter-checkpoint", "git-undo"] },
               run: () => {
@@ -1142,7 +1142,7 @@ function App() {
               name: "omnicode.heal",
               title: "Self-Healing Test & Build Loop (Autocura Autônoma)",
               description: "Inicia loop autônomo de execução de testes, diagnóstico e correção de falhas",
-              category: "OmniCode",
+              category: "OnethyCode",
               suggested: true,
               slash: { name: "heal", aliases: ["self-heal", "corrigir-loop", "autofix"] },
               run: () => {
@@ -1157,7 +1157,7 @@ function App() {
               name: "omnicode.commit",
               title: "Auto-Commit Inteligente (Mensagens Convencionais do Git Diff)",
               description: "Analisa o git diff e gera mensagens de commit padronizadas",
-              category: "OmniCode",
+              category: "OnethyCode",
               suggested: true,
               slash: { name: "commit", aliases: ["autocommit", "git-commit", "salvar"] },
               run: () => {
@@ -1172,7 +1172,7 @@ function App() {
               name: "omnicode.team",
               title: "Pipeline de Equipe Completa (Planner -> Architect -> Coder -> Reviewer)",
               description: "Dispara esquadrão autônomo de 4 fases para construir funcionalidades complexas",
-              category: "OmniCode",
+              category: "OnethyCode",
               suggested: true,
               slash: { name: "team", aliases: ["equipe", "pipeline", "squad"] },
               run: () => {
@@ -1299,14 +1299,14 @@ function App() {
         },
         category: "System",
       },
-      ...(updater.open || process.env.OMNICODE_ACTIVE === "1"
+      ...(updater.open || (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")
         ? [
             {
               name: "opencode.update",
-              title: process.env.OMNICODE_ACTIVE === "1" ? "Atualizar OnethyCode" : "Update OpenCode",
+              title: (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1") ? "Atualizar OnethyCode" : "Update OpenCode",
               slash: { name: "update", aliases: ["atualizar", "upgrade"] },
               run: () => {
-                if (process.env.OMNICODE_ACTIVE === "1") {
+                if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")) {
                   dialog.replace(() => <DialogOmniUpdate />)
                   return
                 }
