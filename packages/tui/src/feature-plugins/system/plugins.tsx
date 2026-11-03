@@ -271,7 +271,8 @@ export function PluginsDialog(props: { context: Plugin.Context; plugins: ReturnT
               {
                 title: "view error",
                 command: "dialog.plugins.error",
-                hidden: !pluginError(focusedTui()),
+                // Space opens errors for both TUI and Server plugins, matching Enter for Server entries.
+                hidden: !pluginError(focusedEntry()),
                 onTrigger: (option) => {
                   const entry = entries().find((entry) => entry.key === option.value)
                   if (pluginError(entry)) setDetail(entry)
