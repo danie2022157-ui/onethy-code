@@ -2,6 +2,11 @@ import type { PluginInfo } from "@opencode/client"
 import { Plugin } from "@opencode/plugin/tui"
 import path from "path"
 import { createEffect, createMemo, createResource, createSignal, onCleanup, onMount, Show } from "solid-js"
+import { useClipboard } from "../../context/clipboard"
+import { useLocation } from "../../context/location"
+import { useRoute } from "../../context/route"
+import { emptyPrompt } from "../../prompt/history"
+import { errorDetails } from "../../util/error-details"
 import { DialogErrorDetails } from "../../component/dialog-error-details"
 import { Spinner } from "../../component/spinner"
 import { usePlugin } from "../../plugin/context"
@@ -25,6 +30,9 @@ type Entry =
 
 export function PluginsDialog(props: { context: Plugin.Context; plugins: ReturnType<typeof usePlugin> }) {
   const dialog = useDialog()
+  const clipboard = useClipboard()
+  const location = useLocation()
+  const route = useRoute()
   const [locked, setLocked] = createSignal(false)
   const [checking, setChecking] = createSignal(false)
   const [focused, setFocused] = createSignal<string>()
@@ -162,6 +170,32 @@ export function PluginsDialog(props: { context: Plugin.Context; plugins: ReturnT
   // user asks. The check response carries fresh `outdated` flags for the whole
   // inventory; apply it directly instead of waiting for a `plugin.updated`
   // event, which only fires when a flag actually changes.
+  const details = (entry: Entry) => ({
+    title: `${entry.runtime === "tui" ? "TUI" : "Server"} plugin error`,
+    source: pluginSource(entry, props.context),
+    error: pluginError(entry) ?? "Unknown plugin error",
+    diagnosticRef: pluginErrorRef(entry),
+    context: `Plugin: ${label(entry, props.context)}\nStatus: failed\nRuntime: ${entry.runtime}\nSource: ${pluginSource(entry, props.context)}`,
+  })
+  const investigate = () => {
+    const entry = focusedEntry()
+    if (!entry || !pluginError(entry)) return
+    route.navigate({
+      type: "home",
+      location: location.ref,
+      prompt: { ...emptyPrompt(), text: errorDetails(details(entry)).prompt },
+    })
+    dialog.clear()
+  }
+  const copy = () => {
+    const entry = focusedEntry()
+    if (!entry || !pluginError(entry)) return
+    void clipboard
+      .write(errorDetails(details(entry)).text)
+      .then(() => props.context.ui.toast.show({ variant: "success", message: "Plugin error details copied" }))
+      .catch((cause) => props.context.ui.toast.show({ variant: "error", message: errorMessage(cause) }))
+  }
+
   const check = () => {
     if (checking()) return
     setChecking(true)
@@ -198,11 +232,18 @@ export function PluginsDialog(props: { context: Plugin.Context; plugins: ReturnT
                   setShowInternal((value) => !value)
                 },
               },
+              { bind: "i", title: "Investigate failed plugin", group: "Plugins", run: investigate },
+              { bind: "c", title: "Copy failed plugin details", group: "Plugins", run: copy },
             ]}
             footerHints={[
-              ...(pluginError(focusedEntry()) && !focusedTui()
-                ? [{ title: "view error", label: "enter", group: "primary" as const }]
+              ...(pluginError(focusedEntry())
+                ? [
+                    { title: "investigate", label: "i", group: "primary" as const },
+                    { title: "copy details", label: "c", group: "primary" as const },
+                    ...(!focusedTui() ? [{ title: "view error", label: "enter", group: "primary" as const }] : []),
+                  ]
                 : []),
+              { title: "scroll", label: "↑/↓" },
               { title: `${showInternal() ? "hide" : "show"} internal`, label: "ctrl+a" },
             ]}
             onMove={(option) => setFocused(option.value)}
@@ -256,11 +297,7 @@ export function PluginsDialog(props: { context: Plugin.Context; plugins: ReturnT
       >
         {(entry) => (
           <DialogErrorDetails
-            title={`${entry().runtime === "tui" ? "TUI" : "Server"} plugin error`}
-            source={pluginSource(entry(), props.context)}
-            error={pluginError(entry()) ?? "Unknown plugin error"}
-            diagnosticRef={pluginErrorRef(entry())}
-            context={`Plugin: ${label(entry(), props.context)}\nStatus: failed\nRuntime: ${entry().runtime}\nSource: ${pluginSource(entry(), props.context)}`}
+            {...details(entry())}
             onBack={() => {
               setDetail()
               dialog.setSize("large")
