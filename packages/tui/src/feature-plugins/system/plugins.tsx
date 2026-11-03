@@ -64,8 +64,9 @@ export function PluginsDialog(props: { context: Plugin.Context; plugins: ReturnT
     const external: Entry[] = props.plugins
       .list()
       .filter((plugin) => plugin.status !== "unsupported")
-      .map((plugin) => ({
-        key: `tui:${plugin.id ?? plugin.target}`,
+      .map((plugin, index) => ({
+        // IDs can repeat when a plugin is configured from more than one source.
+        key: `tui:${plugin.id ?? plugin.target}:${plugin.target}:${index}`,
         runtime: "tui" as const,
         internal: false,
         id: plugin.id,
@@ -76,8 +77,9 @@ export function PluginsDialog(props: { context: Plugin.Context; plugins: ReturnT
     // A package without a server part runs nothing there; its TUI part has its own row.
     const serverEntries: Entry[] = (server() ?? [])
       .filter((plugin) => plugin.features.server || plugin.state.status === "failed")
-      .map((plugin) => ({
-        key: `server:${plugin.id ?? source(plugin, props.context)}`,
+      .map((plugin, index) => ({
+        // A working and a failed plugin may share an ID. Keep their selections distinct.
+        key: `server:${plugin.id ?? source(plugin, props.context)}:${source(plugin, props.context)}:${index}`,
         runtime: "server" as const,
         internal: plugin.source.type === "builtin",
         plugin,
@@ -92,7 +94,11 @@ export function PluginsDialog(props: { context: Plugin.Context; plugins: ReturnT
   )
   createEffect(() => {
     if (visibleEntries().some((entry) => entry.key === focused())) return
-    const first = visibleEntries().find((entry) => entry.runtime === "tui") ?? visibleEntries()[0]
+    // Prioritize errors so Enter opens their details rather than a healthy duplicate.
+    const first =
+      visibleEntries().find((entry) => status(entry) === "failed") ??
+      visibleEntries().find((entry) => entry.runtime === "tui") ??
+      visibleEntries()[0]
     setFocused(first?.key)
   })
 
@@ -223,6 +229,7 @@ export function PluginsDialog(props: { context: Plugin.Context; plugins: ReturnT
             options={options()}
             locked={locked()}
             preserveSelection={true}
+            focusTarget={focused()}
             bindings={[
               {
                 bind: "ctrl+a",
