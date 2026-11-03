@@ -317,6 +317,8 @@ export const Plugin = {
                     mode: "automatic",
                     requiredTypes: ["chat"],
                     requiredCapabilities: { tools: true },
+                    rankBy: ["explore", "researcher", "librarian"].includes(agent.id) ? "cost"
+                      : ["architect", "reviewer"].includes(agent.id) ? "context" : "newest",
                     allowedModels: allowedSet ? [...allowedSet] : undefined,
                     isCoolingDown: (ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
                   }),
