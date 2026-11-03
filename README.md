@@ -21,6 +21,12 @@
   Featuring <b>Omni Fusion</b> (dynamic multi-model auto-routing), <b>Autonomous Memory Bank</b>, <b>Self-Healing Test Loops</b>, and <b>430+ preloaded specialized agents</b>.
 </p>
 
+<p align="center">
+  <img src="assets/onethy-code-subagents.png" alt="OnethyCode Orchestrator coordinating Coder, Reviewer and Test-Runner subagents in parallel" width="95%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.6);" />
+  <br />
+  <sub><i>The Orchestrator running Coder, Reviewer and Test-Runner subagents in parallel, with live context, cost and Memory Bank status in the sidebar.</i></sub>
+</p>
+
 [Quickstart](#-quickstart) • [How to Use Guide](#-step-by-step-how-to-use-guide) • [Omni Fusion Deep Dive](#-onethy-fusion-model-router) • [Memory Bank](#-autonomous-memory-bank) • [Comparison](#-feature-matrix) • [Commands](#-interactive-slash-commands) • [Guia em Português](#-guia-em-português)
 
 ---
