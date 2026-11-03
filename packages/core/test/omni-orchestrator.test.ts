@@ -114,6 +114,31 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
     }),
   )
 
+  effect("mission scheduler runs only ready stages with a bounded parallelism", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* OmniOrchestrator.Service
+      const tasks = yield* orchestrator.planUltrawork("Build safe feature", "mission-scheduler")
+      const first = yield* orchestrator.claimReadyTasks("mission-scheduler", 2)
+      expect(first).toHaveLength(2)
+      expect(first.every((task) => task.status === "running")).toBe(true)
+      expect((yield* orchestrator.claimReadyTasks("mission-scheduler", 2))).toHaveLength(0)
+
+      yield* orchestrator.executeTask("mission-scheduler", tasks[0].id, "Exploration done")
+      yield* orchestrator.failTask("mission-scheduler", tasks[1].id, "Network failed")
+      expect((yield* orchestrator.claimReadyTasks("mission-scheduler", 2))).toHaveLength(0)
+      yield* orchestrator.retryTask("mission-scheduler", tasks[1].id)
+
+      const retried = yield* orchestrator.claimReadyTasks("mission-scheduler", 2)
+      expect(retried.map((task) => task.id)).toEqual([tasks[1].id])
+      yield* orchestrator.executeTask("mission-scheduler", tasks[1].id, "Docs collected")
+
+      const serial = yield* orchestrator.claimReadyTasks("mission-scheduler", 8)
+      expect(serial).toHaveLength(1)
+      expect(serial[0].id).toBe(tasks[2].id)
+      expect((yield* orchestrator.claimReadyTasks("mission-scheduler", 8))).toHaveLength(0)
+    }),
+  )
+
   effect("OmniOrchestrator: expires model cooldowns using the caller clock", () =>
     Effect.gen(function* () {
       const orchestrator = yield* OmniOrchestrator.Service
