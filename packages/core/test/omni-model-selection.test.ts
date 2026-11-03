@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { Model } from "@opencode/core/model"
+import { Money } from "@opencode/schema/money"
 import { Provider } from "@opencode/core/provider"
 import { ModelSelectionPolicy } from "@opencode/core/model-selection-policy"
 
@@ -65,8 +66,9 @@ describe("model selection policy", () => {
   })
 
   it("chooses cheapest eligible connected model when cost ranking is requested", () => {
-    const expensive = info("p", "a-expensive", { cost: [{ input: 15, output: 25, cache: { read: 0, write: 0 } }]  })
-    const cheap = info("p", "z-cheap", { cost: [{ input: 0.5, output: 1, cache: { read: 0, write: 0 } }]  })
+    const amount = Money.USDPerMillionTokens.make
+    const expensive = info("p", "a-expensive", { cost: [{ input: amount(15), output: amount(25), cache: { read: amount(0), write: amount(0) } }]  })
+    const cheap = info("p", "z-cheap", { cost: [{ input: amount(0.5), output: amount(1), cache: { read: amount(0), write: amount(0) } }]  })
     const decision = ModelSelectionPolicy.select([expensive, cheap], { mode: "automatic", rankBy: "cost" })
     expect(String(decision.selected.id)).toBe("z-cheap")
   })
