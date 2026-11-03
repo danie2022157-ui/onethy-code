@@ -89,7 +89,7 @@ for (const flag of [undefined, "0", "1", "true"]) {
     )
 }
 
-it.effect("fails with a typed selection error for a malformed model allowlist", () =>
+it.effect("fails with a typed selection error for a malformed automatic model allowlist", () =>
   withEnv({ OMNICODE_ALLOWED_MODELS: "{}" }, () =>
     Effect.gen(function* () {
       const models = yield* Model.Service
@@ -100,7 +100,6 @@ it.effect("fails with a typed selection error for a malformed model allowlist", 
             id: Session.ID.make("ses_bad_allowlist"),
             projectID: Project.ID.global,
             title: "test",
-            model: { id: Model.ID.make("missing"), providerID: Provider.ID.make("missing") },
             cost: Money.USD.zero,
             tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
             time: { created: DateTime.makeUnsafe(0), updated: DateTime.makeUnsafe(0) },
@@ -110,6 +109,39 @@ it.effect("fails with a typed selection error for a malformed model allowlist", 
         )
         .pipe(Effect.flip)
       expect(failure._tag).toBe("SessionRunnerModel.ModelNotSelectedError")
+    }).pipe(Effect.provide(layer)),
+  ),
+)
+
+it.effect("explicit session selection is not blocked by an unrelated Omni automatic allowlist", () =>
+  withEnv({ OMNICODE_ALLOWED_MODELS: '["unrelated/model"]' }, () =>
+    Effect.gen(function* () {
+      const providerID = Provider.ID.make("manual")
+      const modelID = Model.ID.make("chat")
+      const providers = yield* Provider.Service
+      const models = yield* Model.Service
+      const runner = yield* SessionRunnerModel.Service
+      yield* providers.transform((editor) => {
+        editor.update(providerID, (provider) => {
+          provider.package = "@opencode/ai/providers/openai"
+          provider.activation = "enabled"
+        })
+        editor.models.update(providerID, modelID, () => {})
+      })
+      const selected = yield* runner.resolve(
+        Session.Info.make({
+          id: Session.ID.make("ses_explicit_not_in_omni_pool"),
+          projectID: Project.ID.global,
+          title: "test",
+          model: { providerID, id: modelID },
+          cost: Money.USD.zero,
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          time: { created: DateTime.makeUnsafe(0), updated: DateTime.makeUnsafe(0) },
+          location: ref,
+        }),
+        models.available,
+      )
+      expect(selected.ref).toMatchObject({ providerID, id: modelID })
     }).pipe(Effect.provide(layer)),
   ),
 )
