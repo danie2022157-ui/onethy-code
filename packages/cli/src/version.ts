@@ -6,7 +6,8 @@ declare const OPENCODE_ARTIFACT: string
 declare const OPENCODE_RELEASE_HIGHLIGHTS: string
 
 const isOmni = process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1"
-const commit = /^[a-f0-9]{7,40}$/i.test(process.env.ONETHY_COMMIT ?? "") ? process.env.ONETHY_COMMIT!.slice(0, 7) : undefined
+const checkoutCommit = process.env.ONETHY_COMMIT ?? ""
+const commit = /^[a-f0-9]{7,40}$/i.test(checkoutCommit) ? checkoutCommit.slice(0, 7) : undefined
 const version = isOmni
   ? `2.2.2 (OnethyCode${commit ? ` ${commit}` : ""})`
   : typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local"
