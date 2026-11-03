@@ -46,6 +46,24 @@ describe("OmniCode Session & Durable Memory", () => {
     }),
   )
 
+  effect("persists supervisor mission states for recovery after restart", () =>
+    Effect.gen(function* () {
+      const store = yield* OmniSession.Service
+      const tasks = [{
+        id: "task-a",
+        missionID: "mission-persist-test",
+        title: "Inspect code",
+        assignedAgent: "researcher",
+        status: "running" as const,
+      }]
+      yield* store.saveMissionTasks("mission-persist-test", tasks)
+      const restored = yield* store.loadMissionTasks("mission-persist-test")
+      expect(restored).toEqual(tasks)
+      const missing = yield* store.loadMissionTasks("mission-persist-missing")
+      expect(missing).toBeUndefined()
+    }),
+  )
+
   effect("records durable memory decisions into memory.md", () =>
     Effect.gen(function* () {
       const store = yield* OmniSession.Service
