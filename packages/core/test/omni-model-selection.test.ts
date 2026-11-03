@@ -65,8 +65,8 @@ describe("model selection policy", () => {
   })
 
   it("chooses cheapest eligible connected model when cost ranking is requested", () => {
-    const expensive = info("p", "a-expensive", { cost: [{ input: 15, output: 25 }] })
-    const cheap = info("p", "z-cheap", { cost: [{ input: 0.5, output: 1 }] })
+    const expensive = info("p", "a-expensive", { cost: [{ input: 15, output: 25, cache: { read: 0, write: 0 } }]  })
+    const cheap = info("p", "z-cheap", { cost: [{ input: 0.5, output: 1, cache: { read: 0, write: 0 } }]  })
     const decision = ModelSelectionPolicy.select([expensive, cheap], { mode: "automatic", rankBy: "cost" })
     expect(String(decision.selected.id)).toBe("z-cheap")
   })
