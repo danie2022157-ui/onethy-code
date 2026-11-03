@@ -11,10 +11,10 @@ for (const scenario of ["available", "up-to-date", "network-error", "pull-error"
     const git = async (command: string) => {
       const code =
         (scenario === "network-error" && command === "git fetch origin main") ||
-        (scenario === "pull-error" && command === "git pull origin main")
+        (scenario === "pull-error" && command === "git pull --ff-only origin main")
           ? 1
           : 0
-      if (command === "git pull origin main" && code === 0) pulled = true
+      if (command === "git pull --ff-only origin main" && code === 0) pulled = true
       const outputs: Record<string, string> = {
         "git branch --show-current": "main",
         "git rev-parse --short HEAD": pulled ? "def456" : "abc123",
@@ -32,7 +32,7 @@ for (const scenario of ["available", "up-to-date", "network-error", "pull-error"
 
     setup.dialog.replace(() => (
       <ExitProvider exit={() => {}}>
-        <DialogOmniUpdate git={git} />
+        <DialogOmniUpdate git={git} bunBin="/test/bun" />
       </ExitProvider>
     ))
 
