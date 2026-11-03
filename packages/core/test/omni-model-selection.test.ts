@@ -63,4 +63,23 @@ describe("model selection policy", () => {
     expect(String(selected.selected.id)).toBe("c-chat-tools")
     expect(selected.candidateCount).toBe(1)
   })
+
+  it("chooses cheapest eligible connected model when cost ranking is requested", () => {
+    const expensive = info("p", "a-expensive", { cost: [{ input: 15, output: 25 }] })
+    const cheap = info("p", "z-cheap", { cost: [{ input: 0.5, output: 1 }] })
+    const decision = ModelSelectionPolicy.select([expensive, cheap], { mode: "automatic", rankBy: "cost" })
+    expect(String(decision.selected.id)).toBe("z-cheap")
+  })
+
+  it("supports context requirements and context ranking", () => {
+    const small = info("p", "a-small", { limit: { context: 20_000, output: 8_000 } })
+    const large = info("p", "z-large", { limit: { context: 200_000, output: 8_000 } })
+    const decision = ModelSelectionPolicy.select([small, large], {
+      mode: "automatic",
+      minimumContext: 64_000,
+      rankBy: "context",
+    })
+    expect(String(decision.selected.id)).toBe("z-large")
+    expect(decision.candidateCount).toBe(1)
+  })
 })
