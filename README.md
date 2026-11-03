@@ -17,10 +17,6 @@
 </p>
 
 <p align="center">
-  <img src="assets/omnicode-tui.png" alt="OnethyCode TUI running a multi-agent coding session" width="95%" />
-</p>
-
-<p align="center">
   <b>OnethyCode</b> turns your terminal into a collaborative AI engineering squad.<br />
   Featuring <b>Omni Fusion</b> (dynamic multi-model auto-routing), <b>Autonomous Memory Bank</b>, <b>Self-Healing Test Loops</b>, and <b>430+ preloaded specialized agents</b>.
 </p>
