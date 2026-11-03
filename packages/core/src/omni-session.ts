@@ -38,6 +38,14 @@ export interface Interface {
   readonly getMemory: () => Effect.Effect<string, never>
 }
 
+/** IDs become file names, so reject separators and traversal before touching the disk. */
+export function safeMissionID(value: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)) {
+    throw new Error("Invalid mission or session ID")
+  }
+  return value
+}
+
 export class Service extends Context.Service<Service, Interface>()("@opencode/OmniSession") {}
 
 const layer = Layer.effect(
@@ -63,7 +71,7 @@ const layer = Layer.effect(
 
     const save = Effect.fn("OmniSession.save")(function* (input: SaveSessionInput) {
       yield* init
-      const sessionId = input.id ?? `ses-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`
+      const sessionId = safeMissionID(input.id ?? `ses-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`)
       const sessionFile = path.join(sessionsDir, `${sessionId}.json`)
 
       const record: StoredSession = {
@@ -89,7 +97,7 @@ const layer = Layer.effect(
       tasks: ReadonlyArray<{ id: string; title: string; assignedAgent: string }>,
     ) {
       yield* init
-      const planFile = path.join(plansDir, `${planId}.md`)
+      const planFile = path.join(plansDir, `${safeMissionID(planId)}.md`)
       const lines = [
         `# 📋 Plano de Missão OmniCode (${planId})`,
         "",
@@ -129,7 +137,7 @@ const layer = Layer.effect(
       yield* init
       return yield* Effect.promise(async () => {
         try {
-          const file = path.join(sessionsDir, `${id}.json`)
+          const file = path.join(sessionsDir, `${safeMissionID(id)}.json`)
           const raw = await fs.readFile(file, "utf-8")
           return JSON.parse(raw) as StoredSession
         } catch {
