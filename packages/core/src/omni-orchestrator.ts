@@ -573,15 +573,15 @@ const layer = Layer.effect(
       const remaining = maxParallel - running.length
       if (remaining < 1) return []
       const next = tasks.findIndex((task) => task.status === "pending")
-      if (next < 0) return []
+      if (next < 0 || tasks.slice(0, next).some((task) => task.status === "failed")) return []
       const first = tasks[next]
       if (!first.parallel && running.length > 0) return []
+      // Never start work past a failed stage or a serial dependency.
+      const boundary = tasks.findIndex(
+        (task, index) => index >= next && (!task.parallel || task.status !== "pending"),
+      )
       const claimable = first.parallel
-        ? tasks.slice(next).filter((task, index, pending) => {
-            // Only tasks in the first contiguous parallel group can start together.
-            const boundary = pending.findIndex((candidate) => !candidate.parallel || candidate.status !== "pending")
-            return boundary < 0 || index < boundary
-          }).slice(0, remaining)
+        ? tasks.slice(next, boundary < 0 ? undefined : boundary).slice(0, remaining)
         : [first]
       for (const task of claimable) {
         task.status = "running"
