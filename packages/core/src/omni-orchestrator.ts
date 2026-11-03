@@ -167,6 +167,10 @@ export interface Interface {
   }) => Effect.Effect<{ passed: boolean; reminder?: string }, never>
   readonly executeTask: (missionID: string, taskId: string, resultSummary: string) => Effect.Effect<TaskItem, never>
   readonly getActiveTasks: (missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
+  /** Claims the next runnable stage while respecting parallel flags and a concurrency limit. */
+  readonly claimReadyTasks: (missionID: string, maxParallel?: number) => Effect.Effect<ReadonlyArray<TaskItem>, never>
+  readonly failTask: (missionID: string, taskId: string, reason: string) => Effect.Effect<TaskItem, never>
+  readonly retryTask: (missionID: string, taskId: string) => Effect.Effect<TaskItem, never>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/OmniOrchestrator") {}
@@ -560,6 +564,60 @@ const layer = Layer.effect(
       return { ...task }
     })
 
+    /** Claim one sequential task or a contiguous batch of parallel tasks; never skip an unfinished stage. */
+    const claimReadyTasks = Effect.fn("OmniOrchestrator.claimReadyTasks")(function* (missionID: string, maxParallel = 3) {
+      const tasks = missions.get(missionID)
+      if (!tasks || !Number.isInteger(maxParallel) || maxParallel < 1 || maxParallel > 8) return []
+      const running = tasks.filter((task) => task.status === "running")
+      if (running.some((task) => !task.parallel)) return []
+      const remaining = maxParallel - running.length
+      if (remaining < 1) return []
+      const next = tasks.findIndex((task) => task.status === "pending")
+      if (next < 0) return []
+      const first = tasks[next]
+      if (!first.parallel && running.length > 0) return []
+      const claimable = first.parallel
+        ? tasks.slice(next).filter((task, index, pending) => {
+            // Only tasks in the first contiguous parallel group can start together.
+            const boundary = pending.findIndex((candidate) => !candidate.parallel || candidate.status !== "pending")
+            return boundary < 0 || index < boundary
+          }).slice(0, remaining)
+        : [first]
+      for (const task of claimable) {
+        task.status = "running"
+        yield* bus.publish({
+          sender: "supervisor",
+          target: task.assignedAgent,
+          taskId: task.id,
+          type: "status",
+          payload: { missionID, status: "running" },
+        })
+      }
+      return claimable.map((task) => ({ ...task }))
+    })
+
+    const failTask = Effect.fn("OmniOrchestrator.failTask")(function* (missionID: string, taskId: string, reason: string) {
+      const task = missions.get(missionID)?.find((entry) => entry.id === taskId)
+      if (!task) throw new Error(`Task '${taskId}' does not belong to mission '${missionID}'.`)
+      task.status = "failed"
+      task.result = reason
+      yield* bus.publish({
+        sender: task.assignedAgent,
+        taskId,
+        type: "status",
+        payload: { missionID, status: "failed", reason },
+      })
+      return { ...task }
+    })
+
+    const retryTask = Effect.fn("OmniOrchestrator.retryTask")(function* (missionID: string, taskId: string) {
+      const task = missions.get(missionID)?.find((entry) => entry.id === taskId)
+      if (!task || task.status !== "failed") throw new Error("Only failed tasks can be retried")
+      task.status = "pending"
+      task.result = undefined
+      return { ...task }
+    })
+
     const getActiveTasks = Effect.fn("OmniOrchestrator.getActiveTasks")(function* (missionID?: string) {
       return missionID ? (missions.get(missionID) ?? []).map((task) => ({ ...task })) : []
     })
@@ -580,6 +638,9 @@ const layer = Layer.effect(
       verifyCompletion,
       executeTask,
       getActiveTasks,
+      claimReadyTasks,
+      failTask,
+      retryTask,
     })
   }),
 )
