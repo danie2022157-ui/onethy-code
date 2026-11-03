@@ -58,7 +58,8 @@ function runGit(cmd: string, cwd: string, timeoutMs = 45000): Promise<{ stdout: 
 
 type UpdateStep = "checking" | "available" | "up-to-date" | "updating" | "success" | "error"
 
-export function DialogOmniUpdate() {
+export function DialogOmniUpdate(props: { git?: typeof runGit }) {
+  const git = props.git ?? runGit
   const dialog = useDialog()
   const toast = useToast()
   const theme = useTheme().surface("dialog")
@@ -89,29 +90,32 @@ export function DialogOmniUpdate() {
 
     try {
       // 1. Detect local commit & branch
-      const curBranchRes = await runGit("git branch --show-current", root)
+      const curBranchRes = await git("git branch --show-current", root)
+      if (curBranchRes.code !== 0) throw new Error(curBranchRes.stderr || "Could not determine Git branch.")
       const curBranch = curBranchRes.stdout || "main"
       setBranch(curBranch)
 
-      const localShaRes = await runGit("git rev-parse --short HEAD", root)
+      const localShaRes = await git("git rev-parse --short HEAD", root)
       const currentSha = localShaRes.stdout || "head"
       setLocalSha(currentSha)
 
       // 2. Fetch origin
       setStatusMessage(`Fetching latest from origin/${curBranch}...`)
-      await runGit(`git fetch origin ${curBranch}`, root)
+      const fetchRes = await git(`git fetch origin ${curBranch}`, root)
+      if (fetchRes.code !== 0) throw new Error(fetchRes.stderr || fetchRes.stdout || "Git fetch failed.")
 
       // 3. Check pending commits
-      const logRes = await runGit(`git log HEAD..origin/${curBranch} --oneline -n 6`, root)
+      const logRes = await git(`git log HEAD..origin/${curBranch} --oneline -n 6`, root)
+      if (logRes.code !== 0) throw new Error(logRes.stderr || logRes.stdout || "Could not compare Git commits.")
       const commits = logRes.stdout.split("\n").filter((l) => l.trim().length > 0)
       setPendingCommits(commits)
 
       if (commits.length > 0) {
-        const remoteShaRes = await runGit(`git rev-parse --short origin/${curBranch}`, root)
+        const remoteShaRes = await git(`git rev-parse --short origin/${curBranch}`, root)
         setRemoteSha(remoteShaRes.stdout || "latest")
         setStep("available")
       } else {
-        const lastMsgRes = await runGit("git log -1 --pretty=%s", root)
+        const lastMsgRes = await git("git log -1 --pretty=%s", root)
         setLastCommitMsg(lastMsgRes.stdout || "Latest version")
         setStep("up-to-date")
       }
@@ -121,47 +125,56 @@ export function DialogOmniUpdate() {
     }
   }
 
-  const applyUpdate = async (force = false) => {
+  const applyUpdate = async () => {
     setStep("updating")
     const root = findOnethyRoot()
     const curBranch = branch()
 
     try {
       setStatusMessage("Checking status of local files...")
-      const statusRes = await runGit("git status --porcelain", root)
+      const statusRes = await git("git status --porcelain", root)
+      if (statusRes.code !== 0) throw new Error(statusRes.stderr || "Could not inspect local changes.")
       const isDirty = statusRes.stdout.length > 0
       let stashed = false
 
       if (isDirty) {
         setStatusMessage("Stashing local changes (safe stash)...")
-        const stashRes = await runGit('git stash save "onethy-auto-update"', root)
-        stashed = stashRes.code === 0 && !stashRes.stdout.includes("No local changes")
+        const stashRes = await git('git stash push --include-untracked -m "onethy-auto-update"', root)
+        if (stashRes.code !== 0) throw new Error(stashRes.stderr || "Could not stash local changes.")
+        stashed = !stashRes.stdout.includes("No local changes")
       }
 
       setStatusMessage(`Downloading updates (git pull origin ${curBranch})...`)
-      const pullRes = await runGit(`git pull origin ${curBranch}`, root)
+      const pullRes = await git(`git pull origin ${curBranch}`, root)
 
-      if (pullRes.code !== 0 && !force) {
-        if (stashed) await runGit("git stash pop", root)
-        throw new Error(pullRes.stderr || pullRes.stdout || "Git pull failed.")
+      if (pullRes.code !== 0) {
+        // Keep the saved stash intact if the pull fails; do not claim a successful update.
+        throw new Error(
+          (pullRes.stderr || pullRes.stdout || "Git pull failed.") +
+            (stashed ? " Local changes are saved in git stash." : ""),
+        )
       }
 
       if (stashed) {
         setStatusMessage("Restoring local files...")
-        await runGit("git stash pop", root)
+        const restoreRes = await git("git stash pop", root)
+        if (restoreRes.code !== 0)
+          throw new Error(restoreRes.stderr || "Could not restore local files. Check git stash list.")
       }
 
       // Check if Bun is available to sync dependencies
       const bun = findBunBin()
       if (bun) {
         setStatusMessage("Syncing OnethyCode dependencies...")
-        await runGit(`"${bun}" install`, root, 60000)
+        const installRes = await git(`"${bun}" install`, root, 60000)
+        if (installRes.code !== 0)
+          throw new Error(installRes.stderr || installRes.stdout || "Could not install dependencies.")
       }
 
-      const newShaRes = await runGit("git rev-parse --short HEAD", root)
+      const newShaRes = await git("git rev-parse --short HEAD", root)
       setRemoteSha(newShaRes.stdout || localSha())
 
-      const lastMsgRes = await runGit("git log -1 --pretty=%s", root)
+      const lastMsgRes = await git("git log -1 --pretty=%s", root)
       setLastCommitMsg(lastMsgRes.stdout || "Update completed")
 
       setStep("success")
@@ -213,8 +226,8 @@ export function DialogOmniUpdate() {
         group: "Dialog",
         run: () => {
           const s = step()
-          if (s === "available") void applyUpdate(false)
-          else if (s === "up-to-date") void applyUpdate(true)
+          if (s === "available") void applyUpdate()
+          else if (s === "up-to-date") void applyUpdate()
           else if (s === "success") void restartApp()
           else if (s === "error") void checkUpdates()
         },
@@ -238,7 +251,7 @@ export function DialogOmniUpdate() {
     <DialogLayout
       header={
         <DialogHeader
-          title={
+          titleView={
             <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD}>
               ⚡ OnethyCode Updater
             </text>
@@ -255,7 +268,7 @@ export function DialogOmniUpdate() {
                 paddingLeft={2}
                 paddingRight={2}
                 backgroundColor={RGBA.fromHex("#00F5FF")}
-                onMouseUp={() => void applyUpdate(false)}
+                onMouseUp={() => void applyUpdate()}
               >
                 <text fg={RGBA.fromHex("#0A0F1D")} attributes={TextAttributes.BOLD} selectable={false}>
                   ⚡ Update Now [Enter]
@@ -282,7 +295,7 @@ export function DialogOmniUpdate() {
                 paddingLeft={1}
                 paddingRight={1}
                 backgroundColor={RGBA.fromHex("#10B981")}
-                onMouseUp={() => void applyUpdate(true)}
+                onMouseUp={() => void applyUpdate()}
               >
                 <text fg={RGBA.fromHex("#FFFFFF")} attributes={TextAttributes.BOLD} selectable={false}>
                   🔄 Force Sync [Enter]
@@ -383,7 +396,7 @@ export function DialogOmniUpdate() {
               </text>
             </box>
             <text fg={theme.text.muted}>
-              Active commit: <text fg={RGBA.fromHex("#00F5FF")}>{localSha()}</text> — {lastCommitMsg()}
+              Active commit: <span style={{ fg: RGBA.fromHex("#00F5FF") }}>{localSha()}</span> — {lastCommitMsg()}
             </text>
             <text fg={theme.text.muted}>
               Branch: {branch()} · Synced with origin/main.
@@ -414,7 +427,7 @@ export function DialogOmniUpdate() {
               ✓ Update applied successfully!
             </text>
             <text fg={theme.text.base}>
-              New active commit: <text fg={RGBA.fromHex("#00F5FF")}>{remoteSha() || localSha()}</text>
+              New active commit: <span style={{ fg: RGBA.fromHex("#00F5FF") }}>{remoteSha() || localSha()}</span>
             </text>
             <text fg={theme.text.muted}>
               {lastCommitMsg()}
