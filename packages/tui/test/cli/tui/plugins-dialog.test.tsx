@@ -280,3 +280,44 @@ test("Space opens error details for failed Server plugins", async () => {
     fixture.app.renderer.destroy()
   }
 })
+
+test("two Server plugins with the same ID keep their errors independently selectable", async () => {
+  await using tmp = await tmpdir()
+  const name = "opencode-antigravity-auth"
+  const working: PluginInfo = {
+    id: name,
+    source: { type: "local", path: path.join(tmp.path, "working.ts") },
+    features: { server: true },
+    state: { status: "active" },
+  }
+  const broken: PluginInfo = {
+    id: name,
+    source: { type: "local", path: path.join(tmp.path, "broken.ts") },
+    features: { server: true },
+    state: { status: "failed", error: "Failed to import authentication plugin", ref: "err_auth" },
+  }
+  const fixture = await renderPlugins(tmp.path, { list: [working, broken], check: [] })
+
+  try {
+    // The failed entry should be focused initially, even though the healthy entry comes first.
+    await fixture.app.waitForFrame((frame) => frame.includes("failed, local") && frame.includes("investigate i"))
+    fixture.app.mockInput.pressKey("c")
+    await fixture.app.waitFor(() => fixture.copied.length === 1)
+    expect(fixture.copied[0]).toContain("Failed to import authentication plugin")
+    expect(fixture.copied[0]).toContain("broken.ts")
+    expect(fixture.copied[0]).not.toContain("working.ts")
+
+    // The healthy entry has no error actions. Returning to the failure restores them.
+    fixture.app.mockInput.pressKey("up")
+    await fixture.app.waitForFrame((frame) => !frame.includes("investigate i"))
+    fixture.app.mockInput.pressKey("down")
+    await fixture.app.waitForFrame((frame) => frame.includes("investigate i"))
+
+    fixture.app.mockInput.pressEnter()
+    await fixture.app.waitForFrame((frame) =>
+      frame.includes("Server plugin error") && frame.includes("Failed to import authentication plugin"),
+    )
+  } finally {
+    fixture.app.renderer.destroy()
+  }
+})
