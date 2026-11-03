@@ -272,8 +272,12 @@ const layer = Layer.effect(
       if (existing) return existing
       const persisted = yield* store.loadMissionTasks(missionID)
       if (!persisted) return undefined
-      const restored = persisted.map((task) => ({ ...task }))
+      // A task left "running" after a crash has no live worker. Require an explicit retry.
+      const restored: TaskItem[] = persisted.map((task) => task.status === "running"
+        ? { ...task, status: "failed", result: "Interrupted by OnethyCode restart; retry required" }
+        : { ...task })
       missions.set(missionID, restored)
+      if (persisted.some((task) => task.status === "running")) yield* store.saveMissionTasks(missionID, restored)
       return restored
     })
 
