@@ -12,6 +12,9 @@ export interface Policy {
     readonly output?: ReadonlyArray<string>
   }
   readonly allowDeprecated?: boolean
+  /** Ranking only uses live catalog metadata; no speculative model or provider IDs. */
+  readonly rankBy?: "id" | "cost" | "context" | "newest"
+  readonly minimumContext?: number
   readonly isCoolingDown?: (ref: Model.Ref) => boolean
 }
 
@@ -51,6 +54,7 @@ export function select(catalog: ReadonlyArray<Model.Info>, policy: Policy, reque
   const eligible = catalog.filter((model) => {
     if (!model.enabled || (!policy.allowDeprecated && model.status === "deprecated")) return false
     if (policy.requiredTypes?.length && !policy.requiredTypes.includes(model.type ?? "chat")) return false
+    if (policy.minimumContext !== undefined && model.limit.context < policy.minimumContext) return false
     if (allowed && !allowed.includes(key(model))) return false
     if (policy.requiredCapabilities?.tools !== undefined && model.capabilities.tools !== policy.requiredCapabilities.tools)
       return false
@@ -67,7 +71,17 @@ export function select(catalog: ReadonlyArray<Model.Info>, policy: Policy, reque
   if (policy.mode === "explicit") throw new NoModelCandidateError()
   if (!eligible.length) throw new NoModelCandidateError()
 
-  const sorted = [...eligible].sort((left, right) => key(left).localeCompare(key(right)))
+  const price = (model: Model.Info) => {
+    const tier = model.cost[0]
+    return tier ? tier.input + tier.output : Number.POSITIVE_INFINITY
+  }
+  const rank = (model: Model.Info) => {
+    if (policy.rankBy === "cost") return price(model)
+    if (policy.rankBy === "context") return -model.limit.context
+    if (policy.rankBy === "newest") return -model.time.released
+    return 0
+  }
+  const sorted = [...eligible].sort((left, right) => rank(left) - rank(right) || key(left).localeCompare(key(right)))
   const healthy = sorted.filter((model) => !policy.isCoolingDown?.(Model.Ref.make({ providerID: model.providerID, id: model.id })))
   const selected = healthy[0] ?? sorted[0]
   return {

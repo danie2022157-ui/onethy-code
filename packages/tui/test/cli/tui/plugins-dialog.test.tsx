@@ -308,9 +308,9 @@ test("two Server plugins with the same ID keep their errors independently select
     expect(fixture.copied[0]).not.toContain("working.ts")
 
     // The healthy entry has no error actions. Returning to the failure restores them.
-    fixture.app.mockInput.pressKey("up")
+    fixture.app.mockInput.pressArrow("up")
     await fixture.app.waitForFrame((frame) => !frame.includes("investigate i"))
-    fixture.app.mockInput.pressKey("down")
+    fixture.app.mockInput.pressArrow("down")
     await fixture.app.waitForFrame((frame) => frame.includes("investigate i"))
 
     fixture.app.mockInput.pressEnter()

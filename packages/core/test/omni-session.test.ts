@@ -1,10 +1,10 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { testEffect } from "./lib/effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Location } from "@opencode/core/location"
-import { OmniSession } from "@opencode/core/omni-session"
+import { OmniSession, safeMissionID } from "@opencode/core/omni-session"
 import { AbsolutePath } from "@opencode/core/schema"
 import { location } from "./fixture/location"
 
@@ -46,6 +46,24 @@ describe("OmniCode Session & Durable Memory", () => {
     }),
   )
 
+  effect("persists supervisor mission states for recovery after restart", () =>
+    Effect.gen(function* () {
+      const store = yield* OmniSession.Service
+      const tasks = [{
+        id: "task-a",
+        missionID: "mission-persist-test",
+        title: "Inspect code",
+        assignedAgent: "researcher",
+        status: "running" as const,
+      }]
+      yield* store.saveMissionTasks("mission-persist-test", tasks)
+      const restored = yield* store.loadMissionTasks("mission-persist-test")
+      expect(restored).toEqual(tasks)
+      const missing = yield* store.loadMissionTasks("mission-persist-missing")
+      expect(missing).toBeUndefined()
+    }),
+  )
+
   effect("records durable memory decisions into memory.md", () =>
     Effect.gen(function* () {
       const store = yield* OmniSession.Service
@@ -63,3 +81,12 @@ describe("OmniCode Session & Durable Memory", () => {
   )
 })
 
+
+describe("OmniCode persisted paths", () => {
+  test("rejects traversal and invalid session filenames", () => {
+    expect(safeMissionID("mission-123")).toBe("mission-123")
+    expect(() => safeMissionID("../secret")).toThrow("Invalid mission")
+    expect(() => safeMissionID("..\\\\credentials")).toThrow("Invalid mission")
+    expect(() => safeMissionID("")).toThrow("Invalid mission")
+  })
+})

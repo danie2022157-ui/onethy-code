@@ -1,0 +1,58 @@
+name: onethy-smoke
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: onethy regressions (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      GITHUB_ACTIONS: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Core regression tests
+        run: bun --cwd packages/core test test/omni-config.test.ts test/omni-session.test.ts test/omni-model-selection.test.ts test/omni-orchestrator.test.ts
+
+      - name: TUI regression tests
+        run: bun --cwd packages/tui test test/cli/tui/plugins-dialog.test.tsx test/component/dialog-omni-update.test.tsx
+
+      - name: Core TypeScript check
+        if: runner.os == 'Linux'
+        run: bun --cwd packages/core run typecheck:tsc
+
+      - name: TUI TypeScript check
+        if: runner.os == 'Linux'
+        run: bun --cwd packages/tui run typecheck:tsc

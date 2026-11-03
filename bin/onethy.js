@@ -6,7 +6,7 @@
  * Onethy Fusion, Self-Healing e Memory Bank.
  */
 
-import { spawn } from "node:child_process"
+import { execFileSync, spawn } from "node:child_process"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { findBun, makeOmniEnvironment } from "./omni-runtime.js"
@@ -22,12 +22,24 @@ if (!bunBin) {
 }
 
 const cliDir = path.join(rootDir, "packages", "cli")
+let activeCommit
+try {
+  activeCommit = execFileSync("git", ["rev-parse", "--short=7", "HEAD"], {
+    cwd: rootDir,
+    encoding: "utf8",
+    timeout: 2000,
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim()
+} catch {
+  // Released or source-archive installs may not contain a Git checkout.
+}
 
 const child = spawn(bunBin, ["run", "--cwd", cliDir, "src/index.ts", ...process.argv.slice(2)], {
   stdio: "inherit",
   env: {
     ...makeOmniEnvironment(process.env, bunBin),
     ONETHY_ACTIVE: "1",
+    ...(activeCommit ? { ONETHY_COMMIT: activeCommit } : {}),
     OPENCODE_CLI_NAME: "onethy",
     OPENCODE_THEME: process.env.OPENCODE_THEME || "onethy",
   },

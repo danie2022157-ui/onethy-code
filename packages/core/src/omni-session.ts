@@ -6,6 +6,7 @@ import crypto from "node:crypto"
 import { Context, Effect, Layer } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Location } from "./location.js"
+import type { TaskItem } from "./omni-orchestrator.js"
 
 export interface StoredSession {
   readonly id: string
@@ -36,6 +37,16 @@ export interface Interface {
   readonly get: (id: string) => Effect.Effect<StoredSession | undefined, never>
   readonly recordMemory: (decision: string) => Effect.Effect<void, never>
   readonly getMemory: () => Effect.Effect<string, never>
+  readonly saveMissionTasks: (missionID: string, tasks: ReadonlyArray<TaskItem>) => Effect.Effect<void, never>
+  readonly loadMissionTasks: (missionID: string) => Effect.Effect<ReadonlyArray<TaskItem> | undefined, never>
+}
+
+/** IDs become file names, so reject separators and traversal before touching the disk. */
+export function safeMissionID(value: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)) {
+    throw new Error("Invalid mission or session ID")
+  }
+  return value
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/OmniSession") {}
@@ -49,6 +60,7 @@ const layer = Layer.effect(
     const sessionsDir = path.join(workspace, ".omnicode", "sessions")
     const plansDir = path.join(workspace, ".omnicode", "plans")
     const memoryPath = path.join(workspace, ".omnicode", "memory.md")
+    const missionsDir = path.join(workspace, ".omnicode", "missions")
 
     const init = Effect.promise(async () => {
       await fs.mkdir(sessionsDir, { recursive: true })
@@ -63,7 +75,7 @@ const layer = Layer.effect(
 
     const save = Effect.fn("OmniSession.save")(function* (input: SaveSessionInput) {
       yield* init
-      const sessionId = input.id ?? `ses-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`
+      const sessionId = safeMissionID(input.id ?? `ses-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`)
       const sessionFile = path.join(sessionsDir, `${sessionId}.json`)
 
       const record: StoredSession = {
@@ -89,7 +101,7 @@ const layer = Layer.effect(
       tasks: ReadonlyArray<{ id: string; title: string; assignedAgent: string }>,
     ) {
       yield* init
-      const planFile = path.join(plansDir, `${planId}.md`)
+      const planFile = path.join(plansDir, `${safeMissionID(planId)}.md`)
       const lines = [
         `# 📋 Plano de Missão OmniCode (${planId})`,
         "",
@@ -129,7 +141,7 @@ const layer = Layer.effect(
       yield* init
       return yield* Effect.promise(async () => {
         try {
-          const file = path.join(sessionsDir, `${id}.json`)
+          const file = path.join(sessionsDir, `${safeMissionID(id)}.json`)
           const raw = await fs.readFile(file, "utf-8")
           return JSON.parse(raw) as StoredSession
         } catch {
@@ -157,7 +169,43 @@ const layer = Layer.effect(
       })
     })
 
-    return Service.of({ save, savePlan, list, get, recordMemory, getMemory })
+    const saveMissionTasks = Effect.fn("OmniSession.saveMissionTasks")(function* (
+      missionID: string,
+      tasks: ReadonlyArray<TaskItem>,
+    ) {
+      const id = safeMissionID(missionID)
+      yield* Effect.promise(async () => {
+        await fs.mkdir(missionsDir, { recursive: true })
+        const target = path.join(missionsDir, `${id}.json`)
+        const temporary = `${target}.${crypto.randomBytes(6).toString("hex")}.tmp`
+        try {
+          await fs.writeFile(temporary, JSON.stringify(tasks, null, 2), { encoding: "utf8", flag: "wx" })
+          await fs.rename(temporary, target)
+        } finally {
+          await fs.rm(temporary, { force: true }).catch(() => {})
+        }
+      })
+    })
+
+    const loadMissionTasks = Effect.fn("OmniSession.loadMissionTasks")(function* (missionID: string) {
+      const id = safeMissionID(missionID)
+      return yield* Effect.promise(async () => {
+        try {
+          const value: unknown = JSON.parse(await fs.readFile(path.join(missionsDir, `${id}.json`), "utf8"))
+          if (!Array.isArray(value) || value.some((task) =>
+            !task || typeof task !== "object" ||
+            typeof task.id !== "string" || task.missionID !== id ||
+            typeof task.title !== "string" || typeof task.assignedAgent !== "string" ||
+            !["pending", "running", "completed", "failed"].includes(task.status)
+          )) return undefined
+          return value as TaskItem[]
+        } catch {
+          return undefined
+        }
+      })
+    })
+
+    return Service.of({ save, savePlan, list, get, recordMemory, getMemory, saveMissionTasks, loadMissionTasks })
   }),
 )
 

@@ -3,6 +3,7 @@ export * as OmniConfig from "./omni-config.js"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { Context, Effect, Layer } from "effect"
+import { parse, type ParseError } from "jsonc-parser"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Location } from "./location.js"
 import { Path as GlobalPath } from "@opencode/util/global"
@@ -36,6 +37,48 @@ export interface Interface {
   readonly getProjectPath: () => string
 }
 
+/** Parse the Onethy extension without breaking URLs or silently accepting malformed configuration. */
+export function parseOmniConfig(content: string): Partial<ConfigData> {
+  const errors: ParseError[] = []
+  const value: unknown = parse(content, errors, { allowTrailingComma: true })
+  if (errors.length > 0 || !value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid OmniCode JSONC configuration")
+  }
+  const data = value as Record<string, unknown>
+  if (data.mode !== undefined && !["plan", "approve", "smart", "auto"].includes(String(data.mode))) {
+    throw new Error("Invalid OmniCode autonomy mode")
+  }
+  if (data.defaultModel !== undefined && (typeof data.defaultModel !== "string" || !data.defaultModel)) {
+    throw new Error("Invalid OmniCode default model")
+  }
+  for (const kind of ["providers", "mcpServers"] as const) {
+    const record = data[kind]
+    if (record === undefined) continue
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+      throw new Error(`Invalid OmniCode ${kind} configuration`)
+    }
+    for (const [name, entry] of Object.entries(record)) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error(`Invalid OmniCode ${kind} entry: ${name}`)
+      }
+      const props = entry as Record<string, unknown>
+      if (kind === "providers") {
+        if ((props.apiKey !== undefined && typeof props.apiKey !== "string") ||
+            (props.endpoint !== undefined && typeof props.endpoint !== "string") ||
+            (props.models !== undefined && (!Array.isArray(props.models) || !props.models.every((model) => typeof model === "string")))) {
+          throw new Error(`Invalid OmniCode provider settings for ${name}`)
+        }
+      } else if (typeof props.command !== "string" || !props.command ||
+          (props.args !== undefined && (!Array.isArray(props.args) || !props.args.every((arg) => typeof arg === "string"))) ||
+          (props.env !== undefined && (!props.env || typeof props.env !== "object" || Array.isArray(props.env) ||
+            !Object.values(props.env).every((item) => typeof item === "string")))) {
+        throw new Error(`Invalid OmniCode MCP settings for ${name}`)
+      }
+    }
+  }
+  return data as Partial<ConfigData>
+}
+
 export class Service extends Context.Service<Service, Interface>()("@opencode/OmniConfig") {}
 
 const DEFAULT_CONFIG: ConfigData = {
@@ -65,10 +108,10 @@ const layer = Layer.effect(
       Effect.promise(async () => {
         try {
           const content = await fs.readFile(filePath, "utf-8")
-          const clean = content.replace(/\/\/.*$/gm, "")
-          return JSON.parse(clean) as Partial<ConfigData>
-        } catch {
-          return undefined
+          return parseOmniConfig(content)
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined
+          throw new Error(`Failed to load OmniCode configuration at ${filePath}: ${error instanceof Error ? error.message : String(error)}`)
         }
       })
 
