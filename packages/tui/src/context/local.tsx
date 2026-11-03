@@ -209,7 +209,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       })
 
       function syncAllowedModelsEnv() {
-        if (autoStore.selectedModels && autoStore.selectedModels.length > 0) {
+        // A persisted Omni pool must not restrict manually selected models after Auto is disabled.
+        if (autoStore.enabled && autoStore.selectedModels && autoStore.selectedModels.length > 0) {
           process.env.OMNICODE_ALLOWED_MODELS = JSON.stringify(autoStore.selectedModels)
         } else {
           delete process.env.OMNICODE_ALLOWED_MODELS
