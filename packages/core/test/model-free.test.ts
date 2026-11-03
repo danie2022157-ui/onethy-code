@@ -145,3 +145,35 @@ it.effect("explicit session selection is not blocked by an unrelated Omni automa
     }).pipe(Effect.provide(layer)),
   ),
 )
+
+it.effect("Omni automatic routing uses available models without a cooldown service", () =>
+  withEnv({ OMNICODE_ACTIVE: "1", OMNICODE_ALLOWED_MODELS: '["automatic/chat"]' }, () =>
+    Effect.gen(function* () {
+      const providerID = Provider.ID.make("automatic")
+      const modelID = Model.ID.make("chat")
+      const providers = yield* Provider.Service
+      const models = yield* Model.Service
+      const runner = yield* SessionRunnerModel.Service
+      yield* providers.transform((editor) => {
+        editor.update(providerID, (provider) => {
+          provider.package = "@opencode/ai/providers/openai"
+          provider.activation = "enabled"
+        })
+        editor.models.update(providerID, modelID, () => {})
+      })
+      const selected = yield* runner.resolve(
+        Session.Info.make({
+          id: Session.ID.make("ses_omni_without_orchestrator"),
+          projectID: Project.ID.global,
+          title: "test",
+          cost: Money.USD.zero,
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          time: { created: DateTime.makeUnsafe(0), updated: DateTime.makeUnsafe(0) },
+          location: ref,
+        }),
+        models.available,
+      )
+      expect(selected.ref).toMatchObject({ providerID, id: modelID })
+    }).pipe(Effect.provide(layer)),
+  ),
+)
