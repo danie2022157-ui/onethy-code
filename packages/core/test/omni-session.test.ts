@@ -1,10 +1,10 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { testEffect } from "./lib/effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Location } from "@opencode/core/location"
-import { OmniSession } from "@opencode/core/omni-session"
+import { OmniSession, safeMissionID } from "@opencode/core/omni-session"
 import { AbsolutePath } from "@opencode/core/schema"
 import { location } from "./fixture/location"
 
@@ -63,3 +63,12 @@ describe("OmniCode Session & Durable Memory", () => {
   )
 })
 
+
+describe("OmniCode persisted paths", () => {
+  test("rejects traversal and invalid session filenames", () => {
+    expect(safeMissionID("mission-123")).toBe("mission-123")
+    expect(() => safeMissionID("../secret")).toThrow("Invalid mission")
+    expect(() => safeMissionID("..\\\\credentials")).toThrow("Invalid mission")
+    expect(() => safeMissionID("")).toThrow("Invalid mission")
+  })
+})
