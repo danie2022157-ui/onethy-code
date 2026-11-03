@@ -8,6 +8,7 @@ import { Location } from "@opencode/core/location"
 import { OmniConfig } from "@opencode/core/omni-config"
 import { OmniBus } from "@opencode/core/omni-bus"
 import { OmniOrchestrator } from "@opencode/core/omni-orchestrator"
+import { OmniSession } from "@opencode/core/omni-session"
 import { Model } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
 import { AbsolutePath } from "@opencode/core/schema"
@@ -136,6 +137,26 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       expect(serial).toHaveLength(1)
       expect(serial[0].id).toBe(tasks[2].id)
       expect((yield* orchestrator.claimReadyTasks("mission-scheduler", 8))).toHaveLength(0)
+    }),
+  )
+
+  effect("mission restoration marks abandoned workers failed until explicit retry", () =>
+    Effect.gen(function* () {
+      const store = yield* OmniSession.Service
+      const orchestrator = yield* OmniOrchestrator.Service
+      yield* store.saveMissionTasks("mission-recovery-test", [{
+        id: "task-recovery",
+        missionID: "mission-recovery-test",
+        title: "Interrupted build",
+        assignedAgent: "coder",
+        status: "running",
+      }])
+      const restored = yield* orchestrator.getActiveTasks("mission-recovery-test")
+      expect(restored[0].status).toBe("failed")
+      expect(restored[0].result).toContain("retry required")
+      expect((yield* store.loadMissionTasks("mission-recovery-test"))?.[0].status).toBe("failed")
+      yield* orchestrator.retryTask("mission-recovery-test", "task-recovery")
+      expect((yield* orchestrator.claimReadyTasks("mission-recovery-test", 1))[0].status).toBe("running")
     }),
   )
 
