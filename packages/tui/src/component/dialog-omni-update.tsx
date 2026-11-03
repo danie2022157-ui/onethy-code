@@ -145,7 +145,7 @@ export function DialogOmniUpdate(props: { git?: typeof runGit }) {
       }
 
       setStatusMessage(`Downloading updates (git pull origin ${curBranch})...`)
-      const pullRes = await git(`git pull origin ${curBranch}`, root)
+      const pullRes = await git(`git pull --ff-only origin ${curBranch}`, root)
 
       if (pullRes.code !== 0) {
         // Keep the saved stash intact if the pull fails; do not claim a successful update.
@@ -164,12 +164,11 @@ export function DialogOmniUpdate(props: { git?: typeof runGit }) {
 
       // Check if Bun is available to sync dependencies
       const bun = findBunBin()
-      if (bun) {
-        setStatusMessage("Syncing OnethyCode dependencies...")
-        const installRes = await git(`"${bun}" install`, root, 60000)
-        if (installRes.code !== 0)
-          throw new Error(installRes.stderr || installRes.stdout || "Could not install dependencies.")
-      }
+      if (!bun) throw new Error("Bun not found. Dependencies were not synchronized; install Bun and retry.")
+      setStatusMessage("Syncing OnethyCode dependencies...")
+      const installRes = await git(`"${bun}" install`, root, 180000)
+      if (installRes.code !== 0)
+        throw new Error(installRes.stderr || installRes.stdout || "Could not install dependencies.")
 
       const newShaRes = await git("git rev-parse --short HEAD", root)
       setRemoteSha(newShaRes.stdout || localSha())
