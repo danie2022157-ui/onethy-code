@@ -99,12 +99,11 @@ const layer = Layer.effect(
         if (!session.model) {
           const agent = (yield* agents.select(session.agent)).info?.model
           const list = yield* available()
-          const configuredAllowlist = yield* allowedModels
-          // The general runner graph does not install the Omni plugin graph. Active Omni automatic routing
-          // therefore requires the caller's Location context to provide this service explicitly.
+          // The Omni allowlist controls automatic routing, not an agent explicitly configured with a model.
+          const configuredAllowlist = agent ? undefined : yield* allowedModels
+          // The Omni orchestrator is optional in the general runner graph. When absent, the live
+          // catalog and allowlist still determine eligibility; only advisory cooldown hints are skipped.
           const orchestrator = yield* Effect.serviceOption(OmniOrchestrator.Service)
-          if (process.env.OMNICODE_ACTIVE === "1" && !agent && orchestrator._tag === "None")
-            return yield* new CooldownServiceUnavailableError({ sessionID: session.id })
           const coolingDown = new Set<string>()
           if (process.env.OMNICODE_ACTIVE === "1" && !agent && orchestrator._tag === "Some") {
             for (const model of list) {
@@ -129,9 +128,10 @@ const layer = Layer.effect(
 
         const sessionModel = session.model
         const list = yield* available()
-        const configuredAllowlist = yield* allowedModels
+        // A user-selected session model takes precedence over Omni automatic routing preferences.
+        // Availability is still checked against the enabled, connected catalog.
         const selected = yield* Effect.try({
-          try: () => ModelSelectionPolicy.select(list, { mode: "explicit", allowedModels: configuredAllowlist }, sessionModel).selected,
+          try: () => ModelSelectionPolicy.select(list, { mode: "explicit" }, sessionModel).selected,
           catch: () => new ModelUnavailableError({ providerID: sessionModel.providerID, modelID: sessionModel.id }),
         })
         return yield* resolver.resolveModel(selected, sessionModel.variant)
