@@ -44,3 +44,11 @@ jobs:
 
       - name: TUI regression tests
         run: bun --cwd packages/tui test test/cli/tui/plugins-dialog.test.tsx test/component/dialog-omni-update.test.tsx
+
+      - name: Core TypeScript check
+        if: runner.os == 'Linux'
+        run: bun --cwd packages/core run typecheck:tsc
+
+      - name: TUI TypeScript check
+        if: runner.os == 'Linux'
+        run: bun --cwd packages/tui run typecheck:tsc
