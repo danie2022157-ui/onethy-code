@@ -16,7 +16,7 @@ import "../../../src/plugin/context"
 import { ClientProvider } from "../../../src/context/client"
 import { DataProvider } from "../../../src/context/data"
 import { LocationProvider } from "../../../src/context/location"
-import { RouteProvider } from "../../../src/context/route"
+import { RouteProvider, useRoute } from "../../../src/context/route"
 import { PluginsDialog } from "../../../src/feature-plugins/system/plugins"
 import { DialogProvider } from "../../../src/ui/dialog"
 import { ToastProvider } from "../../../src/ui/toast"
@@ -49,6 +49,8 @@ async function renderPlugins(
   const requests: { path: string; body: unknown }[] = []
   const toasts: ToastOptions[] = []
   const activations: string[] = []
+  const copied: string[] = []
+  let route: ReturnType<typeof useRoute> | undefined
   const location = { directory: root, project: { id: "proj_test", directory: root, canonical: root } }
   const transport = createFetch(async (url, request) => {
     if (url.pathname === "/api/plugin") return json({ location, data: inventory.list })
@@ -65,6 +67,7 @@ async function renderPlugins(
 
   function Harness() {
     function Content() {
+      route = useRoute()
       onCleanup(Keymap.use().mode.push("modal"))
       const theme = useThemes().currentTokens()
       const context = {
@@ -91,7 +94,11 @@ async function renderPlugins(
     }
 
     return (
-      <TestTuiContexts directory={root} paths={{ home: root, state, worktree: root }}>
+      <TestTuiContexts
+        directory={root}
+        paths={{ home: root, state, worktree: root }}
+        clipboard={{ read: async () => undefined, write: async (value) => void copied.push(value) }}
+      >
         <ConfigProvider config={createTuiResolvedConfig()}>
           <RouteProvider initialRoute={{ type: "home" }}>
             <ClientProvider api={api}>
@@ -119,7 +126,7 @@ async function renderPlugins(
   app.renderer.start()
   const expected = tui?.list[0]?.id ?? inventory.list[0]?.id ?? "local.plugin"
   await app.waitForFrame((frame) => frame.includes(expected))
-  return { app, requests, toasts, activations }
+  return { app, requests, toasts, activations, copied, get route() { return route } }
 }
 
 test("failed TUI plugins keep enter to enable and use space to show the error", async () => {
@@ -211,6 +218,39 @@ test("the check action stays hidden without package plugins", async () => {
     fixture.app.mockInput.pressKey("r", { ctrl: true })
     await fixture.app.flush()
     expect(fixture.requests).toEqual([])
+  } finally {
+    fixture.app.renderer.destroy()
+  }
+})
+
+test("failed server plugins expose investigate, copy and scroll controls in the list", async () => {
+  await using tmp = await tmpdir()
+  const failure: PluginInfo = {
+    id: "broken.server",
+    source: { type: "local", path: path.join(tmp.path, "broken.ts") },
+    features: { server: true },
+    state: { status: "failed", error: "Plugin import failed: missing dependency", ref: "err_plugin_123" },
+  }
+  const fixture = await renderPlugins(tmp.path, { list: [failure], check: [] })
+
+  try {
+    await fixture.app.waitForFrame((frame) => frame.includes("broken.server") && frame.includes("investigate i"))
+    expect(fixture.app.captureCharFrame()).toContain("copy details c")
+    expect(fixture.app.captureCharFrame()).toContain("scroll ↑/↓")
+
+    fixture.app.mockInput.pressKey("c")
+    await fixture.app.waitFor(() => fixture.copied.length === 1)
+    expect(fixture.copied[0]).toContain("broken.server")
+    expect(fixture.copied[0]).toContain("Plugin import failed: missing dependency")
+    expect(fixture.copied[0]).toContain("Reference: err_plugin_123")
+
+    fixture.app.mockInput.pressKey("i")
+    await fixture.app.waitFor(() => fixture.route?.data.type === "home" && !!fixture.route.data.prompt)
+    const data = fixture.route?.data
+    expect(data?.type === "home" && data.prompt?.text).toContain("broken.server")
+    expect(data?.type === "home" && data.prompt?.text).toContain("Plugin import failed: missing dependency")
+    expect(data?.type === "home" && data.prompt?.text).toContain("matching reference err_plugin_123")
+    expect(fixture.copied.length).toBe(1)
   } finally {
     fixture.app.renderer.destroy()
   }

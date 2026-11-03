@@ -108,7 +108,7 @@ export function DialogErrorDetails(props: {
           </Show>
         </box>
       }
-      footer={{ actions: { primary: actions() } }}
+      footer={{ actions: { primary: actions(), secondary: [{ title: "scroll", key: "↑/↓" }] } }}
       legacyFooter={<DialogFooter actions={{ secondary: actions(), primary: [{ title: "scroll", key: "↑/↓" }] }} />}
     >
       <scrollbox
