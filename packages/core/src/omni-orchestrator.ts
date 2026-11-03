@@ -492,18 +492,26 @@ const layer = Layer.effect(
           (model) => `${model.providerID}/${model.id}`,
         ),
       )
-      const decision = availableModels.length
-        ? ModelSelectionPolicy.select(availableModels, {
-            mode: "automatic",
-            isCoolingDown: (ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
-          })
-        : undefined
+      const policy = {
+        mode: "automatic" as const,
+        requiredTypes: ["chat"],
+        requiredCapabilities: { tools: true },
+        rankBy: category === "fast_explore" || category === "external_research"
+          ? "cost" as const
+          : category === "deep_architecture" || category === "security_review"
+            ? "context" as const
+            : "newest" as const,
+        isCoolingDown: (ref: Model.Ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
+      }
+      const eligible = availableModels.filter((model) =>
+        model.enabled && model.status !== "deprecated" &&
+        (model.type ?? "chat") === "chat" && model.capabilities.tools,
+      )
+      const decision = eligible.length ? ModelSelectionPolicy.select(eligible, policy) : undefined
       const primary = decision && { providerID: decision.selected.providerID, id: decision.selected.id }
-      const fallback = availableModels
-        .filter((model) => model.enabled && model.status !== "deprecated")
-        .filter((model) => model.providerID !== primary?.providerID || model.id !== primary?.id)
-        .sort((left, right) => `${left.providerID}/${left.id}`.localeCompare(`${right.providerID}/${right.id}`))
-        .map((model) => ({ providerID: model.providerID, id: model.id }))[0]
+      const alternates = eligible.filter((model) => model.providerID !== primary?.providerID || model.id !== primary?.id)
+      const secondary = alternates.length ? ModelSelectionPolicy.select(alternates, policy).selected : undefined
+      const fallback = secondary && { providerID: secondary.providerID, id: secondary.id }
 
       const thinkingLevel: "off" | "low" | "medium" | "high" | "max" = "medium"
 
