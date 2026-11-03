@@ -247,11 +247,12 @@ export function PluginsDialog(props: { context: Plugin.Context; plugins: ReturnT
                 ? [
                     { title: "investigate", label: "i", group: "primary" as const },
                     { title: "copy details", label: "c", group: "primary" as const },
-                    ...(!focusedTui() ? [{ title: "view error", label: "enter", group: "primary" as const }] : []),
+                    { title: "scroll", label: "↑/↓" },
                   ]
-                : []),
-              { title: "scroll", label: "↑/↓" },
-              { title: `${showInternal() ? "hide" : "show"} internal`, label: "ctrl+a" },
+                : [
+                    { title: "scroll", label: "↑/↓" },
+                    { title: `${showInternal() ? "hide" : "show"} internal`, label: "ctrl+a" },
+                  ]),
             ]}
             onMove={(option) => setFocused(option.value)}
             onSelect={(option) => {
