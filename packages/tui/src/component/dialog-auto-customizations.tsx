@@ -17,124 +17,124 @@ export function DialogAutoCustomizations() {
     return [
       {
         value: "toggle-global",
-        title: isGlobal ? "✓ ⚡ Auto-Uso Geral: [ATIVADO]" : "○ ⚡ Auto-Uso Geral: [DESATIVADO]",
+        title: isGlobal ? "✓ ⚡ Proactive Auto-Usage: [ENABLED]" : "○ ⚡ Proactive Auto-Usage: [DISABLED]",
         description: isGlobal
-          ? "Ativo: a IA seleciona e aciona proativamente os recursos abaixo conforme a tarefa"
-          : "Inativo: IA não acionará recursos automaticamente (modo passivo estrito)",
-        category: "Controle Geral",
-        footer: isGlobal ? "[Ativo]" : "[Inativo]",
+          ? "Active: AI autonomously selects and executes capabilities below matching the task"
+          : "Inactive: AI will not automatically invoke additional resources (strict passive mode)",
+        category: "Global Control",
+        footer: isGlobal ? "[Active]" : "[Inactive]",
         onSelect: () => {
           cust.toggleEnabled()
           toast.show({
             variant: cust.enabled() ? "success" : "info",
-            message: cust.enabled() ? "✓ Auto-Uso Geral Ativado" : "○ Auto-Uso Geral Desativado",
+            message: cust.enabled() ? "✓ Proactive Auto-Usage Enabled" : "○ Proactive Auto-Usage Disabled",
           })
         },
       },
       {
         value: "useSkills",
-        title: cfg.useSkills ? "✓ 🛠️ Skills Especializadas (@skills)" : "○ 🛠️ Skills Especializadas (@skills)",
-        description: "Carregar e executar skills automaticamente (testes, UI, vídeo, SEO, segurança, git)",
-        category: "Recursos Permitidos de Acordo com a Tarefa",
-        footer: cfg.useSkills ? "[Permitido]" : "[Ignorar]",
+        title: cfg.useSkills ? "✓ 🛠️ Specialized Skills (@skills)" : "○ 🛠️ Specialized Skills (@skills)",
+        description: "Automatically invoke specialized skills (testing, UI, video, SEO, security, git)",
+        category: "Allowed Capabilities Matching Task",
+        footer: cfg.useSkills ? "[Allowed]" : "[Ignore]",
         onSelect: () => {
           cust.toggle("useSkills")
         },
       },
       {
         value: "useAgents",
-        title: cfg.useAgents ? "✓ 🤖 Subagentes Especialistas (@agentes)" : "○ 🤖 Subagentes Especialistas (@agentes)",
-        description: "Delegar para @architect, @researcher, @coder, @reviewer em tarefas complexas",
-        category: "Recursos Permitidos de Acordo com a Tarefa",
-        footer: cfg.useAgents ? "[Permitido]" : "[Ignorar]",
+        title: cfg.useAgents ? "✓ 🤖 Expert Subagents (@agents)" : "○ 🤖 Expert Subagents (@agents)",
+        description: "Delegate to @architect, @researcher, @coder, @reviewer on complex tasks",
+        category: "Allowed Capabilities Matching Task",
+        footer: cfg.useAgents ? "[Allowed]" : "[Ignore]",
         onSelect: () => {
           cust.toggle("useAgents")
         },
       },
       {
         value: "useMcps",
-        title: cfg.useMcps ? "✓ 🔌 Servidores MCP Conectados" : "○ 🔌 Servidores MCP Conectados",
-        description: "Usar ativamente ferramentas externas (navegadores, bancos de dados, git, APIs)",
-        category: "Recursos Permitidos de Acordo com a Tarefa",
-        footer: cfg.useMcps ? "[Permitido]" : "[Ignorar]",
+        title: cfg.useMcps ? "✓ 🔌 Connected MCP Servers" : "○ 🔌 Connected MCP Servers",
+        description: "Proactively utilize external tools (browsers, databases, git, APIs)",
+        category: "Allowed Capabilities Matching Task",
+        footer: cfg.useMcps ? "[Allowed]" : "[Ignore]",
         onSelect: () => {
           cust.toggle("useMcps")
         },
       },
       {
         value: "useHooks",
-        title: cfg.useHooks ? "✓ 🪝 Ganchos & Hooks (hook-*, /hook-*)" : "○ 🪝 Ganchos & Hooks (hook-*, /hook-*)",
-        description: "Disparar regras pré/pós tarefa e checagens automáticas de integridade",
-        category: "Recursos Permitidos de Acordo com a Tarefa",
-        footer: cfg.useHooks ? "[Permitido]" : "[Ignorar]",
+        title: cfg.useHooks ? "✓ 🪝 Automated Hooks (hook-*, /hook-*)" : "○ 🪝 Automated Hooks (hook-*, /hook-*)",
+        description: "Trigger pre/post task rules and automated integrity assertions",
+        category: "Allowed Capabilities Matching Task",
+        footer: cfg.useHooks ? "[Allowed]" : "[Ignore]",
         onSelect: () => {
           cust.toggle("useHooks")
         },
       },
       {
         value: "useMods",
-        title: cfg.useMods ? "✓ 🧩 Mods e Plugins Ativos" : "○ 🧩 Mods e Plugins Ativos",
-        description: "Aproveitar extensões de código e plugins instalados no workspace",
-        category: "Recursos Permitidos de Acordo com a Tarefa",
-        footer: cfg.useMods ? "[Permitido]" : "[Ignorar]",
+        title: cfg.useMods ? "✓ 🧩 Active Mods & Plugins" : "○ 🧩 Active Mods & Plugins",
+        description: "Leverage code extensions and plugins installed in the workspace",
+        category: "Allowed Capabilities Matching Task",
+        footer: cfg.useMods ? "[Allowed]" : "[Ignore]",
         onSelect: () => {
           cust.toggle("useMods")
         },
       },
       {
         value: "useCommands",
-        title: cfg.useCommands ? "✓ ⚡ Comandos Slash & Loops (/loop-*)" : "○ ⚡ Comandos Slash & Loops (/loop-*)",
-        description: "Sugerir e acionar comandos de verificação contínua e pipelines de testes",
-        category: "Recursos Permitidos de Acordo com a Tarefa",
-        footer: cfg.useCommands ? "[Permitido]" : "[Ignorar]",
+        title: cfg.useCommands ? "✓ ⚡ Slash Commands & Loops (/loop-*)" : "○ ⚡ Slash Commands & Loops (/loop-*)",
+        description: "Suggest and run verification loops and testing pipelines",
+        category: "Allowed Capabilities Matching Task",
+        footer: cfg.useCommands ? "[Allowed]" : "[Ignore]",
         onSelect: () => {
           cust.toggle("useCommands")
         },
       },
       {
         value: "useSettings",
-        title: cfg.useSettings ? "✓ ⚙️ Modos, Presets e Settings" : "○ ⚙️ Modos, Presets e Settings",
-        description: "Respeitar modo de autonomia selecionado e configurações de ambiente",
-        category: "Recursos Permitidos de Acordo com a Tarefa",
-        footer: cfg.useSettings ? "[Permitido]" : "[Ignorar]",
+        title: cfg.useSettings ? "✓ ⚙️ Modes, Presets & Settings" : "○ ⚙️ Modes, Presets & Settings",
+        description: "Respect active autonomy mode and workspace environment settings",
+        category: "Allowed Capabilities Matching Task",
+        footer: cfg.useSettings ? "[Allowed]" : "[Ignore]",
         onSelect: () => {
           cust.toggle("useSettings")
         },
       },
       {
         value: "enable-all",
-        title: "🟢 Ativar Todos os Recursos",
-        description: "Permitir auto-uso total (Skills, Agentes, MCPs, Hooks, Mods, Comandos, Settings)",
-        category: "Ações Rápidas",
-        footer: "[Ativar Todos]",
+        title: "🟢 Enable All Capabilities",
+        description: "Allow full autonomous usage (Skills, Agents, MCPs, Hooks, Mods, Commands, Settings)",
+        category: "Quick Actions",
+        footer: "[Enable All]",
         onSelect: () => {
           cust.setAll(true)
           toast.show({
             variant: "success",
-            message: "✓ Todos os 7 recursos de auto-orquestração foram ativados!",
+            message: "✓ All 7 autonomous orchestration capabilities enabled!",
           })
         },
       },
       {
         value: "disable-all",
-        title: "🔴 Desativar Todos os Recursos",
-        description: "Desabilitar a seleção automática de qualquer recurso adicional",
-        category: "Ações Rápidas",
-        footer: "[Desativar]",
+        title: "🔴 Disable All Capabilities",
+        description: "Disable automatic selection of any additional resources",
+        category: "Quick Actions",
+        footer: "[Disable All]",
         onSelect: () => {
           cust.setAll(false)
           toast.show({
             variant: "info",
-            message: "Todos os recursos foram desativados.",
+            message: "All autonomous capabilities disabled.",
           })
         },
       },
       {
         value: "close",
-        title: "← Concluir & Fechar",
-        description: `Salvo: ${cust.summary()} · Pressione Enter ou ESC para retornar`,
-        category: "Ações Rápidas",
-        footer: "[Concluir]",
+        title: "← Done & Close",
+        description: `Saved: ${cust.summary()} · Press Enter or ESC to return`,
+        category: "Quick Actions",
+        footer: "[Done]",
         onSelect: () => {
           dialog.clear()
         },
@@ -145,8 +145,8 @@ export function DialogAutoCustomizations() {
   return (
     <DialogSelect<string>
       options={options()}
-      title="⚙️ Auto-Uso de Customizações — OnethyCode"
-      titlePlaceholder="Filtrar opções (Enter para alternar)..."
+      title="⚙️ Proactive Capabilities Auto-Usage — OmniCode"
+      titlePlaceholder="Filter capabilities (Enter to toggle)..."
       renderFilter={true}
       flat={false}
       onSelect={(opt) => {

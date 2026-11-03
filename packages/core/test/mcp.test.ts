@@ -15,7 +15,7 @@ import { ConfigMCP } from "@opencode/schema/config/mcp"
 import { McpEvent } from "@opencode/schema/mcp-event"
 import { ConfigPolicy } from "@opencode/schema/config/policy"
 import { Config } from "@opencode/core/config"
-import { ConfigMcpPlugin } from "@opencode/core/config/plugin/mcp"
+import { ConfigMcpPlugin, decodeDiscovered, discoveredName, isContained, mergeServers } from "@opencode/core/config/plugin/mcp"
 import { Credential } from "@opencode/core/credential"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
@@ -575,6 +575,83 @@ describe("MCP errors", () => {
     ).toBe("failed")
     expect(new McpClient.NeedsAuthError({ server: "demo", message: "Unauthorized" }).message).toBe("Unauthorized")
     expect(new McpClient.ConnectError({ server: "demo", message: "offline" }).message).toBe("offline")
+  })
+})
+
+describe("discovered MCP configuration", () => {
+  test("discovered servers cannot enable themselves and retain literal environment references", () => {
+    const discovered = decodeDiscovered(
+      JSON.stringify({
+        mcpServers: {
+          sample: { command: "node", args: ["server.js"], env: { TOKEN: "${env:SECRET}" }, disabled: false, cwd: "." },
+        },
+      }),
+    )
+
+    const server = discovered.get("sample")
+    expect(server?.disabled).toBe(true)
+    expect(server?.type).toBe("local")
+    if (server?.type !== "local") throw new Error("expected local MCP server")
+    expect(server.environment).toEqual({ TOKEN: "${env:SECRET}" })
+    expect("cwd" in server).toBe(false)
+  })
+
+  test("trusted canonical config can override discovered disabled defaults", () => {
+    const canonical = new Document({
+      type: "document",
+      info: new Info({
+        mcp: {
+          servers: {
+            sample: { type: "local", command: ["node", "trusted.js"], disabled: false },
+          },
+        },
+      }),
+    })
+    const discovered = decodeDiscovered(JSON.stringify({ mcpServers: { sample: { command: "bad", disabled: false } } }))
+    const servers = mergeServers(discovered, [canonical])
+    const server = servers.get("sample")
+    expect(server?.disabled).toBe(false)
+    expect(server?.type).toBe("local")
+    if (server?.type !== "local") throw new Error("expected local MCP server")
+    expect(server.command).toEqual(["node", "trusted.js"])
+  })
+
+  test("canonical containment rejects a symlink target outside the discovery root", async () => {
+    const base = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-mcp-discovery-"))
+    const root = path.join(base, ".claude")
+    const outside = path.join(base, "outside")
+    await fs.mkdir(path.join(root, "mcp"), { recursive: true })
+    await fs.mkdir(outside)
+    await fs.writeFile(path.join(outside, "server.json"), "{}")
+    try {
+      await fs.symlink(outside, path.join(root, "mcp", "linked"), "junction")
+    } catch (error) {
+      await fs.rm(base, { recursive: true, force: true })
+      if (process.platform === "win32" && ["EPERM", "EACCES", "UNKNOWN"].includes((error as NodeJS.ErrnoException).code ?? "")) {
+        return
+      }
+      throw error
+    }
+    const canonicalRoot = await fs.realpath(root)
+    const canonicalTarget = await fs.realpath(path.join(root, "mcp", "linked", "server.json")).catch(() =>
+      fs.realpath(path.join(outside, "server.json")),
+    )
+    expect(isContained(canonicalRoot, canonicalTarget)).toBe(false)
+    expect(isContained(canonicalRoot, await fs.realpath(path.join(root, "mcp")))).toBe(true)
+    await fs.rm(base, { recursive: true, force: true })
+  })
+
+  test("normalizes names consistently so sanitized collisions can be detected", () => {
+    expect(discoveredName("My Server")).toBe("my-server")
+    expect(discoveredName("my/server")).toBe("my-server")
+    const discovered = decodeDiscovered(
+      JSON.stringify({ mcpServers: { "My Server": { command: "first" }, "my/server": { command: "second" } } }),
+    )
+    expect(discovered.size).toBe(1)
+    const server = discovered.get("my-server")
+    expect(server?.type).toBe("local")
+    if (server?.type !== "local") throw new Error("expected local MCP server")
+    expect(server.command).toEqual(["first"])
   })
 })
 

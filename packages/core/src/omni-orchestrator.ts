@@ -4,14 +4,13 @@ import crypto from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { Context, Effect, Layer } from "effect"
+import { Clock, Context, Effect, Layer } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
+import { Model } from "./model.js"
+import { ModelSelectionPolicy } from "./model-selection-policy.js"
 import { Location } from "./location.js"
 import { OmniBus } from "./omni-bus.js"
 import { OmniConfig } from "./omni-config.js"
-
-const memoryCooldowns = new Map<string, number>()
-let diskCooldownCache: { data: Record<string, number>; ts: number } | undefined
 
 function getAutoModelFilePath(): string {
   const stateDir =
@@ -20,55 +19,6 @@ function getAutoModelFilePath(): string {
       ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "omnicode", "state")
       : path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"), "omnicode"))
   return path.join(stateDir, "auto-model.json")
-}
-
-export function markModelCooldown(providerID: string, modelID: string, durationMs = 5 * 60_000): void {
-  const key = `${providerID}/${modelID}`
-  const until = Date.now() + durationMs
-  memoryCooldowns.set(key, until)
-  try {
-    const file = getAutoModelFilePath()
-    const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {}
-    const cooldowns: Record<string, number> =
-      existing && typeof existing.cooldowns === "object" && existing.cooldowns ? { ...existing.cooldowns } : {}
-    cooldowns[key] = until
-    fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(file, JSON.stringify({ ...existing, cooldowns }, null, 2), "utf8")
-    diskCooldownCache = { data: cooldowns, ts: Date.now() }
-  } catch {
-    // ignore disk errors
-  }
-}
-
-export function isModelInCooldown(providerID: string, modelID: string): boolean {
-  const key = `${providerID}/${modelID}`
-  const now = Date.now()
-  const memUntil = memoryCooldowns.get(key)
-  if (memUntil !== undefined) {
-    if (memUntil > now) return true
-    memoryCooldowns.delete(key)
-  }
-  try {
-    if (!diskCooldownCache || now - diskCooldownCache.ts > 3000) {
-      const file = getAutoModelFilePath()
-      if (fs.existsSync(file)) {
-        const parsed = JSON.parse(fs.readFileSync(file, "utf8"))
-        diskCooldownCache = {
-          data: parsed && typeof parsed.cooldowns === "object" && parsed.cooldowns ? parsed.cooldowns : {},
-          ts: now,
-        }
-      } else {
-        diskCooldownCache = { data: {}, ts: now }
-      }
-    }
-    const diskUntil = diskCooldownCache.data[key]
-    if (typeof diskUntil === "number" && diskUntil > now) {
-      return true
-    }
-  } catch {
-    // ignore
-  }
-  return false
 }
 
 export interface AutoCustomizationsConfig {
@@ -165,6 +115,7 @@ export interface AgentDefinition {
 
 export interface TaskItem {
   readonly id: string
+  readonly missionID: string
   readonly title: string
   readonly assignedAgent: string
   readonly category?: TaskCategory
@@ -194,16 +145,19 @@ export interface RoutedModelSelection {
 }
 
 export interface Interface {
+  readonly markModelCooldown: (providerID: string, modelID: string, durationMs?: number) => Effect.Effect<void>
+  readonly clearModelCooldown: (providerID?: string, modelID?: string) => Effect.Effect<void>
+  readonly isModelInCooldown: (providerID: string, modelID: string) => Effect.Effect<boolean>
   readonly getAgents: () => Effect.Effect<ReadonlyArray<AgentDefinition>, never>
-  readonly planMission: (goal: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
-  readonly planUltrawork: (goal: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
-  readonly planArena: (problem: string, models: ReadonlyArray<string>) => Effect.Effect<ReadonlyArray<TaskItem>, never>
-  readonly planTeamPipeline: (goal: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
+  readonly planMission: (goal: string, missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
+  readonly planUltrawork: (goal: string, missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
+  readonly planArena: (problem: string, models: ReadonlyArray<string>, missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
+  readonly planTeamPipeline: (goal: string, missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
   readonly classifyCategory: (taskDescription: string, agentId: string) => TaskCategory
   readonly selectModelForAgent: (
     agentId: string,
     taskDescription: string,
-    availableModels: ReadonlyArray<ModelRef>,
+    availableModels: ReadonlyArray<Model.Info>,
   ) => Effect.Effect<RoutedModelSelection, never>
   readonly formatBoomerangContract: (agentId: string) => string
   readonly summarizeBoomerang: (rawOutput: string) => string
@@ -211,8 +165,8 @@ export interface Interface {
     todosPending: number
     hasUnverifiedEdits: boolean
   }) => Effect.Effect<{ passed: boolean; reminder?: string }, never>
-  readonly executeTask: (taskId: string, resultSummary: string) => Effect.Effect<TaskItem, never>
-  readonly getActiveTasks: () => Effect.Effect<ReadonlyArray<TaskItem>, never>
+  readonly executeTask: (missionID: string, taskId: string, resultSummary: string) => Effect.Effect<TaskItem, never>
+  readonly getActiveTasks: (missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/OmniOrchestrator") {}
@@ -268,79 +222,14 @@ const DEFAULT_AGENTS: AgentDefinition[] = [
   },
 ]
 
-const CATEGORY_MODEL_PREFERENCES: Record<TaskCategory, ReadonlyArray<string>> = {
-  fast_explore: [
-    "google/antigravity-gemini-3.8-flash",
-    "google/gemini-3.8-flash",
-    "openai/gpt-6.1-terra-fast",
-    "opencode/nemotron-3.5-super-vl-free",
-    "opencode/nemotron-3.5-lightning-free",
-    "opencode/glm-5.3-flash-free",
-    "opencode/deepseek-v4.1-flash-free",
-    "google/gemini-2.5-flash",
-  ],
-  external_research: [
-    "google/antigravity-gemini-3.8-flash",
-    "google/gemini-3.8-flash",
-    "openai/gpt-5.6-sol",
-    "opencode/nemotron-3.5-super-vl-free",
-    "opencode/deepseek-v4.1-flash-free",
-    "google/gemini-2.5-flash",
-  ],
-  deep_architecture: [
-    "google/gemini-4-argon",
-    "openai/gpt-6-luna",
-    "openai/gpt-5.6-luna",
-    "google/antigravity-claude-opus-4-6-thinking",
-    "google/antigravity-claude-sonnet-4-6",
-    "openai/gpt-6-astra",
-    "anthropic/claude-3-7-sonnet",
-    "google/gemini-2.5-pro",
-  ],
-  code_implementation: [
-    "openai/gpt-5.6-luna",
-    "openai/gpt-6-luna",
-    "google/gemini-4-argon",
-    "google/antigravity-gemini-3.8-flash",
-    "google/gemini-3.8-flash",
-    "openai/gpt-6.1-terra",
-    "openai/gpt-5.6-sol",
-    "google/antigravity-claude-sonnet-4-6",
-    "anthropic/claude-3-7-sonnet",
-  ],
-  security_review: [
-    "google/gemini-4-argon",
-    "openai/gpt-6-luna",
-    "openai/gpt-5.6-luna",
-    "google/antigravity-claude-opus-4-6-thinking",
-    "google/antigravity-claude-sonnet-4-6",
-    "openai/gpt-6-astra",
-    "deepseek/deepseek-reasoner",
-  ],
-  orchestration: [
-    "google/gemini-4-argon",
-    "openai/gpt-6-luna",
-    "google/antigravity-gemini-3.8-flash",
-    "google/gemini-3.8-flash",
-    "openai/gpt-5.6-luna",
-    "openai/gpt-6-astra",
-    "google/antigravity-claude-opus-4-6-thinking",
-    "anthropic/claude-3-7-sonnet",
-  ],
-}
-
 export function classifyTaskCategory(taskDescription: string, agentId: string): TaskCategory {
   const lowerAgent = agentId.toLowerCase()
-  const lowerDesc = taskDescription.toLowerCase()
   if (lowerAgent === "explore" || lowerAgent === "researcher") return "fast_explore"
   if (lowerAgent === "librarian") return "external_research"
   if (lowerAgent === "architect") return "deep_architecture"
   if (lowerAgent === "reviewer") return "security_review"
   if (lowerAgent === "coder") return "code_implementation"
-  if (/(doc|api|web|referência|changelog|pesquis)/i.test(lowerDesc)) return "external_research"
-  if (/(arquitet|schema|contrato|camada|design|segurança)/i.test(lowerDesc)) return "deep_architecture"
-  if (/(revis|audit|test|typecheck|regress)/i.test(lowerDesc)) return "security_review"
-  if (/(busca|explor|encontr|grep|mapear)/i.test(lowerDesc)) return "fast_explore"
+  void taskDescription
   return "code_implementation"
 }
 
@@ -348,54 +237,79 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* OmniBus.Service
-    const tasks: TaskItem[] = []
+    const cooldowns = new Map<string, number>()
+    const markModelCooldown = Effect.fn("OmniOrchestrator.markModelCooldown")(function* (
+      providerID: string,
+      modelID: string,
+      durationMs = 5 * 60_000,
+    ) {
+      cooldowns.set(`${providerID}/${modelID}`, (yield* Clock.currentTimeMillis) + Math.max(0, Math.min(durationMs, 5 * 60_000)))
+    })
+    const clearModelCooldown = Effect.fn("OmniOrchestrator.clearModelCooldown")(function* (
+      providerID?: string,
+      modelID?: string,
+    ) {
+      if (providerID && modelID) cooldowns.delete(`${providerID}/${modelID}`)
+      else cooldowns.clear()
+    })
+    const isModelInCooldown = Effect.fn("OmniOrchestrator.isModelInCooldown")(function* (providerID: string, modelID: string) {
+      const key = `${providerID}/${modelID}`
+      const until = cooldowns.get(key)
+      if (until === undefined) return false
+      if (until > (yield* Clock.currentTimeMillis)) return true
+      cooldowns.delete(key)
+      return false
+    })
+    const missions = new Map<string, TaskItem[]>()
 
     const getAgents = Effect.fn("OmniOrchestrator.getAgents")(function* () {
       return [...DEFAULT_AGENTS]
     })
 
-    const planMission = Effect.fn("OmniOrchestrator.planMission")(function* (goal: string) {
-      tasks.length = 0
+    const planMission = Effect.fn("OmniOrchestrator.planMission")(function* (goal: string, missionID = `mission-${crypto.randomUUID()}`) {
 
       // Supervisor gera as subtarefas especializadas para a missão
       const subtasks: TaskItem[] = [
         {
-          id: `task-${crypto.randomBytes(3).toString("hex")}`,
+          id: `task-${crypto.randomUUID()}`,
+          missionID,
           title: `Explorar e mapear contexto para: ${goal}`,
           assignedAgent: "researcher",
           status: "pending",
         },
         {
-          id: `task-${crypto.randomBytes(3).toString("hex")}`,
+          id: `task-${crypto.randomUUID()}`,
+          missionID,
           title: `Implementar alterações solicitadas`,
           assignedAgent: "coder",
           status: "pending",
         },
         {
-          id: `task-${crypto.randomBytes(3).toString("hex")}`,
+          id: `task-${crypto.randomUUID()}`,
+          missionID,
           title: `Revisar diff e verificar segurança/testes`,
           assignedAgent: "reviewer",
           status: "pending",
         },
       ]
 
-      tasks.push(...subtasks)
+      missions.set(missionID, subtasks)
 
       yield* bus.publish({
         sender: "supervisor",
         type: "plan",
-        payload: { goal, subtasks: subtasks.map((t) => ({ id: t.id, title: t.title, agent: t.assignedAgent })) },
+        payload: { missionID, goal, subtasks: subtasks.map((t) => ({ id: t.id, title: t.title, agent: t.assignedAgent })) },
       })
 
-      return [...tasks]
+      return subtasks.map((task) => ({ ...task }))
     })
 
-    const planUltrawork = Effect.fn("OmniOrchestrator.planUltrawork")(function* (goal: string) {
-      tasks.length = 0
+    const planUltrawork = Effect.fn("OmniOrchestrator.planUltrawork")(function* (goal: string, missionID = `mission-${crypto.randomUUID()}`) {
 
       const subtasks: TaskItem[] = [
         {
-          id: `ulw-${crypto.randomBytes(3).toString("hex")}`,
+          id: `ulw-${crypto.randomUUID()}`,
+          missionID,
           title: `[Paralelo 1] Varredura rápida de arquivos e símbolos para: ${goal}`,
           assignedAgent: "explore",
           category: "fast_explore",
@@ -403,7 +317,8 @@ const layer = Layer.effect(
           status: "pending",
         },
         {
-          id: `ulw-${crypto.randomBytes(3).toString("hex")}`,
+          id: `ulw-${crypto.randomUUID()}`,
+          missionID,
           title: `[Paralelo 2] Pesquisa de documentação e contratos de API para: ${goal}`,
           assignedAgent: "librarian",
           category: "external_research",
@@ -411,7 +326,8 @@ const layer = Layer.effect(
           status: "pending",
         },
         {
-          id: `ulw-${crypto.randomBytes(3).toString("hex")}`,
+          id: `ulw-${crypto.randomUUID()}`,
+          missionID,
           title: `Validar arquitetura, invariantes de segurança e impacto entre pacotes`,
           assignedAgent: "architect",
           category: "deep_architecture",
@@ -419,7 +335,8 @@ const layer = Layer.effect(
           status: "pending",
         },
         {
-          id: `ulw-${crypto.randomBytes(3).toString("hex")}`,
+          id: `ulw-${crypto.randomUUID()}`,
+          missionID,
           title: `Implementar código de produção e testes unitários completos`,
           assignedAgent: "coder",
           category: "code_implementation",
@@ -427,7 +344,8 @@ const layer = Layer.effect(
           status: "pending",
         },
         {
-          id: `ulw-${crypto.randomBytes(3).toString("hex")}`,
+          id: `ulw-${crypto.randomUUID()}`,
+          missionID,
           title: `Gate final (Ralph Loop): executar typecheck, testes e auditoria de diff`,
           assignedAgent: "reviewer",
           category: "security_review",
@@ -436,12 +354,13 @@ const layer = Layer.effect(
         },
       ]
 
-      tasks.push(...subtasks)
+      missions.set(missionID, subtasks)
 
       yield* bus.publish({
         sender: "supervisor",
         type: "plan",
         payload: {
+          missionID,
           mode: "ultrawork",
           goal,
           subtasks: subtasks.map((t) => ({
@@ -454,17 +373,18 @@ const layer = Layer.effect(
         },
       })
 
-      return [...tasks]
+      return subtasks.map((task) => ({ ...task }))
     })
 
     const planArena = Effect.fn("OmniOrchestrator.planArena")(function* (
       problem: string,
       models: ReadonlyArray<string>,
+      missionID = `mission-${crypto.randomUUID()}`,
     ) {
-      tasks.length = 0
       const candidateAgents = ["architect", "reviewer", "coder"]
       const subtasks: TaskItem[] = models.slice(0, 3).map((modelRef, idx) => ({
         id: `arena-${crypto.randomBytes(3).toString("hex")}`,
+        missionID,
         title: `[Arena Competidor #${idx + 1} · ${modelRef}] Diagnosticar e propor solução para: ${problem}`,
         assignedAgent: candidateAgents[idx % candidateAgents.length] ?? "architect",
         category: "deep_architecture",
@@ -473,12 +393,13 @@ const layer = Layer.effect(
         status: "pending",
       }))
 
-      tasks.push(...subtasks)
+      missions.set(missionID, subtasks)
 
       yield* bus.publish({
         sender: "supervisor",
         type: "plan",
         payload: {
+          missionID,
           mode: "arena",
           goal: problem,
           models,
@@ -491,15 +412,15 @@ const layer = Layer.effect(
         },
       })
 
-      return [...tasks]
+      return subtasks.map((task) => ({ ...task }))
     })
 
-    const planTeamPipeline = Effect.fn("OmniOrchestrator.planTeamPipeline")(function* (goal: string) {
-      tasks.length = 0
+    const planTeamPipeline = Effect.fn("OmniOrchestrator.planTeamPipeline")(function* (goal: string, missionID = `mission-${crypto.randomUUID()}`) {
 
       const subtasks: TaskItem[] = [
         {
           id: `team-spec-${crypto.randomBytes(3).toString("hex")}`,
+          missionID,
           title: `[Fase 1 · Especificação] Decompor requisitos, critérios de aceite e escopo: ${goal}`,
           assignedAgent: "planner",
           category: "orchestration",
@@ -508,6 +429,7 @@ const layer = Layer.effect(
         },
         {
           id: `team-arch-${crypto.randomBytes(3).toString("hex")}`,
+          missionID,
           title: `[Fase 2 · Arquitetura] Desenhar interfaces, contratos de tipos e limites modulares`,
           assignedAgent: "architect",
           category: "deep_architecture",
@@ -516,6 +438,7 @@ const layer = Layer.effect(
         },
         {
           id: `team-code-${crypto.randomBytes(3).toString("hex")}`,
+          missionID,
           title: `[Fase 3 · Implementação] Desenvolver código em conformidade e criar testes`,
           assignedAgent: "coder",
           category: "code_implementation",
@@ -524,6 +447,7 @@ const layer = Layer.effect(
         },
         {
           id: `team-review-${crypto.randomBytes(3).toString("hex")}`,
+          missionID,
           title: `[Fase 4 · Auditoria & Gate] Executar testes/typecheck e auditar qualidade/segurança`,
           assignedAgent: "reviewer",
           category: "security_review",
@@ -532,12 +456,13 @@ const layer = Layer.effect(
         },
       ]
 
-      tasks.push(...subtasks)
+      missions.set(missionID, subtasks)
 
       yield* bus.publish({
         sender: "supervisor",
         type: "plan",
         payload: {
+          missionID,
           mode: "team_pipeline",
           goal,
           subtasks: subtasks.map((t) => ({
@@ -549,87 +474,34 @@ const layer = Layer.effect(
         },
       })
 
-      return [...tasks]
+      return subtasks.map((task) => ({ ...task }))
     })
-
-    function classifyAvailableModelBucket(model: ModelRef): "efficiency" | "balanced" | "intelligence" {
-      const text = `${model.providerID}/${model.id}`.toLowerCase()
-      if (/(flash|mini|haiku|nano|lite|small|instant|fast|8b)/.test(text)) return "efficiency"
-      if (/(opus|o3|o1|astra|pro|max|reasoner|reasoning|thinking|deep|claude-4-opus|gpt-6)/.test(text)) {
-        return "intelligence"
-      }
-      return "balanced"
-    }
 
     const selectModelForAgent = Effect.fn("OmniOrchestrator.selectModelForAgent")(function* (
       agentId: string,
       taskDescription: string,
-      availableModels: ReadonlyArray<ModelRef>,
+      availableModels: ReadonlyArray<Model.Info>,
     ) {
       const category = classifyTaskCategory(taskDescription, agentId)
-      const candidates = CATEGORY_MODEL_PREFERENCES[category]
-      const matched: ModelRef[] = []
+      const coolingDown = new Set(
+        (yield* Effect.filter(availableModels, (model) => isModelInCooldown(model.providerID, model.id))).map(
+          (model) => `${model.providerID}/${model.id}`,
+        ),
+      )
+      const decision = availableModels.length
+        ? ModelSelectionPolicy.select(availableModels, {
+            mode: "automatic",
+            isCoolingDown: (ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
+          })
+        : undefined
+      const primary = decision && { providerID: decision.selected.providerID, id: decision.selected.id }
+      const fallback = availableModels
+        .filter((model) => model.enabled && model.status !== "deprecated")
+        .filter((model) => model.providerID !== primary?.providerID || model.id !== primary?.id)
+        .sort((left, right) => `${left.providerID}/${left.id}`.localeCompare(`${right.providerID}/${right.id}`))
+        .map((model) => ({ providerID: model.providerID, id: model.id }))[0]
 
-      for (const candidate of candidates) {
-        const parts = candidate.split("/")
-        const pId = parts[0] ?? ""
-        const mId = parts[1] ?? ""
-        const found = availableModels.find((m) => m.providerID === pId && m.id === mId)
-        if (found) matched.push(found)
-      }
-
-      const optimizeTier = process.env.OMNICODE_OPTIMIZE_TIER as
-        | "efficiency"
-        | "balanced"
-        | "intelligence"
-        | undefined
-
-      const targetBucket: "efficiency" | "balanced" | "intelligence" =
-        optimizeTier === "efficiency"
-          ? "efficiency"
-          : optimizeTier === "intelligence"
-            ? "intelligence"
-            : category === "fast_explore" || category === "external_research"
-              ? "efficiency"
-              : category === "deep_architecture" || category === "security_review" || category === "orchestration"
-                ? "intelligence"
-                : "balanced"
-
-      const healthyPool = availableModels.filter((m) => !isModelInCooldown(m.providerID, m.id))
-      const pool = healthyPool.length > 0 ? healthyPool : availableModels
-      const healthyMatched = matched.filter((m) => !isModelInCooldown(m.providerID, m.id))
-      const effectiveMatched = healthyMatched.length > 0 ? healthyMatched : matched
-
-      const bucketOrder: ("efficiency" | "balanced" | "intelligence")[] =
-        targetBucket === "efficiency"
-          ? ["efficiency", "balanced", "intelligence"]
-          : targetBucket === "intelligence"
-            ? ["intelligence", "balanced", "efficiency"]
-            : ["balanced", "intelligence", "efficiency"]
-
-      for (const bucket of bucketOrder) {
-        for (const m of pool) {
-          if (
-            classifyAvailableModelBucket(m) === bucket &&
-            !effectiveMatched.some((x) => x.providerID === m.providerID && x.id === m.id)
-          ) {
-            effectiveMatched.push(m)
-          }
-        }
-      }
-
-      const primary = effectiveMatched[0] ?? pool[0] ?? availableModels[0]
-      const fallback =
-        effectiveMatched.find((m) => m.providerID !== primary?.providerID || m.id !== primary?.id) ??
-        pool.find((m) => m !== primary) ??
-        availableModels.find((m) => m !== primary)
-
-      const thinkingLevel: "off" | "low" | "medium" | "high" | "max" =
-        category === "fast_explore" || category === "external_research" || agentId === "explore" || agentId === "librarian"
-          ? "low"
-          : category === "deep_architecture" || category === "security_review" || agentId === "architect" || agentId === "reviewer"
-            ? "max"
-            : "medium"
+      const thinkingLevel: "off" | "low" | "medium" | "high" | "max" = "medium"
 
       return { category, primary, fallback, thinkingLevel }
     })
@@ -669,10 +541,10 @@ const layer = Layer.effect(
       return { passed: true }
     })
 
-    const executeTask = Effect.fn("OmniOrchestrator.executeTask")(function* (taskId: string, resultSummary: string) {
-      const task = tasks.find((t) => t.id === taskId)
+    const executeTask = Effect.fn("OmniOrchestrator.executeTask")(function* (missionID: string, taskId: string, resultSummary: string) {
+      const task = missions.get(missionID)?.find((t) => t.id === taskId)
       if (!task) {
-        throw new Error(`Tarefa '${taskId}' não encontrada.`)
+        throw new Error(`Tarefa '${taskId}' não pertence à missão '${missionID}'.`)
       }
 
       task.status = "completed"
@@ -682,17 +554,20 @@ const layer = Layer.effect(
         sender: task.assignedAgent,
         taskId: task.id,
         type: "status",
-        payload: { status: "completed", result: resultSummary },
+        payload: { missionID, status: "completed", result: resultSummary },
       })
 
-      return task
+      return { ...task }
     })
 
-    const getActiveTasks = Effect.fn("OmniOrchestrator.getActiveTasks")(function* () {
-      return [...tasks]
+    const getActiveTasks = Effect.fn("OmniOrchestrator.getActiveTasks")(function* (missionID?: string) {
+      return missionID ? (missions.get(missionID) ?? []).map((task) => ({ ...task })) : []
     })
 
     return Service.of({
+      markModelCooldown,
+      clearModelCooldown,
+      isModelInCooldown,
       getAgents,
       planMission,
       planUltrawork,
@@ -714,4 +589,3 @@ export const node = makeLocationNode({
   layer,
   deps: [Location.node, OmniBus.node, OmniConfig.node],
 })
-

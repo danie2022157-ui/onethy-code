@@ -94,6 +94,13 @@
   font-weight: 440;
 }
 
+@media (max-width: 767px) {
+  [data-slot="mobile-tabs-trigger"],
+  [data-slot="mobile-tabs-drawer"] [data-action^="mobile-tabs-"] {
+    min-block-size: 44px;
+  }
+}
+
 [data-slot="titlebar-tab-item"] a {
   outline: none;
 }

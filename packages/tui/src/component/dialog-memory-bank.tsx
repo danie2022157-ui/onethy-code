@@ -20,87 +20,87 @@ interface MemoryBankFile {
 const STANDARD_FILES = [
   {
     names: ["active-context.md", "activeContext.md"],
-    label: "Contexto Ativo (active-context.md)",
-    description: "Foco atual da sprint, decisões recentes e próximos passos imediatos",
+    label: "Active Context (active-context.md)",
+    description: "Current sprint focus, recent discoveries, and immediate next steps",
     template: [
       "# Active Context",
       "",
-      "## 1. Foco Atual",
-      "- Funcionalidade ou refatoração sendo desenvolvida no momento.",
+      "## 1. Current Focus",
+      "- Feature or refactoring currently under development.",
       "",
-      "## 2. Tarefas e Próximos Passos",
-      "- [ ] Próxima tarefa imediata.",
+      "## 2. Immediate Next Steps",
+      "- [ ] Next concrete task.",
       "",
-      "## 3. Descobertas e Decisões Recentes",
-      "- Notas para os próximos subagentes e sessões futuras.",
+      "## 3. Recent Discoveries & Decisions",
+      "- Guidance and notes for subagents and future sessions.",
     ].join("\n"),
   },
   {
     names: ["project-brief.md", "projectbrief.md"],
-    label: "Brief do Projeto (project-brief.md)",
-    description: "Visão geral, objetivos essenciais e requisitos fundamentais",
+    label: "Project Brief (project-brief.md)",
+    description: "High-level overview, core goals, and project scope",
     template: [
       "# Project Brief",
       "",
-      "## 1. Visão Geral e Objetivos",
-      "- Propósito central do projeto.",
-      "- Problemas que resolve e valor para os usuários.",
+      "## 1. Overview & Goals",
+      "- Core purpose of this project.",
+      "- Problems it solves and value delivered.",
       "",
-      "## 2. Requisitos e Escopo",
-      "- Funcionalidades essenciais.",
-      "- O que está explicitamente FORA de escopo.",
+      "## 2. Requirements & Scope",
+      "- Essential capabilities.",
+      "- What is explicitly out of scope.",
       "",
-      "## 3. Critérios de Sucesso",
-      "- Estabilidade, cobertura de testes e aderência aos requisitos.",
+      "## 3. Success Criteria",
+      "- Stability, test coverage, and specification adherence.",
     ].join("\n"),
   },
   {
     names: ["system-patterns.md", "systemPatterns.md"],
-    label: "Padrões de Sistema (system-patterns.md)",
-    description: "Arquitetura, convenções de código e decisões estruturais",
+    label: "System Patterns (system-patterns.md)",
+    description: "Architecture, code conventions, and structural patterns",
     template: [
-      "# System Patterns & Arquitetura",
+      "# System Patterns & Architecture",
       "",
-      "## 1. Arquitetura Geral",
-      "- Camadas do sistema e separação de responsabilidades.",
-      "- Direção de dependências e regras de importação.",
+      "## 1. System Architecture",
+      "- Layers and separation of concerns.",
+      "- Dependency direction and import conventions.",
       "",
-      "## 2. Padrões de Código e Convenções",
-      "- Nomenclatura, tratamento de erros e convenções de estilo.",
-      "- Regras de schema e tipagem.",
+      "## 2. Coding Patterns & Conventions",
+      "- Naming conventions, error handling, and style rules.",
+      "- Schema rules and typing.",
       "",
-      "## 3. Decisões Arquiteturais Chave (ADRs)",
-      "- Decisões importantes e suas justificativas técnicas.",
+      "## 3. Key Architectural Decisions (ADRs)",
+      "- Critical decisions and technical rationale.",
     ].join("\n"),
   },
   {
     names: ["tech-context.md", "techContext.md"],
-    label: "Contexto Tecnológico (tech-context.md)",
-    description: "Linguagens, frameworks, versões e restrições de ambiente",
+    label: "Technology Context (tech-context.md)",
+    description: "Languages, frameworks, versions, and build constraints",
     template: [
       "# Tech Context",
       "",
-      "## 1. Stack Tecnológica",
-      "- Runtime / Linguagens principais.",
-      "- Frameworks, bibliotecas e bancos de dados.",
+      "## 1. Technology Stack",
+      "- Runtime / Core languages.",
+      "- Frameworks, libraries, and databases.",
       "",
-      "## 2. Comandos e Scripts de Desenvolvimento",
-      "- Testes: comando para rodar testes.",
-      "- Build / Lint / Typecheck: scripts de validação.",
+      "## 2. Development Commands & Scripts",
+      "- Tests: test suite execution command.",
+      "- Build / Lint / Typecheck: validation scripts.",
       "",
-      "## 3. Restrições do Ambiente",
-      "- Compatibilidade de SO, variáveis de ambiente e requisitos de segurança.",
+      "## 3. Environment Constraints",
+      "- OS compatibility, environment variables, and security constraints.",
     ].join("\n"),
   },
   {
     names: ["memory.md"],
-    label: "Notas Globais de Memória (memory.md)",
-    description: "Registro persistente de preferências e decisões históricas em .omnicode/memory.md",
+    label: "Global Memory Notes (memory.md)",
+    description: "Persistent repository of project preferences in .omnicode/memory.md",
     isRoot: true,
     template: [
-      "# Notas Globais de Memória OmniCode",
+      "# OmniCode Global Memory Notes",
       "",
-      "Registro de decisões arquiteturais e notas duráveis do projeto.",
+      "Durable architectural decisions and long-term project knowledge.",
     ].join("\n"),
   },
 ]
@@ -124,7 +124,7 @@ export function DialogMemoryBank() {
   }
 
   const files = createMemo<MemoryBankFile[]>(() => {
-    version() // dependência reativa
+    version()
     const folder = dir()
     const memoryRoot = rootMemoryPath()
 
@@ -170,7 +170,6 @@ export function DialogMemoryBank() {
       })
     }
 
-    // Identificar arquivos adicionais/customizados dentro de .omnicode/memory-bank/
     if (fs.existsSync(folder)) {
       try {
         const customFiles = fs.readdirSync(folder).filter((f) => f.endsWith(".md"))
@@ -180,8 +179,8 @@ export function DialogMemoryBank() {
             const stat = fs.statSync(p)
             result.push({
               name: file,
-              label: `Memória Customizada (${file})`,
-              description: `Arquivo de memória adicional em .omnicode/memory-bank/${file}`,
+              label: `Custom Memory (${file})`,
+              description: `Additional memory file in .omnicode/memory-bank/${file}`,
               exists: true,
               size: stat.size,
               path: p,
@@ -202,15 +201,15 @@ export function DialogMemoryBank() {
         setVersion((v) => v + 1)
         toast.show({
           variant: "success",
-          title: "Memória Excluída",
-          message: `Arquivo '${path.basename(filePath)}' excluído com sucesso.`,
+          title: "Memory Deleted",
+          message: `File '${path.basename(filePath)}' deleted successfully.`,
         })
       }
     } catch (err) {
       toast.show({
         variant: "error",
-        title: "Erro ao excluir",
-        message: `Não foi possível excluir o arquivo: ${err}`,
+        title: "Delete Error",
+        message: `Unable to delete file: ${err}`,
       })
     }
   }
@@ -240,14 +239,14 @@ export function DialogMemoryBank() {
       setVersion((v) => v + 1)
       toast.show({
         variant: "success",
-        title: "Memory Bank Limpo",
-        message: `${count} arquivo(s) de memória excluído(s) com sucesso.`,
+        title: "Memory Bank Cleared",
+        message: `${count} memory file(s) deleted successfully.`,
       })
     } catch (err) {
       toast.show({
         variant: "error",
-        title: "Erro ao limpar",
-        message: `Erro ao limpar memória: ${err}`,
+        title: "Clear Error",
+        message: `Error clearing memory: ${err}`,
       })
     }
   }
@@ -260,10 +259,10 @@ export function DialogMemoryBank() {
 
     list.push({
       value: "__init__",
-      title: `⚡ Inicializar Todos os Arquivos Padrão (${totalExists}/${STANDARD_FILES.length} ativos)`,
-      description: "Garante que a estrutura .omnicode/memory-bank/ e memory.md estejam criados com os modelos",
-      category: "Ações de Gestão",
-      footer: "[Inicializar]",
+      title: `⚡ Initialize All Standard Files (${totalExists}/${STANDARD_FILES.length} active)`,
+      description: "Ensures .omnicode/memory-bank/ and memory.md are scaffolded with templates",
+      category: "Management Actions",
+      footer: "[Initialize]",
       onSelect: () => {
         try {
           const folder = dir()
@@ -279,14 +278,14 @@ export function DialogMemoryBank() {
           setVersion((v) => v + 1)
           toast.show({
             variant: "info",
-            title: "🧠 Memory Bank Inicializado",
-            message: "Arquivos do banco de memória persistente foram criados.",
+            title: "🧠 Memory Bank Initialized",
+            message: "Persistent memory bank files created successfully.",
           })
         } catch {
           toast.show({
             variant: "warning",
-            title: "Erro ao inicializar",
-            message: "Não foi possível criar os arquivos do Memory Bank.",
+            title: "Init Error",
+            message: "Unable to create Memory Bank files.",
           })
         }
       },
@@ -298,23 +297,23 @@ export function DialogMemoryBank() {
       const statusLabel = f.exists
         ? f.size > 0
           ? `${(f.size / 1024).toFixed(1)} KB`
-          : "Vazio (0 KB)"
-        : "Não criado"
+          : "Empty (0 KB)"
+        : "Not created"
 
       list.push({
         value: f.path,
         title: isPendingDelete
-          ? `⚠️ EXCLUIR: ${f.label}`
+          ? `⚠️ DELETE: ${f.label}`
           : `${statusIcon} ${f.label} [${statusLabel}]`,
         description: isPendingDelete
-          ? "Pressione Enter ou Ctrl+D novamente para confirmar a exclusão deste arquivo de memória"
+          ? "Press Enter or Ctrl+D again to confirm deletion of this memory file"
           : f.description,
-        category: f.exists ? "Arquivos Ativos na Memória" : "Arquivos Disponíveis para Criação",
+        category: f.exists ? "Active Memory Files" : "Available Memory Files",
         footer: isPendingDelete
-          ? "Pressione Ctrl+D novamente para confirmar exclusão"
+          ? "Press Ctrl+D again to confirm deletion"
           : f.exists
-            ? "[Enter: Abrir · Ctrl+D: Excluir]"
-            : "[Enter: Criar]",
+            ? "[Enter: Open · Ctrl+D: Delete]"
+            : "[Enter: Create]",
         footerColor: isPendingDelete ? theme.text.feedback.warning.base : undefined,
         onSelect: () => {
           if (isPendingDelete) {
@@ -326,19 +325,19 @@ export function DialogMemoryBank() {
               const folder = path.dirname(f.path)
               if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true })
               const match = STANDARD_FILES.find((s) => s.names.includes(f.name))
-              const template = match?.template ?? `# ${f.label}\n\n*Arquivo de memória persistente.*\n`
+              const template = match?.template ?? `# ${f.label}\n\n*Persistent memory file.*\n`
               fs.writeFileSync(f.path, template, "utf8")
               setVersion((v) => v + 1)
               toast.show({
                 variant: "info",
-                title: "Arquivo Criado",
-                message: `${f.name} criado com sucesso.`,
+                title: "File Created",
+                message: `${f.name} created successfully.`,
               })
             } catch (err) {
               toast.show({
                 variant: "error",
-                title: "Erro ao criar",
-                message: `Falha ao criar arquivo: ${err}`,
+                title: "Create Error",
+                message: `Failed to create file: ${err}`,
               })
             }
           } else {
@@ -354,15 +353,15 @@ export function DialogMemoryBank() {
       list.push({
         value: "__clear_all__",
         title: isPendingClearAll
-          ? "⚠️ CONFIRMAR: Limpar Todo o Banco de Memória (.omnicode/memory-bank/)"
-          : `🗑️ Limpar Todo o Banco de Memória (${totalExists} arquivo${totalExists > 1 ? "s" : ""})`,
+          ? "⚠️ CONFIRM: Clear Entire Memory Bank (.omnicode/memory-bank/)"
+          : `🗑️ Clear Entire Memory Bank (${totalExists} file${totalExists > 1 ? "s" : ""})`,
         description: isPendingClearAll
-          ? "Atenção: Todos os arquivos de memória serão apagados permanentemente. Pressione Enter ou Ctrl+D para confirmar."
-          : "Exclui todos os arquivos de memória persistente deste workspace",
-        category: "Ações de Gestão",
+          ? "Warning: All memory files will be permanently erased. Press Enter or Ctrl+D to confirm."
+          : "Permanently deletes all persistent memory files in this workspace",
+        category: "Management Actions",
         footer: isPendingClearAll
-          ? "Pressione Enter ou Ctrl+D para confirmar"
-          : "[Limpar Tudo]",
+          ? "Press Enter or Ctrl+D to confirm"
+          : "[Clear All]",
         footerColor: isPendingClearAll ? theme.text.feedback.error.base : undefined,
         onSelect: () => {
           if (isPendingClearAll) {
@@ -379,18 +378,18 @@ export function DialogMemoryBank() {
 
   return (
     <DialogSelect
-      title="🧠 OmniCode — Banco de Memória Persistente (Memory Bank)"
-      placeholder="Pesquisar arquivos de memória..."
+      title="🧠 OmniCode — Persistent Memory Bank"
+      placeholder="Search memory files..."
       options={options()}
       onMove={() => setToDelete(undefined)}
       actions={[
         {
           command: "session.delete",
           title: (option) => {
-            if (!option?.value) return "excluir"
-            if (option.value === "__clear_all__") return "limpar tudo (Ctrl+D)"
+            if (!option?.value) return "delete"
+            if (option.value === "__clear_all__") return "clear all (Ctrl+D)"
             if (option.value === "__init__") return ""
-            return toDelete() === option.value ? "confirmar exclusão" : "excluir (Ctrl+D)"
+            return toDelete() === option.value ? "confirm delete" : "delete (Ctrl+D)"
           },
           onTrigger: (option) => {
             if (!option.value || option.value === "__init__") return
@@ -411,8 +410,8 @@ export function DialogMemoryBank() {
         },
       ]}
       footerHints={[
-        { title: "abrir / criar", label: "enter" },
-        { title: "excluir memória", label: "ctrl+d", side: "right" },
+        { title: "open / create", label: "enter" },
+        { title: "delete memory", label: "ctrl+d", side: "right" },
       ]}
     />
   )

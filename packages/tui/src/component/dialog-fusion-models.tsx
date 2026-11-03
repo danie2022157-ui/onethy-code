@@ -6,7 +6,6 @@ import { DialogHeader, DialogLayout, useDialog } from "../ui/dialog"
 import { useTheme } from "../context/theme"
 import { Keymap } from "../context/keymap"
 import { useToast } from "../ui/toast"
-import { DialogVariant } from "./dialog-variant"
 
 type ProviderColumnItem = {
   id: string
@@ -159,7 +158,7 @@ export function DialogFusionModels() {
     local.model.auto.applyRecommendedPreset()
     toast.show({
       variant: "info",
-      message: "⭐ Preset Recomendado aplicado (1 Rápido + 1 Raciocínio/Código + 1 Backup)",
+      message: "⭐ Recommended Preset applied (1 Fast + 1 Reasoning/Code + 1 Backup)",
       duration: 2800,
     })
   }
@@ -168,7 +167,7 @@ export function DialogFusionModels() {
     local.model.auto.setAllowAllModels()
     toast.show({
       variant: "info",
-      message: "✓ Todos os modelos conectados liberados no Omni Fusion",
+      message: "✓ All connected models enabled in Omni Fusion",
       duration: 2200,
     })
   }
@@ -179,113 +178,113 @@ export function DialogFusionModels() {
     commands: [
       {
         bind: "left",
-        title: "Coluna anterior",
+        title: "Previous column",
         group: "Dialog",
         run: () => moveColumn(-1),
       },
       {
         bind: "h",
-        title: "Coluna anterior",
+        title: "Previous column",
         group: "Dialog",
         run: () => moveColumn(-1),
       },
       {
         bind: "right",
-        title: "Próxima coluna",
+        title: "Next column",
         group: "Dialog",
         run: () => moveColumn(1),
       },
       {
         bind: "l",
-        title: "Próxima coluna",
+        title: "Next column",
         group: "Dialog",
         run: () => moveColumn(1),
       },
       {
         bind: "tab",
-        title: "Próxima coluna",
+        title: "Next column",
         group: "Dialog",
         run: () => moveColumn(1),
       },
       {
         bind: "up",
-        title: "Modelo anterior",
+        title: "Previous model",
         group: "Dialog",
         run: () => moveRow(-1),
       },
       {
         bind: "k",
-        title: "Modelo anterior",
+        title: "Previous model",
         group: "Dialog",
         run: () => moveRow(-1),
       },
       {
         bind: "down",
-        title: "Próximo modelo",
+        title: "Next model",
         group: "Dialog",
         run: () => moveRow(1),
       },
       {
         bind: "j",
-        title: "Próximo modelo",
+        title: "Next model",
         group: "Dialog",
         run: () => moveRow(1),
       },
       {
         bind: "return",
-        title: "Marcar/Desmarcar modelo",
+        title: "Toggle model",
         group: "Dialog",
         run: () => toggleCurrentModel(),
       },
       {
         bind: "space",
-        title: "Marcar/Desmarcar modelo",
+        title: "Toggle model",
         group: "Dialog",
         run: () => toggleCurrentModel(),
       },
       {
         bind: "p",
-        title: "Alternar todos do provedor",
+        title: "Toggle provider models",
         group: "Dialog",
         run: () => toggleCurrentProvider(),
       },
       {
         bind: "a",
-        title: "Permitir todos os modelos",
+        title: "Allow all models",
         group: "Dialog",
         run: () => triggerAllowAll(),
       },
       {
         bind: "r",
-        title: "Aplicar Preset Recomendado",
+        title: "Apply Recommended Preset",
         group: "Dialog",
         run: () => triggerPreset(),
       },
       {
         bind: "t",
-        title: "Alternar Roteamento de Thinking",
+        title: "Toggle Thinking Budget Routing",
         group: "Dialog",
         run: () => local.model.auto.toggleThinkingRouting(),
       },
       {
         bind: "backspace",
-        title: "Voltar para Variantes",
+        title: "Back to Variants",
         group: "Dialog",
-        run: () => dialog.replace(() => <DialogVariant />),
+        run: () => dialog.pop(),
       },
     ],
   }))
 
   const bucketBadge = (bucket: "efficiency" | "balanced" | "intelligence") => {
-    if (bucket === "efficiency") return { label: "⚡Ráp", color: RGBA.fromHex("#10B981") }
+    if (bucket === "efficiency") return { label: "⚡Fast", color: RGBA.fromHex("#10B981") }
     if (bucket === "intelligence") return { label: "🧠Int", color: RGBA.fromHex("#A855F7") }
     return { label: "⚖Bal", color: RGBA.fromHex("#38BDF8") }
   }
 
   const bucketFullName = (bucket: "efficiency" | "balanced" | "intelligence") => {
-    if (bucket === "efficiency") return "⚡ Eficiência (Rápido / Econômico)"
-    if (bucket === "intelligence") return "🧠 Inteligência Profunda (Código & Arquitetura)"
-    return "⚖️ Balanceado (Uso Geral)"
+    if (bucket === "efficiency") return "⚡ Efficiency (Fast / Cost-Effective)"
+    if (bucket === "intelligence") return "🧠 Deep Intelligence (Code & Architecture)"
+    return "⚖️ Balanced (General Purpose)"
   }
 
   return (
@@ -295,7 +294,7 @@ export function DialogFusionModels() {
           titleView={
             <box flexDirection="row" gap={1}>
               <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD}>
-                ⚡ Omni Fusion — Modelos Permitidos por Provedor
+                ⚡ Omni Fusion — Allowed Models by Provider
               </text>
               <text fg={theme.text.muted}>({local.model.auto.allowedModelsSummary()})</text>
             </box>
@@ -327,7 +326,7 @@ export function DialogFusionModels() {
                 attributes={local.model.auto.isAllModelsAllowed() ? TextAttributes.BOLD : undefined}
                 selectable={false}
               >
-                {local.model.auto.isAllModelsAllowed() ? "✓ Todos Ativos [A]" : "○ Usar Todos [A]"}
+                {local.model.auto.isAllModelsAllowed() ? "✓ All Active [A]" : "○ Use All [A]"}
               </text>
             </box>
 
@@ -338,7 +337,7 @@ export function DialogFusionModels() {
               onMouseUp={() => triggerPreset()}
             >
               <text fg={RGBA.fromHex("#F59E0B")} attributes={TextAttributes.BOLD} selectable={false}>
-                ⭐ Preset Recomendado (2-3 Modelos) [R]
+                ⭐ Recommended Preset (2-3 Models) [R]
               </text>
             </box>
           </box>
@@ -509,21 +508,21 @@ export function DialogFusionModels() {
 
         <box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1}>
           <text fg={theme.text.muted} wrapMode="none">
-            <span style={{ fg: RGBA.fromHex("#00F5FF") }}>←/→</span> Coluna ·{" "}
-            <span style={{ fg: RGBA.fromHex("#00F5FF") }}>↑/↓</span> Modelo ·{" "}
-            <span style={{ fg: RGBA.fromHex("#10B981") }}>Espaço/Enter</span> Marcar ·{" "}
-            <span style={{ fg: RGBA.fromHex("#38BDF8") }}>[P]</span> Provedor ·{" "}
-            <span style={{ fg: RGBA.fromHex("#F59E0B") }}>[R]</span> Recomendado ·{" "}
-            <span style={{ fg: RGBA.fromHex("#A855F7") }}>[A]</span> Todos
+            <span style={{ fg: RGBA.fromHex("#00F5FF") }}>←/→</span> Column ·{" "}
+            <span style={{ fg: RGBA.fromHex("#00F5FF") }}>↑/↓</span> Model ·{" "}
+            <span style={{ fg: RGBA.fromHex("#10B981") }}>Space/Enter</span> Toggle ·{" "}
+            <span style={{ fg: RGBA.fromHex("#38BDF8") }}>[P]</span> Provider ·{" "}
+            <span style={{ fg: RGBA.fromHex("#F59E0B") }}>[R]</span> Preset ·{" "}
+            <span style={{ fg: RGBA.fromHex("#A855F7") }}>[A]</span> All
           </text>
           <box
             paddingLeft={1}
             paddingRight={1}
             backgroundColor={RGBA.fromInts(255, 255, 255, 18)}
-            onMouseUp={() => dialog.replace(() => <DialogVariant />)}
+            onMouseUp={() => dialog.pop()}
           >
             <text fg={RGBA.fromHex("#38BDF8")} selectable={false}>
-              ← Voltar [Backspace]
+              ← Back [Backspace]
             </text>
           </box>
         </box>

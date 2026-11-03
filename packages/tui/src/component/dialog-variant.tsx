@@ -17,74 +17,74 @@ export function DialogVariant() {
       const summary = local.model.auto.allowedModelsSummary()
       return [
         {
-          value: "modo auto",
-          title: "Modo Auto",
-          category: "Níveis de Otimização",
-          description: `Automático por complexidade da tarefa · ${pool.balanced.label}`,
+          value: "auto mode",
+          title: "Auto Mode",
+          category: "Optimization Tiers",
+          description: `Autonomous selection by task complexity · ${pool.balanced.label}`,
           onSelect: () => {
             local.model.auto.setTier("default")
             dialog.clear()
           },
         },
         {
-          value: "eficiência",
-          title: "Eficiência",
-          category: "Níveis de Otimização",
-          description: `Menor consumo de crédito e latência · ${pool.efficiency.label}`,
+          value: "efficiency",
+          title: "Efficiency",
+          category: "Optimization Tiers",
+          description: `Lowest credit consumption and fastest latency · ${pool.efficiency.label}`,
           onSelect: () => {
             local.model.auto.setTier("efficiency")
             dialog.clear()
           },
         },
         {
-          value: "balanceado",
-          title: "Balanceado",
-          category: "Níveis de Otimização",
-          description: `Equilíbrio entre capacidade e crédito · ${pool.balanced.label}`,
+          value: "balanced",
+          title: "Balanced",
+          category: "Optimization Tiers",
+          description: `Optimal balance between capability and cost · ${pool.balanced.label}`,
           onSelect: () => {
             local.model.auto.setTier("balanced")
             dialog.clear()
           },
         },
         {
-          value: "inteligente",
-          title: "Inteligente",
-          category: "Níveis de Otimização",
-          description: `Modelos mais capazes p/ tarefas complexas · ${pool.intelligence.label}`,
+          value: "intelligence",
+          title: "Intelligence",
+          category: "Optimization Tiers",
+          description: `Most capable flagship models for complex tasks · ${pool.intelligence.label}`,
           onSelect: () => {
             local.model.auto.setTier("intelligence")
             dialog.clear()
           },
         },
         {
-          value: "modelos permitidos",
-          title: "🎯 Modelos Permitidos por Provedor...",
-          category: "Ajustes do Omni Fusion",
-          description: `${summary} · Organizados em colunas (OpenAI, Google, OpenCode)`,
+          value: "allowed models",
+          title: "🎯 Allowed Models by Provider...",
+          category: "Omni Fusion Settings",
+          description: `${summary} · Organized in provider columns (OpenAI, Google, OpenCode)`,
           onSelect: () => {
-            dialog.replace(() => <DialogFusionModels />)
+            dialog.push(() => <DialogFusionModels />)
           },
         },
         {
           value: "thinking routing",
           title: local.model.auto.thinkingRouting()
-            ? "✓ 🧠 Roteamento de Thinking: [ATIVADO]"
-            : "○ 🧠 Roteamento de Thinking: [DESATIVADO]",
-          category: "Ajustes do Omni Fusion",
+            ? "✓ 🧠 Thinking Budget Routing: [ENABLED]"
+            : "○ 🧠 Thinking Budget Routing: [DISABLED]",
+          category: "Omni Fusion Settings",
           description: local.model.auto.thinkingRouting()
-            ? "Ativo: ajusta raciocínio dinamicamente (low em buscas, max em arquitetura)"
-            : "Inativo: mantém variante fixa do modelo. Clique para ativar",
+            ? "Active: dynamically allocates reasoning effort (low on lookups, max on architecture)"
+            : "Inactive: keeps fixed model reasoning budget. Click to enable",
           onSelect: () => {
             local.model.auto.toggleThinkingRouting()
           },
         },
         {
           value: "auto customizations",
-          title: `⚙️ Auto-Uso de Recursos: [${local.customizations.summary()}]`,
-          category: "Ajustes do Omni Fusion",
-          description: "Configurar quais skills, agentes, MCPs, hooks e mods a IA usa automaticamente",
+          title: `⚙️ Capabilities Auto-Usage: [${local.customizations.summary()}]`,
+          category: "Omni Fusion Settings",
+          description: "Configure which skills, agents, MCPs, hooks and mods the AI uses autonomously",
           onSelect: () => {
-            dialog.replace(() => <DialogAutoCustomizations />)
+            dialog.push(() => <DialogAutoCustomizations />)
           },
         },
       ]
@@ -93,8 +93,8 @@ export function DialogVariant() {
     return [
       {
         value: "default",
-        title: "Padrão (Default)",
-        category: "Variantes do Modelo",
+        title: "Default",
+        category: "Model Variants",
         onSelect: () => {
           dialog.clear()
           local.model.variant.set(undefined)
@@ -106,7 +106,7 @@ export function DialogVariant() {
         .map((variant) => ({
           value: variant,
           title: variant,
-          category: "Variantes do Modelo",
+          category: "Model Variants",
           onSelect: () => {
             dialog.clear()
             local.model.variant.set(variant)
@@ -118,9 +118,9 @@ export function DialogVariant() {
   return (
     <DialogSelect<string>
       options={options()}
-      title={local.model.auto.enabled() ? "Selecionar variante — ⚡ Omni Fusion" : "Selecionar variante"}
+      title={local.model.auto.enabled() ? "Select Model Variant — ⚡ Omni Fusion" : "Select Model Variant"}
       renderFilter={!newDesigns()}
-      current={local.model.variant.current() ?? (local.model.auto.enabled() ? "modo auto" : "default")}
+      current={local.model.variant.current() ?? (local.model.auto.enabled() ? "auto mode" : "default")}
       flat={false}
     />
   )

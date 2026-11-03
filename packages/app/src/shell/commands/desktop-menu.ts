@@ -22,6 +22,7 @@ export type DesktopMenuAction =
   | "window.close"
   | "window.minimize"
   | "window.toggleMaximize"
+  | "window.next"
 
 export type DesktopMenuRole =
   | "about"
@@ -262,6 +263,14 @@ export const DESKTOP_MENU: DesktopMenu[] = [
     labelKey: "desktop.menu.window",
     role: "windowMenu",
     items: [
+      {
+        type: "item",
+        labelKey: "desktop.menu.nextWindow",
+        action: "window.next",
+        accelerator: { macos: "Cmd+Shift+`", windows: "Ctrl+Shift+`" },
+        platforms: ["windows"],
+      },
+      { type: "separator", platforms: ["windows"] },
       { type: "item", labelKey: "desktop.menu.minimize", action: "window.minimize" },
       { type: "item", labelKey: "desktop.menu.maximize", action: "window.toggleMaximize" },
       { type: "separator" },

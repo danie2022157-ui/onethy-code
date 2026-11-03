@@ -362,6 +362,7 @@ function HomeSessionSearch(
             value={props.searchValue}
             placeholder={props.searchPlaceholder}
             aria-label={props.searchPlaceholder}
+            role="combobox"
             aria-expanded={props.searchOpen}
             aria-controls={HOME_SESSION_SEARCH_RESULTS_ID}
             aria-autocomplete="list"
@@ -410,7 +411,7 @@ function HomeSessionSearch(
               size="small"
               class="relative z-20 shrink-0"
               icon={<Icon name="close" size="large" class="text-v2-icon-icon-muted" />}
-              aria-label={props.searchPlaceholder}
+              aria-label={props.language.t("common.clear")}
               onClick={() => {
                 props.onSearchClose()
                 props.onSearchFocus()

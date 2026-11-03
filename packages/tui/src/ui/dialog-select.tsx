@@ -259,7 +259,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   })
 
   const dimensions = useTerminalDimensions()
-  const limit = createMemo(() => Math.floor(dimensions().height / 2) - 6)
+  const limit = createMemo(() => Math.max(1, Math.floor(dimensions().height / 2) - 6))
   // Under new designs an overflowing list gives its last row to a "…" indicator.
   const overflows = createMemo(() => newDesigns() && rows() > limit())
   // Computed once here so per-row details do not each call useTerminalDimensions(),
@@ -402,13 +402,17 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     }),
   )
 
+  let lastKeyboardMove = 0
+
   function move(direction: number) {
+    lastKeyboardMove = Date.now()
     if (props.locked) return
     if (flat().length === 0) return
     moveTo(moveSelection(store.selected, { count: flat().length, delta: direction, policy: "wrap" }), true)
   }
 
   function moveSection(direction: 1 | -1) {
+    lastKeyboardMove = Date.now()
     if (props.locked) return
     const sections = grouped().filter(([_, options]) => options.length > 0)
     if (sections.length === 0) return
@@ -782,19 +786,33 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                         <box
                           flexDirection="column"
                           position="relative"
+                          focusable
                           onMouseMove={() => {
                             if (props.locked) return
+
+
+                            if (Date.now() - lastKeyboardMove < 350) return
                             const index = flat().findIndex((x) => isDeepEqual(x.value, option.value))
                             if (index === -1 || index === store.selected) return
                             moveTo(index)
                           }}
                           onMouseUp={() => {
                             if (props.locked) return
+
+                            option.onSelect?.(dialog)
+                            props.onSelect?.(option)
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.name !== "return" && event.name !== "space") return
+                            event.preventDefault()
+                            if (props.locked) return
                             option.onSelect?.(dialog)
                             props.onSelect?.(option)
                           }}
                           onMouseDown={() => {
                             if (props.locked) return
+
+
                             const index = flat().findIndex((x) => isDeepEqual(x.value, option.value))
                             if (index === -1) return
                             moveTo(index)

@@ -68,7 +68,7 @@ export function DialogOmniUpdate() {
   const repoUrl = "https://github.com/danie2022157-ui/onethy-code"
 
   const [step, setStep] = createSignal<UpdateStep>("checking")
-  const [statusMessage, setStatusMessage] = createSignal("Verificando atualizações no GitHub...")
+  const [statusMessage, setStatusMessage] = createSignal("Checking for updates on GitHub...")
   const [localSha, setLocalSha] = createSignal("")
   const [remoteSha, setRemoteSha] = createSignal("")
   const [branch, setBranch] = createBranchSignal()
@@ -84,7 +84,7 @@ export function DialogOmniUpdate() {
 
   const checkUpdates = async () => {
     setStep("checking")
-    setStatusMessage("Conectando ao repositório oficial...")
+    setStatusMessage("Connecting to official repository...")
     const root = findOnethyRoot()
 
     try {
@@ -98,7 +98,7 @@ export function DialogOmniUpdate() {
       setLocalSha(currentSha)
 
       // 2. Fetch origin
-      setStatusMessage(`Buscando novidades em origin/${curBranch}...`)
+      setStatusMessage(`Fetching latest from origin/${curBranch}...`)
       await runGit(`git fetch origin ${curBranch}`, root)
 
       // 3. Check pending commits
@@ -112,11 +112,11 @@ export function DialogOmniUpdate() {
         setStep("available")
       } else {
         const lastMsgRes = await runGit("git log -1 --pretty=%s", root)
-        setLastCommitMsg(lastMsgRes.stdout || "Versão mais recente")
+        setLastCommitMsg(lastMsgRes.stdout || "Latest version")
         setStep("up-to-date")
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || "Não foi possível verificar o repositório.")
+      setErrorMessage(err?.message || "Could not verify repository.")
       setStep("error")
     }
   }
@@ -127,34 +127,34 @@ export function DialogOmniUpdate() {
     const curBranch = branch()
 
     try {
-      setStatusMessage("Verificando estado dos arquivos locais...")
+      setStatusMessage("Checking status of local files...")
       const statusRes = await runGit("git status --porcelain", root)
       const isDirty = statusRes.stdout.length > 0
       let stashed = false
 
       if (isDirty) {
-        setStatusMessage("Guardando alterações locais (stash seguro)...")
+        setStatusMessage("Stashing local changes (safe stash)...")
         const stashRes = await runGit('git stash save "onethy-auto-update"', root)
         stashed = stashRes.code === 0 && !stashRes.stdout.includes("No local changes")
       }
 
-      setStatusMessage(`Baixando novidades (git pull origin ${curBranch})...`)
+      setStatusMessage(`Downloading updates (git pull origin ${curBranch})...`)
       const pullRes = await runGit(`git pull origin ${curBranch}`, root)
 
       if (pullRes.code !== 0 && !force) {
         if (stashed) await runGit("git stash pop", root)
-        throw new Error(pullRes.stderr || pullRes.stdout || "Falha no git pull.")
+        throw new Error(pullRes.stderr || pullRes.stdout || "Git pull failed.")
       }
 
       if (stashed) {
-        setStatusMessage("Restaurando arquivos locais...")
+        setStatusMessage("Restoring local files...")
         await runGit("git stash pop", root)
       }
 
       // Check if Bun is available to sync dependencies
       const bun = findBunBin()
       if (bun) {
-        setStatusMessage("Sincronizando dependências do OnethyCode...")
+        setStatusMessage("Syncing OnethyCode dependencies...")
         await runGit(`"${bun}" install`, root, 60000)
       }
 
@@ -162,17 +162,17 @@ export function DialogOmniUpdate() {
       setRemoteSha(newShaRes.stdout || localSha())
 
       const lastMsgRes = await runGit("git log -1 --pretty=%s", root)
-      setLastCommitMsg(lastMsgRes.stdout || "Atualização concluída")
+      setLastCommitMsg(lastMsgRes.stdout || "Update completed")
 
       setStep("success")
       toast.show({
         variant: "success",
-        title: "⚡ OnethyCode Atualizado!",
-        message: `Versão ${newShaRes.stdout}: ${lastMsgRes.stdout.slice(0, 50)}`,
+        title: "⚡ OnethyCode Updated!",
+        message: `Version ${newShaRes.stdout}: ${lastMsgRes.stdout.slice(0, 50)}`,
         duration: 5000,
       })
     } catch (err: any) {
-      setErrorMessage(err?.message || "Falha durante o download da atualização.")
+      setErrorMessage(err?.message || "Failed to download update.")
       setStep("error")
     }
   }
@@ -183,7 +183,7 @@ export function DialogOmniUpdate() {
 
   const restartApp = async () => {
     if (client.restart) {
-      toast.show({ variant: "info", message: "Reiniciando serviço OnethyCode...", duration: 25000 })
+      toast.show({ variant: "info", message: "Restarting OnethyCode service...", duration: 25000 })
       dialog.clear()
       await client.restart().catch(toast.error)
     } else {
@@ -198,8 +198,8 @@ export function DialogOmniUpdate() {
     toast.show({
       variant: "success",
       message: decision
-        ? `🩺 Sessão & Cache reparados! Modelo ativo: ${decision.modelName} (${decision.providerID})`
-        : "🩺 Cache de rate-limit (429) e estado da sessão reparados!",
+        ? `🩺 Session & cache repaired! Active model: ${decision.modelName} (${decision.providerID})`
+        : "🩺 Rate-limit cache (429) and session state repaired!",
       duration: 3800,
     })
   }
@@ -209,7 +209,7 @@ export function DialogOmniUpdate() {
     commands: [
       {
         bind: "return",
-        title: "Confirmar Ação",
+        title: "Confirm Action",
         group: "Dialog",
         run: () => {
           const s = step()
@@ -221,13 +221,13 @@ export function DialogOmniUpdate() {
       },
       {
         bind: "d",
-        title: "Reparar Sessão e Cache",
+        title: "Repair Session and Cache",
         group: "Dialog",
         run: () => repairSessionAndCache(),
       },
       {
         bind: "escape",
-        title: "Fechar",
+        title: "Close",
         group: "Dialog",
         run: () => dialog.clear(),
       },
@@ -240,10 +240,10 @@ export function DialogOmniUpdate() {
         <DialogHeader
           title={
             <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD}>
-              ⚡ Atualizador OnethyCode
+              ⚡ OnethyCode Updater
             </text>
           }
-          description="Sincronização com o repositório oficial no GitHub"
+          description="Sync with official GitHub repository"
           onClose={() => dialog.clear()}
         />
       }
@@ -258,12 +258,12 @@ export function DialogOmniUpdate() {
                 onMouseUp={() => void applyUpdate(false)}
               >
                 <text fg={RGBA.fromHex("#0A0F1D")} attributes={TextAttributes.BOLD} selectable={false}>
-                  ⚡ Atualizar Agora [Enter]
+                  ⚡ Update Now [Enter]
                 </text>
               </box>
               <box paddingLeft={1} paddingRight={1} onMouseUp={() => dialog.clear()}>
                 <text fg={theme.text.muted} selectable={false}>
-                  Pular [Esc]
+                  Skip [Esc]
                 </text>
               </box>
             </Match>
@@ -275,7 +275,7 @@ export function DialogOmniUpdate() {
                 onMouseUp={() => repairSessionAndCache()}
               >
                 <text fg={RGBA.fromHex("#38BDF8")} attributes={TextAttributes.BOLD} selectable={false}>
-                  🩺 Reparar Sessão & Cache [D]
+                  🩺 Repair Session & Cache [D]
                 </text>
               </box>
               <box
@@ -285,12 +285,12 @@ export function DialogOmniUpdate() {
                 onMouseUp={() => void applyUpdate(true)}
               >
                 <text fg={RGBA.fromHex("#FFFFFF")} attributes={TextAttributes.BOLD} selectable={false}>
-                  🔄 Forçar Sincronização [Enter]
+                  🔄 Force Sync [Enter]
                 </text>
               </box>
               <box paddingLeft={1} paddingRight={1} onMouseUp={() => dialog.clear()}>
                 <text fg={theme.text.muted} selectable={false}>
-                  Fechar [Esc]
+                  Close [Esc]
                 </text>
               </box>
             </Match>
@@ -302,12 +302,12 @@ export function DialogOmniUpdate() {
                 onMouseUp={() => void restartApp()}
               >
                 <text fg={RGBA.fromHex("#FFFFFF")} attributes={TextAttributes.BOLD} selectable={false}>
-                  🚀 Reiniciar OnethyCode [Enter]
+                  🚀 Restart OnethyCode [Enter]
                 </text>
               </box>
               <box paddingLeft={1} paddingRight={1} onMouseUp={() => dialog.clear()}>
                 <text fg={theme.text.muted} selectable={false}>
-                  Depois [Esc]
+                  Later [Esc]
                 </text>
               </box>
             </Match>
@@ -319,12 +319,12 @@ export function DialogOmniUpdate() {
                 onMouseUp={() => void checkUpdates()}
               >
                 <text fg={RGBA.fromHex("#FFFFFF")} attributes={TextAttributes.BOLD} selectable={false}>
-                  Tentar Novamente [Enter]
+                  Try Again [Enter]
                 </text>
               </box>
               <box paddingLeft={1} paddingRight={1} onMouseUp={() => dialog.clear()}>
                 <text fg={theme.text.muted} selectable={false}>
-                  Fechar [Esc]
+                  Close [Esc]
                 </text>
               </box>
             </Match>
@@ -337,7 +337,7 @@ export function DialogOmniUpdate() {
           <box flexDirection="column" gap={1} paddingBottom={1}>
             <Spinner shimmer={theme.text.base}>{statusMessage()}</Spinner>
             <text fg={theme.text.muted}>
-              Repositório: danie2022157-ui/onethy-code · Branch: {branch()}
+              Repository: danie2022157-ui/onethy-code · Branch: {branch()}
             </text>
           </box>
         </Match>
@@ -346,14 +346,14 @@ export function DialogOmniUpdate() {
           <box flexDirection="column" gap={1} paddingBottom={1}>
             <box flexDirection="row" gap={1}>
               <text fg={RGBA.fromHex("#10B981")} attributes={TextAttributes.BOLD}>
-                ✦ Nova atualização disponível!
+                ✦ New update available!
               </text>
               <text fg={theme.text.muted}>
                 ({localSha()} → {remoteSha()})
               </text>
             </box>
             <text fg={theme.text.base}>
-              Novos commits disponíveis em <b>origin/{branch()}</b>:
+              New commits available in <b>origin/{branch()}</b>:
             </text>
             <box
               flexDirection="column"
@@ -370,7 +370,7 @@ export function DialogOmniUpdate() {
               </For>
             </box>
             <text fg={theme.text.muted}>
-              Pressione <b>Enter</b> para aplicar as atualizações automaticamente via git pull.
+              Press <b>Enter</b> to apply updates automatically via git pull.
             </text>
           </box>
         </Match>
@@ -379,21 +379,21 @@ export function DialogOmniUpdate() {
           <box flexDirection="column" gap={1} paddingBottom={1}>
             <box flexDirection="row" gap={1}>
               <text fg={RGBA.fromHex("#10B981")} attributes={TextAttributes.BOLD}>
-                ✓ O OnethyCode já está na versão mais recente!
+                ✓ OnethyCode is up to date!
               </text>
             </box>
             <text fg={theme.text.muted}>
-              Commit ativo: <text fg={RGBA.fromHex("#00F5FF")}>{localSha()}</text> — {lastCommitMsg()}
+              Active commit: <text fg={RGBA.fromHex("#00F5FF")}>{localSha()}</text> — {lastCommitMsg()}
             </text>
             <text fg={theme.text.muted}>
-              Branch: {branch()} · Sincronizado com origin/main.
+              Branch: {branch()} · Synced with origin/main.
             </text>
             <box
               paddingTop={1}
               onMouseUp={() => void openUrl(repoUrl).catch(() => undefined)}
             >
               <text fg={RGBA.fromHex("#38BDF8")}>
-                🌐 Abrir repositório no GitHub: {repoUrl}
+                🌐 Open repository on GitHub: {repoUrl}
               </text>
             </box>
           </box>
@@ -403,7 +403,7 @@ export function DialogOmniUpdate() {
           <box flexDirection="column" gap={1} paddingBottom={1}>
             <Spinner shimmer={RGBA.fromHex("#00F5FF")}>{statusMessage()}</Spinner>
             <text fg={theme.text.muted}>
-              Aguarde enquanto os arquivos são atualizados com segurança...
+              Please wait while files are safely updated...
             </text>
           </box>
         </Match>
@@ -411,16 +411,16 @@ export function DialogOmniUpdate() {
         <Match when={step() === "success"}>
           <box flexDirection="column" gap={1} paddingBottom={1}>
             <text fg={RGBA.fromHex("#10B981")} attributes={TextAttributes.BOLD}>
-              ✓ Atualização aplicada com sucesso!
+              ✓ Update applied successfully!
             </text>
             <text fg={theme.text.base}>
-              Novo commit ativo: <text fg={RGBA.fromHex("#00F5FF")}>{remoteSha() || localSha()}</text>
+              New active commit: <text fg={RGBA.fromHex("#00F5FF")}>{remoteSha() || localSha()}</text>
             </text>
             <text fg={theme.text.muted}>
               {lastCommitMsg()}
             </text>
             <text fg={RGBA.fromHex("#F59E0B")} attributes={TextAttributes.BOLD}>
-              ⚡ Reinicie o OnethyCode para ativar todas as novas funcionalidades no terminal.
+              ⚡ Restart OnethyCode to activate all new features in the terminal.
             </text>
           </box>
         </Match>
@@ -428,13 +428,13 @@ export function DialogOmniUpdate() {
         <Match when={step() === "error"}>
           <box flexDirection="column" gap={1} paddingBottom={1}>
             <text fg={RGBA.fromHex("#F43F5E")} attributes={TextAttributes.BOLD}>
-              ✕ Falha ao sincronizar atualizações
+              ✕ Failed to sync updates
             </text>
             <text fg={theme.text.feedback.error.base} wrapMode="word">
               {errorMessage()}
             </text>
             <text fg={theme.text.muted}>
-              Verifique sua conexão de internet ou execute 'git pull' manualmente no terminal.
+              Check your internet connection or run 'git pull' manually in terminal.
             </text>
           </box>
         </Match>

@@ -22,10 +22,11 @@ type SubstituteInput = ParseSource & {
   env?: Record<string, string>
 }
 
-/** Apply {env:VAR} and {file:path} substitutions to config text. */
+/** Apply {env:VAR}, ${env:VAR}, and {file:path} substitutions to config text. */
 export const substitute = Effect.fn("ConfigVariable.substitute")(function* (input: SubstituteInput) {
   const env = (escape: boolean) =>
-    input.text.replace(/\{env:([^}]+)\}/g, (_, name: string) => {
+    input.text.replace(/\$\{env:([^}]+)\}|\{env:([^}]+)\}/g, (_, dollarName: string, plainName: string) => {
+      const name = dollarName ?? plainName
       const value = (input.env?.[name] ?? process.env[name]) || ""
       return escape ? JSON.stringify(value).slice(1, -1) : value
     })

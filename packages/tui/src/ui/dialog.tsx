@@ -78,7 +78,8 @@ export function Dialog(
             e.stopPropagation()
           }}
           width={dialogWidth(props.size ?? "medium")}
-          maxWidth={dimensions().width - 2}
+           maxWidth={Math.max(1, dimensions().width - 2)}
+           maxHeight={Math.max(1, dimensions().height - 2)}
           backgroundColor={theme.background.base}
           paddingTop={1}
         >
@@ -114,9 +115,9 @@ export function DialogHeader(
       <text
         fg={theme.text.muted}
         flexShrink={0}
-        onMouseUp={() => (props.onClose ?? dialog.clear)()}
+        onMouseUp={() => (props.onClose ?? (dialog.stack.length > 1 ? dialog.pop : dialog.clear))()}
       >
-        {props.closeLabel ?? "esc"}
+        {props.closeLabel ?? (dialog.stack.length > 1 ? "← back (esc)" : "esc")}
       </text>
     </box>
   )
@@ -416,6 +417,30 @@ function init() {
           },
         ])
       })
+    },
+    push(input: () => JSX.Element, onClose?: () => void, options?: { key?: unknown; size?: DialogSize }) {
+      if (store.stack.length === 0) {
+        focus = renderer.currentFocusedRenderable
+        focus?.blur()
+      }
+      batch(() => {
+        if (options?.size) setStore("size", options.size)
+        setStore("stack", [
+          ...store.stack,
+          {
+            element: input,
+            onClose,
+            key: options?.key,
+          },
+        ])
+      })
+    },
+    pop() {
+      if (store.stack.length === 0) return
+      const current = store.stack.at(-1)
+      current?.onClose?.()
+      setStore("stack", store.stack.slice(0, -1))
+      refocus()
     },
     get stack() {
       return store.stack

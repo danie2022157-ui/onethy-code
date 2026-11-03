@@ -312,15 +312,15 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
       function tierLabelText(tier: "default" | "efficiency" | "balanced" | "intelligence"): string {
         const base =
-          tier === "efficiency" ? "Eficiência" : tier === "intelligence" ? "Inteligente" : tier === "balanced" ? "Balanceado" : "Modo Auto"
+          tier === "efficiency" ? "Efficiency" : tier === "intelligence" ? "Intelligence" : tier === "balanced" ? "Balanced" : "Auto Mode"
         return autoStore.thinkingRouting ? `${base} · 🧠 Thinking` : base
       }
 
       function autoVariantValue(tier: "default" | "efficiency" | "balanced" | "intelligence"): string {
-        if (tier === "efficiency") return "eficiência"
-        if (tier === "balanced") return "balanceado"
-        if (tier === "intelligence") return "inteligente"
-        return "modo auto"
+        if (tier === "efficiency") return "efficiency"
+        if (tier === "balanced") return "balanced"
+        if (tier === "intelligence") return "intelligence"
+        return "auto mode"
       }
       const pendingSelectionCommits = new Map<string, { agentID: string; selection: string }>()
       const selectionKey = (value: ModelSelection) =>
@@ -640,8 +640,16 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         set(model: { providerID: string; modelID: string }, options?: { recent?: boolean; fromAuto?: boolean }) {
           batch(() => {
             if (!isModelValid(model)) return
+            const key = `${model.providerID}/${model.modelID}`
+            if (autoStore.cooldowns[key]) {
+              const updated = { ...autoStore.cooldowns }
+              delete updated[key]
+              setAutoStore("cooldowns", updated)
+            }
             if (!options?.fromAuto && autoStore.enabled) {
               setAutoStore("enabled", false)
+              saveAutoStore()
+            } else if (autoStore.cooldowns[key]) {
               saveAutoStore()
             }
             if (!selectModel(model)) return
@@ -701,6 +709,16 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           markCooldown(providerID: string, modelID: string, durationMs = 5 * 60_000) {
             batch(() => {
               setAutoStore("cooldowns", `${providerID}/${modelID}`, Date.now() + durationMs)
+              saveAutoStore()
+            })
+          },
+          clearCooldown(providerID: string, modelID: string) {
+            const key = `${providerID}/${modelID}`
+            if (!autoStore.cooldowns[key]) return
+            batch(() => {
+              const updated = { ...autoStore.cooldowns }
+              delete updated[key]
+              setAutoStore("cooldowns", updated)
               saveAutoStore()
             })
           },
@@ -810,10 +828,10 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           allowedModelsSummary(): string {
             const raw = this.rawConnectedModels()
             if (this.isAllModelsAllowed()) {
-              return `Todos os modelos (${raw.length})`
+              return `All models (${raw.length})`
             }
             const count = autoStore.selectedModels?.length ?? 0
-            return `${count} de ${raw.length} selecionados`
+            return `${count} of ${raw.length} selected`
           },
           classify(id: string, name: string): "efficiency" | "balanced" | "intelligence" {
             return classifyModelBucket(id, name)
@@ -867,7 +885,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           tierPool() {
             const provMap = new Map((providers() ?? []).map((p) => [p.id, p.name]))
             const formatModel = (m: ReturnType<typeof this.pickForBucket>) =>
-              m ? `${m.name} (${provMap.get(m.providerID) ?? m.providerID})` : "Nenhum modelo conectado"
+              m ? `${m.name} (${provMap.get(m.providerID) ?? m.providerID})` : "No models connected"
             const eff = this.pickForBucket("efficiency")
             const bal = this.pickForBucket("balanced")
             const int = this.pickForBucket("intelligence")
@@ -955,8 +973,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               toast.show({
                 variant: enabled ? "success" : "info",
                 message: enabled
-                  ? "🧠 Roteamento Inteligente de Thinking ATIVADO (low em buscas, max em arquitetura)"
-                  : "Roteamento de Thinking DESATIVADO",
+                  ? "🧠 Intelligent Thinking Routing ENABLED (low for search, max for architecture)"
+                  : "Thinking Routing DISABLED",
                 duration: 3500,
               })
             })
@@ -987,7 +1005,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           },
           list() {
             if (autoStore.enabled) {
-              return ["modo auto", "eficiência", "balanceado", "inteligente"]
+              return ["auto mode", "efficiency", "balanced", "intelligence"]
             }
             const m = currentSelection()
             if (!m) return []

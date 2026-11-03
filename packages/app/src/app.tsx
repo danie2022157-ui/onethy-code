@@ -67,10 +67,10 @@ export function AppBaseProviders(
         <LanguageProvider locale={props.locale} onNativeTranslations={props.onNativeTranslations}>
           <UiI18nBridge>
             <ErrorBoundary
-              fallback={(error) => {
+              fallback={(error, reset) => {
                 void import("@sentry/solid").then(({ captureException }) => captureException(error))
 
-                return <ErrorPage error={error} />
+                return <ErrorPage error={error} onRetry={reset} />
               }}
             >
               <QueryProvider>

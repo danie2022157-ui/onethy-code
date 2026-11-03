@@ -15,13 +15,78 @@ export interface ChangedFile {
   readonly status: "added" | "modified" | "deleted" | string
 }
 
+type DismissListener = (sessionID?: string) => void
+const dismissListeners = new Set<DismissListener>()
+
 // Global dismiss trigger for the review bar
 export const ReviewBarSignals = {
   dismiss: (sessionID?: string) => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("omnicode:review:dismiss", { detail: { sessionID } }))
+    for (const listener of dismissListeners) {
+      try {
+        listener(sessionID)
+      } catch {}
     }
   },
+  onDismiss: (listener: DismissListener) => {
+    dismissListeners.add(listener)
+    return () => dismissListeners.delete(listener)
+  },
+}
+
+function parseGitNumstat(output: string): ChangedFile[] {
+  const result: ChangedFile[] = []
+  const lines = output.split(/\r?\n/)
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    const parts = trimmed.split(/\t+/)
+    if (parts.length >= 3) {
+      const adds = parseInt(parts[0], 10) || 0
+      const dels = parseInt(parts[1], 10) || 0
+      const file = parts.slice(2).join("\t").trim()
+      if (file) {
+        result.push({
+          file,
+          additions: adds,
+          deletions: dels,
+          status: "modified",
+        })
+      }
+    }
+  }
+  return result
+}
+
+function runGitDiff(cwd: string): Promise<ChangedFile[]> {
+  return new Promise((resolve) => {
+    execFile("git", ["diff", "--numstat"], { cwd }, (err, stdout) => {
+      if (err) {
+        resolve([])
+        return
+      }
+      const files = parseGitNumstat(stdout)
+      execFile("git", ["status", "--porcelain"], { cwd }, (statusErr, statusStdout) => {
+        if (!statusErr && statusStdout) {
+          const statusLines = statusStdout.split(/\r?\n/)
+          for (const sLine of statusLines) {
+            const sTrimmed = sLine.trim()
+            if (sTrimmed.startsWith("??")) {
+              const untrackedFile = sTrimmed.slice(2).trim()
+              if (untrackedFile && !files.some((f) => f.file === untrackedFile)) {
+                files.push({
+                  file: untrackedFile,
+                  additions: 1,
+                  deletions: 0,
+                  status: "added",
+                })
+              }
+            }
+          }
+        }
+        resolve(files)
+      })
+    })
+  })
 }
 
 export function PromptReviewBar(props: { sessionID?: string }) {
@@ -51,16 +116,16 @@ export function PromptReviewBar(props: { sessionID?: string }) {
     }
 
     const currentRequestId = ++diffRequestId
-    const isRunning = status() === "running"
 
     try {
       let resolved: ChangedFile[] = []
 
       // 1. Try session.diff first
       try {
-        const sessionDiff = await client.api.session.diff({ sessionID: sid })
+        const sessionDiffRes: any = await client.api.session.diff({ sessionID: sid })
+        const sessionDiff = Array.isArray(sessionDiffRes) ? sessionDiffRes : (sessionDiffRes?.data ?? [])
         if (Array.isArray(sessionDiff) && sessionDiff.length > 0) {
-          resolved = sessionDiff.map((item) => ({
+          resolved = sessionDiff.map((item: any) => ({
             file: item.file ?? "",
             additions: typeof item.additions === "number" ? item.additions : 0,
             deletions: typeof item.deletions === "number" ? item.deletions : 0,
@@ -71,8 +136,8 @@ export function PromptReviewBar(props: { sessionID?: string }) {
         // session.diff may not have snapshot records
       }
 
-      // 2. Fallback to vcs.diff("working") if idle or step completed (avoid hammering during streaming)
-      if (resolved.length === 0 && (!isRunning || resolved.length > 0)) {
+      // 2. Fallback to vcs.diff("working")
+      if (resolved.length === 0) {
         try {
           const vcsRes: any = await client.api.vcs.diff({ mode: "working" })
           const vcsList = Array.isArray(vcsRes) ? vcsRes : (vcsRes?.data ?? [])
@@ -89,6 +154,19 @@ export function PromptReviewBar(props: { sessionID?: string }) {
         }
       }
 
+      // 3. Fallback to direct git diff in workspace
+      if (resolved.length === 0) {
+        try {
+          const cwd = location.ref?.directory || process.cwd()
+          const gitFiles = await runGitDiff(cwd)
+          if (gitFiles.length > 0) {
+            resolved = gitFiles
+          }
+        } catch {
+          // git command fallback failed
+        }
+      }
+
       // Guard against out-of-order resolution
       if (currentRequestId === diffRequestId) {
         resolved = resolved.filter((f) => f.file && f.file.trim().length > 0)
@@ -101,7 +179,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
     }
   }
 
-  const scheduleLoadDiff = (delay = 400) => {
+  const scheduleLoadDiff = (delay = 300) => {
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       void executeLoadDiff()
@@ -114,7 +192,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
     const s = status()
     void messages().length
     if (sid) {
-      scheduleLoadDiff(s === "running" ? 600 : 200)
+      scheduleLoadDiff(s === "running" ? 500 : 150)
     } else {
       setFiles([])
     }
@@ -129,7 +207,6 @@ export function PromptReviewBar(props: { sessionID?: string }) {
         const raw = evt?.details?.type ?? evt?.type ?? evt?.name
         if (typeof raw !== "string" || !raw) return
 
-        // Filter out high-frequency streaming deltas
         if (
           raw.includes(".delta") ||
           raw.includes(".chunk") ||
@@ -148,55 +225,30 @@ export function PromptReviewBar(props: { sessionID?: string }) {
           raw === "session.step.failed" ||
           raw === "session.updated"
         ) {
-          scheduleLoadDiff(raw.startsWith("vcs.") ? 150 : 400)
+          scheduleLoadDiff(raw.startsWith("vcs.") ? 150 : 350)
         }
       } catch {
         // never throw in event listener
       }
     })
 
-    // Listen to global dismiss events from /keep command
-    const handleGlobalDismiss = (e: Event) => {
-      const detail = (e as CustomEvent).detail
-      if (!detail?.sessionID || detail.sessionID === props.sessionID) {
+    // Listen to global dismiss events from /keep command or ReviewBarSignals
+    const unsubDismiss = ReviewBarSignals.onDismiss((targetSessionID) => {
+      if (!targetSessionID || targetSessionID === props.sessionID) {
         dismissCurrent()
       }
-    }
+    })
 
-    if (typeof window !== "undefined") {
-      window.addEventListener("omnicode:review:dismiss", handleGlobalDismiss)
-    }
-
-    // Keyboard shortcuts for ReviewBar (Alt+K: Keep, Alt+U / Alt+Z: Undo, Alt+D: Diff drawer)
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!visible()) return
-
-      if (e.altKey && (e.key === "k" || e.key === "K")) {
-        e.preventDefault()
-        e.stopPropagation()
-        dismissCurrent()
-      } else if (e.altKey && (e.key === "u" || e.key === "U" || e.key === "z" || e.key === "Z")) {
-        e.preventDefault()
-        e.stopPropagation()
-        triggerUndo()
-      } else if (e.altKey && (e.key === "d" || e.key === "D")) {
-        e.preventDefault()
-        e.stopPropagation()
-        setExpanded((prev) => !prev)
-      }
-    }
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("keydown", handleKeyDown, true)
-    }
+    // Periodic check every 3 seconds to keep working tree changes fresh
+    const pollInterval = setInterval(() => {
+      void executeLoadDiff()
+    }, 3000)
 
     onCleanup(() => {
       unsub()
+      unsubDismiss()
+      clearInterval(pollInterval)
       if (debounceTimer) clearTimeout(debounceTimer)
-      if (typeof window !== "undefined") {
-        window.removeEventListener("omnicode:review:dismiss", handleGlobalDismiss)
-        window.removeEventListener("keydown", handleKeyDown, true)
-      }
     })
   })
 
@@ -221,7 +273,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
       setDismissedFingerprint(currentFingerprint())
       toast.show({
         variant: "success",
-        message: `✓ Alterações mantidas (${files().length} ${files().length === 1 ? "arquivo" : "arquivos"})`,
+        message: `✓ Changes kept (${files().length} ${files().length === 1 ? "file" : "files"})`,
         duration: 3000,
       })
     }
@@ -232,16 +284,45 @@ export function PromptReviewBar(props: { sessionID?: string }) {
       keymap.dispatch("session.undo")
       toast.show({
         variant: "info",
-        message: "⏪ Revertendo alterações...",
+        message: "⏪ Reverting changes...",
         duration: 2500,
       })
       setTimeout(() => {
-        scheduleLoadDiff(300)
+        scheduleLoadDiff(200)
       }, 500)
     } catch {
       // ignore
     }
   }
+
+  // Register native OpenTUI keybindings for the ReviewBar
+  Keymap.createLayer(() => ({
+    mode: "global",
+    enabled: () => visible(),
+    commands: [
+      {
+        id: "session.review.keep",
+        bind: "alt+k",
+        title: "Keep review changes",
+        group: "Review",
+        run: dismissCurrent,
+      },
+      {
+        id: "session.review.diff",
+        bind: "alt+d",
+        title: "Toggle changed files list",
+        group: "Review",
+        run: () => setExpanded((prev) => !prev),
+      },
+      {
+        id: "session.review.undo",
+        bind: "alt+u,alt+z",
+        title: "Undo review changes",
+        group: "Review",
+        run: () => void triggerUndo(),
+      },
+    ],
+  }))
 
   const handleKeep = (e: MouseEvent) => {
     e.stopPropagation()
@@ -266,7 +347,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
         execFile("git", ["clean", "-f", "--", item.file], { cwd }, () => {
           toast.show({
             variant: "info",
-            message: `⏪ Arquivo revertido: ${item.file}`,
+            message: `⏪ File reverted: ${item.file}`,
             duration: 2400,
           })
           scheduleLoadDiff(150)
@@ -275,7 +356,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
       }
       toast.show({
         variant: err ? "warning" : "info",
-        message: err ? `Não foi possível reverter ${item.file} via git` : `⏪ Arquivo revertido: ${item.file}`,
+        message: err ? `Unable to revert ${item.file} via git` : `⏪ File reverted: ${item.file}`,
         duration: 2400,
       })
       scheduleLoadDiff(150)
@@ -288,7 +369,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
         width="100%"
         flexDirection="column"
         border
-        borderStyle="rounded"
+        borderStyle="single"
         borderColor={RGBA.fromHex("#00D2FF")}
         backgroundColor={RGBA.fromHex("#080D1A")}
         marginBottom={0}
@@ -316,10 +397,10 @@ export function PromptReviewBar(props: { sessionID?: string }) {
             onMouseUp={toggleExpand}
           >
             <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
-              {expanded() ? "▾" : ">"}
+              {expanded() ? "v" : ">"}
             </text>
             <text fg={RGBA.fromHex("#F8FAFC")} attributes={TextAttributes.BOLD} selectable={false}>
-              {files().length} {files().length === 1 ? "arquivo alterado" : "arquivos alterados"}
+              {files().length} {files().length === 1 ? "file changed" : "files changed"}
             </text>
             <text fg={RGBA.fromHex("#10B981")} attributes={TextAttributes.BOLD} selectable={false}>
               +{totalAdditions()}
@@ -338,7 +419,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               onMouseUp={handleKeep}
             >
               <text fg={RGBA.fromHex("#FFFFFF")} attributes={TextAttributes.BOLD} selectable={false}>
-                Manter [Alt+K]
+                Keep [Alt+K]
               </text>
             </box>
             <box
@@ -348,7 +429,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               onMouseUp={handleUndo}
             >
               <text fg={RGBA.fromHex("#E2E8F0")} attributes={TextAttributes.BOLD} selectable={false}>
-                Desfazer [Alt+U]
+                Undo [Alt+U]
               </text>
             </box>
             <box
@@ -357,7 +438,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
               onMouseUp={toggleExpand}
             >
               <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
-                {expanded() ? "[Arquivos ▴]" : "[Arquivos ▾ Alt+D]"}
+                {expanded() ? "Files [v]" : "Files [Alt+D]"}
               </text>
             </box>
           </box>
@@ -402,7 +483,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
                     onMouseUp={(e) => undoSingleFile(e, item)}
                   >
                     <text fg={RGBA.fromHex("#38BDF8")} selectable={false}>
-                      [Desfazer arquivo]
+                      [Revert file]
                     </text>
                   </box>
                 </box>

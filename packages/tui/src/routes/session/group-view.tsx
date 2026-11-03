@@ -140,20 +140,22 @@ function GroupContent(props: GroupProps) {
         when={props.node.kind === "reasoning"}
         fallback={
           <Show when={grouped()} fallback={children("normal")}>
-            <Show when={tools().length > 0}>
-              <InlineToolRow
-                icon={completed() ? "→" : "✱"}
-                color={hover() ? theme.text.base : theme.text.muted}
-                complete={completed()}
-                pending={label()}
-                spinner={!completed()}
-                onMouseOver={() => setHover(true)}
-                onMouseOut={() => setHover(false)}
-                onMouseUp={toggle}
-              >
-                {label()}
-              </InlineToolRow>
-            </Show>
+             <Show when={tools().length > 0}>
+               <box focusable onKeyDown={activate(toggle)}>
+                 <InlineToolRow
+                   icon={completed() ? "→" : "✱"}
+                   color={hover() ? theme.text.base : theme.text.muted}
+                   complete={completed()}
+                   pending={label()}
+                   spinner={!completed()}
+                   onMouseOver={() => setHover(true)}
+                   onMouseOut={() => setHover(false)}
+                   onMouseUp={toggle}
+                 >
+                   {label()}
+                 </InlineToolRow>
+               </box>
+             </Show>
             <Show when={expanded() && tools().length > 0}>{children("tool")}</Show>
             <Show when={!props.imagesOutside}>{props.images(tools())}</Show>
           </Show>
@@ -161,32 +163,34 @@ function GroupContent(props: GroupProps) {
       >
         <Show when={thoughts().length > 0}>
           <Show when={grouped()} fallback={children("normal")}>
-            <InlineToolRow
-              icon={expanded() ? "-" : "+"}
-              color={
-                !props.completed
-                  ? theme.text.base
-                  : hover() || expanded()
-                    ? theme.text.feedback.warning.base
-                    : RGBA.fromValues(
-                        theme.text.feedback.warning.base.r,
-                        theme.text.feedback.warning.base.g,
-                        theme.text.feedback.warning.base.b,
-                        0.6,
-                      )
-              }
-              complete={props.completed}
-              pending={latest() ? `Thinking: ${latest()}` : "Thinking"}
-              spinner={!props.completed}
-              onMouseOver={() => setHover(true)}
-              onMouseOut={() => setHover(false)}
-              onMouseUp={toggle}
-            >
-              {props.completed ? "Thought" : latest() ? `Thinking: ${latest()}` : "Thinking"}
-              <Show when={props.completed && !expanded() && latest()}>: {latest()}</Show>
-              <Show when={props.completed && thoughts().length > 1}> · {thoughts().length} steps</Show>
-              <Show when={props.completed && duration()}> · {Locale.duration(duration())}</Show>
-            </InlineToolRow>
+             <box focusable onKeyDown={activate(toggle)}>
+               <InlineToolRow
+                 icon={expanded() ? "-" : "+"}
+                 color={
+                   !props.completed
+                     ? theme.text.base
+                     : hover() || expanded()
+                       ? theme.text.feedback.warning.base
+                       : RGBA.fromValues(
+                           theme.text.feedback.warning.base.r,
+                           theme.text.feedback.warning.base.g,
+                           theme.text.feedback.warning.base.b,
+                           0.6,
+                         )
+                 }
+                 complete={props.completed}
+                 pending={latest() ? `Thinking: ${latest()}` : "Thinking"}
+                 spinner={!props.completed}
+                 onMouseOver={() => setHover(true)}
+                 onMouseOut={() => setHover(false)}
+                 onMouseUp={toggle}
+               >
+                 {props.completed ? "Thought" : latest() ? `Thinking: ${latest()}` : "Thinking"}
+                 <Show when={props.completed && !expanded() && latest()}>: {latest()}</Show>
+                 <Show when={props.completed && thoughts().length > 1}> · {thoughts().length} steps</Show>
+                 <Show when={props.completed && duration()}> · {Locale.duration(duration())}</Show>
+               </InlineToolRow>
+             </box>
             <Show when={expanded()}>
               <box paddingLeft={3}>{children("thought")}</box>
             </Show>
@@ -208,18 +212,20 @@ function ActivityGroup(props: GroupProps) {
   return (
     <GroupAnchor groupID={disclosure.id()} active={summary().label !== ""}>
       <Show when={summary().label}>
-        <InlineToolRow
-          icon={disclosure.expanded() ? "−" : "+"}
-          color={hover() ? theme.text.base : theme.text.muted}
-          complete={true}
-          pending={summary().label}
-          spinner={!disclosure.expanded() && summary().active}
-          onMouseOver={() => setHover(true)}
-          onMouseOut={() => setHover(false)}
-          onMouseUp={(event) => disclosure.toggle(event.currentTarget)}
-        >
-          {summary().label}
-        </InlineToolRow>
+       <box focusable onKeyDown={activate(() => disclosure.toggle())}>
+         <InlineToolRow
+           icon={disclosure.expanded() ? "−" : "+"}
+           color={hover() ? theme.text.base : theme.text.muted}
+           complete={true}
+           pending={summary().label}
+           spinner={!disclosure.expanded() && summary().active}
+           onMouseOver={() => setHover(true)}
+           onMouseOut={() => setHover(false)}
+           onMouseUp={(event) => disclosure.toggle(event.currentTarget)}
+         >
+           {summary().label}
+         </InlineToolRow>
+       </box>
         <Show when={disclosure.expanded()}>
           <box flexDirection="column" gap={1} marginTop={1}>
             <Children {...props} nodes={props.node.children} mode="normal" />
@@ -246,17 +252,19 @@ function InstructionsGroup(props: GroupProps) {
   )
   return (
     <GroupAnchor groupID={disclosure.id()} active={files() > 0}>
-      <InlineToolRow
-        icon="◈"
-        color={hover() ? theme.text.base : theme.text.muted}
-        complete={true}
-        pending=""
-        onMouseOver={() => setHover(true)}
-        onMouseOut={() => setHover(false)}
-        onMouseUp={() => disclosure.toggle()}
-      >
-        Instructions: {files()} {files() === 1 ? "file" : "files"}
-      </InlineToolRow>
+       <box focusable onKeyDown={activate(() => disclosure.toggle())}>
+         <InlineToolRow
+           icon="◈"
+           color={hover() ? theme.text.base : theme.text.muted}
+           complete={true}
+           pending=""
+           onMouseOver={() => setHover(true)}
+           onMouseOut={() => setHover(false)}
+           onMouseUp={() => disclosure.toggle()}
+         >
+           Instructions: {files()} {files() === 1 ? "file" : "files"}
+         </InlineToolRow>
+       </box>
       <Show when={disclosure.expanded()}>
         <Children {...props} nodes={props.node.children} mode="normal" />
       </Show>
@@ -280,6 +288,14 @@ function useDisclosure(props: GroupProps) {
       const key = id()
       if (key) ctx.setGroupExpanded(key, !expanded(), anchor)
     },
+  }
+}
+
+function activate(action: () => void) {
+  return (event: { name: string; preventDefault(): void }) => {
+    if (event.name !== "return" && event.name !== "space") return
+    event.preventDefault()
+    action()
   }
 }
 

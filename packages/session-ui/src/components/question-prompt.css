@@ -490,6 +490,32 @@
     }
   }
 
+  @media (max-width: 767px) {
+    [data-slot="question-header-actions"] [data-component="icon-button-v2"],
+    [data-slot="question-progress-segment"] {
+      min-inline-size: 44px;
+      min-block-size: 44px;
+    }
+
+    [data-slot="question-option"] {
+      min-block-size: 44px;
+      padding-block: 12px;
+    }
+
+    [data-slot="question-option"][data-custom="true"] {
+      block-size: 44px;
+      min-block-size: 44px;
+      max-block-size: 44px;
+      padding-block: 0;
+    }
+
+    [data-slot="question-custom-toggle"] {
+      min-inline-size: 44px;
+      min-block-size: 44px;
+      flex-basis: 44px;
+    }
+  }
+
   [data-component="session-question-dock"][data-keyboard="true"] &,
   :root[data-motion="reduce"] & {
     --question-feedback-duration: 0s;

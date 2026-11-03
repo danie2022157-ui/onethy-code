@@ -169,7 +169,10 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
         id: "pane.focus.left",
         title: "Focus session pane",
         enabled: () => !fullscreen(),
-        run: focusSession,
+        run: () => {
+          if (activePane() === "session") focusRightPane()
+          else focusSession()
+        },
       },
       {
         id: "pane.focus.right",

@@ -21,6 +21,7 @@ const DesktopMenuAction = Schema.Literals([
   "window.close",
   "window.minimize",
   "window.toggleMaximize",
+  "window.next",
 ])
 
 export const MenuRunAction = Rpc.make("MenuRunAction", {

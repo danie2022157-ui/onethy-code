@@ -155,7 +155,7 @@ export function SettingsNavigation(props: {
             // Keep a failed page inside the content area; choosing another page renders it again.
             createEffect(on(() => props.value, reset, { defer: true }))
 
-            return <ErrorPage error={error} />
+            return <ErrorPage error={error} onRetry={reset} />
           }}
         >
           {props.children}

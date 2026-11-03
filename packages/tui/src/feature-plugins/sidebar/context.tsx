@@ -149,7 +149,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
     const int = pick("intelligence")
 
     return {
-      providers: (activeProviders.length > 0 ? activeProviders : connProvs).map((p) => p.name).join(", ") || "Padrão",
+      providers: (activeProviders.length > 0 ? activeProviders : connProvs).map((p) => p.name).join(", ") || "Default",
       modelCount: pool.length,
       totalConnectedCount: allPool.length,
       isFiltered,
@@ -205,7 +205,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
       <Show when={state() || cost() > 0}>
         <box paddingBottom={1}>
           <text fg={theme.text.base}>
-            <b>Contexto & Limites</b>
+            <b>Context & Limits</b>
           </text>
           <Show when={state()}>
             {(value) => (
@@ -220,7 +220,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
             )}
           </Show>
           <Show when={cost() > 0}>
-            <text fg={theme.text.muted}>{money.format(cost())} gasto</text>
+            <text fg={theme.text.muted}>{money.format(cost())} spent</text>
           </Show>
         </box>
       </Show>
@@ -230,17 +230,17 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
           <b>🧠 Memory Bank</b>
         </text>
         <text fg={theme.text.feedback.info.base} wrapMode="none">
-          ● Ativo · .omnicode/
+          ● Active · .omnicode/
         </text>
         <text fg={theme.text.muted} wrapMode="none">
-          Use /memory para gerenciar
+          Use /memory to manage
         </text>
       </box>
 
       <Show when={activeSubagents().length > 0}>
         <box paddingBottom={1}>
           <text fg={theme.text.base}>
-            <b>Subagentes Ativos ({activeSubagents().length})</b>
+            <b>Active Subagents ({activeSubagents().length})</b>
           </text>
           <For each={activeSubagents()}>
             {(item) => (
@@ -264,31 +264,31 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
             >
               <text fg={theme.text.base}>
                 {accordion.fusion ? "▼" : "▶"}{" "}
-                <b>⚡ Omni Fusion & Modelos ({fusion().modelCount} {fusion().isFiltered ? "selecionados" : "modelos"})</b>
+                <b>⚡ Omni Fusion & Models ({fusion().modelCount} {fusion().isFiltered ? "selected" : "models"})</b>
               </text>
             </box>
             <Show when={accordion.fusion}>
               <text fg={theme.text.muted} wrapMode="none">
-                Provedores: {truncateMiddle(fusion().providers)}
+                Providers: {truncateMiddle(fusion().providers)}
               </text>
               <Show when={fusion().isFiltered}>
                 <text fg={theme.text.feedback.info.base} wrapMode="none">
-                  Filtro: {fusion().modelCount} de {fusion().totalConnectedCount} modelos
+                  Filter: {fusion().modelCount} of {fusion().totalConnectedCount} models
                 </text>
               </Show>
               <text fg={theme.text.muted} wrapMode="none">
-                🌱 Eficiência: {truncateMiddle(fusion().efficiency)}
+                🌱 Efficiency: {truncateMiddle(fusion().efficiency)}
               </text>
               <text fg={theme.text.muted} wrapMode="none">
-                ⚖️ Balanceado: {truncateMiddle(fusion().balanced)}
+                ⚖️ Balanced: {truncateMiddle(fusion().balanced)}
               </text>
               <text fg={theme.text.muted} wrapMode="none">
-                🧠 Inteligência: {truncateMiddle(fusion().intelligence)}
+                🧠 Intelligence: {truncateMiddle(fusion().intelligence)}
               </text>
               <Show when={configuredSubagents().length > 0}>
                 <box paddingTop={1} paddingBottom={0}>
                   <text fg={theme.text.base}>
-                    <b>Modelos dos Subagentes:</b>
+                    <b>Subagent Models:</b>
                   </text>
                   <For each={configuredSubagents()}>
                     {(item) => (
@@ -315,24 +315,24 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
             >
               <text fg={theme.text.base}>
                 {accordion.customizations ? "▼" : "▶"}{" "}
-                <b>Personalizações ({summary().skills + summary().mods + summary().hooks + summary().settings} itens)</b>
+                <b>Customizations ({summary().skills + summary().mods + summary().hooks + summary().settings} items)</b>
               </text>
             </box>
             <Show when={accordion.customizations}>
               <text fg={theme.text.muted} wrapMode="none">
-                Agentes (@): {summary().agents} · Skills: {summary().skills}
+                Agents (@): {summary().agents} · Skills: {summary().skills}
               </text>
               <text fg={theme.text.muted} wrapMode="none">
                 Mods/Plugins: {summary().mods} · Hooks: {summary().hooks}
               </text>
               <text fg={theme.text.muted} wrapMode="none">
-                Modos: {summary().settings} · Cmds (/): {summary().commands}
+                Modes: {summary().settings} · Cmds (/): {summary().commands}
               </text>
               <text fg={theme.text.muted} wrapMode="none">
-                MCPs: {summary().mcps} · /personalizacoes
+                MCPs: {summary().mcps} · /customizations
               </text>
               <text fg={theme.text.base} wrapMode="none">
-                ⚙️ Auto-Uso: {local?.customizations?.summary() ?? "Ativo"}
+                ⚙️ Auto-Use: {local?.customizations?.summary() ?? "Active"}
               </text>
             </Show>
           </box>

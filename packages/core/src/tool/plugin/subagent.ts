@@ -11,6 +11,7 @@ import { Agent } from "../../agent.js"
 import { Config } from "../../config.js"
 import { Job } from "../../job.js"
 import { Model } from "../../model.js"
+import { ModelSelectionPolicy } from "../../model-selection-policy.js"
 import { OmniBus } from "../../omni-bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { Permission } from "../../permission.js"
@@ -33,14 +34,14 @@ const backgroundResult = (sessionID: SessionSchema.ID) => ({
 })
 
 function resolveOmniAllowedModels(): Set<string> | undefined {
-  if (process.env.OMNICODE_ALLOWED_MODELS) {
+  if (process.env.OMNICODE_ALLOWED_MODELS !== undefined) {
     try {
-      const parsed = JSON.parse(process.env.OMNICODE_ALLOWED_MODELS)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return new Set(parsed.filter((item): item is string => typeof item === "string"))
-      }
-    } catch {
-      // ignore
+      const parsed: unknown = JSON.parse(process.env.OMNICODE_ALLOWED_MODELS)
+      if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.every((item) => typeof item === "string"))
+        throw new Error("OMNICODE_ALLOWED_MODELS must be a non-empty JSON array of model refs")
+      return new Set(parsed)
+    } catch (error) {
+      throw new Error("OMNICODE_ALLOWED_MODELS is invalid", { cause: error })
     }
   }
 
@@ -177,7 +178,7 @@ export const Plugin = {
     const orchestratorOpt = yield* Effect.serviceOption(OmniOrchestrator.Service)
     const omniBusOpt = yield* Effect.serviceOption(OmniBus.Service)
 
-    const resolveModel = Effect.fn("SubagentTool.resolveModel")(function* (input: string) {
+    const resolveModel = Effect.fn("SubagentTool.resolveModel")(function* (input: string, available: ReadonlyArray<Model.Info>) {
       const ref = yield* Effect.try({
         try: () => Model.Ref.parse(input),
         catch: () =>
@@ -185,7 +186,7 @@ export const Plugin = {
             message: `Invalid model "${input}". Use "providerID/modelID" or "providerID/modelID#variant".`,
           }),
       })
-      const model = (yield* models.available()).find(
+      const model = available.find(
         (model) => model.providerID === ref.providerID && model.id === ref.id,
       )
       if (model === undefined) {
@@ -276,56 +277,62 @@ export const Plugin = {
                 return yield* new ToolFailure({
                   message: `Session ${existing.id} is not a child of the current session`,
                 })
-              const override = input.model === undefined ? undefined : yield* resolveModel(input.model)
+              const availableList = yield* models.available()
+              const override = input.model === undefined ? undefined : yield* resolveModel(input.model, availableList)
 
-              const allowedSet = process.env.OMNICODE_ACTIVE === "1" ? resolveOmniAllowedModels() : undefined
-              const hasAllowedConstraint = allowedSet !== undefined && allowedSet.size > 0
+              const allowedSet = yield* Effect.try({
+                try: () => process.env.OMNICODE_ACTIVE === "1" ? resolveOmniAllowedModels() : undefined,
+                catch: (error) => new ToolFailure({ message: "Configured model allowlist is invalid.", error }),
+              })
+              const hasAllowedConstraint = allowedSet !== undefined
+              if (hasAllowedConstraint && allowedSet.size === 0)
+                return yield* new ToolFailure({ message: "The configured model allowlist is invalid or empty." })
               const isAllowed = (m: typeof parent.model) =>
-                m !== undefined &&
-                (!hasAllowedConstraint || allowedSet.has(`${m.providerID}/${m.id}`)) &&
-                (m.providerID === "test" || !OmniOrchestrator.isModelInCooldown(m.providerID, m.id))
+                m !== undefined && (!hasAllowedConstraint || allowedSet.has(`${m.providerID}/${m.id}`))
+              if (override && !isAllowed(override))
+                return yield* new ToolFailure({ message: `Requested model ${override.providerID}/${override.id} is denied by the model allowlist.` })
+              if (agent.model && override === undefined && !(existing !== undefined && existing.agent === agent.id)) {
+                const configured = availableList.find((model) => model.providerID === agent.model?.providerID && model.id === agent.model?.id)
+                if (!configured || !isAllowed(agent.model))
+                  return yield* new ToolFailure({ message: `Configured agent model ${agent.model.providerID}/${agent.model.id} is unavailable or denied by policy.` })
+              }
 
               let routedModel: typeof parent.model = undefined
+              let parentCoolingDown = false
               if (
                 process.env.OMNICODE_ACTIVE === "1" &&
                 Option.isSome(orchestratorOpt) &&
-                override === undefined
+                override === undefined &&
+                !agent.model &&
+                !(existing !== undefined && existing.agent === agent.id)
               ) {
-                const availableList = yield* models.available()
-                const allowedCandidates = hasAllowedConstraint
-                  ? availableList.filter((m) => allowedSet.has(`${m.providerID}/${m.id}`))
-                  : availableList
-                const basePool = allowedCandidates.length > 0 ? allowedCandidates : availableList
-                const healthyPool = basePool.filter((m) => !OmniOrchestrator.isModelInCooldown(m.providerID, m.id))
-                const pool = healthyPool.length > 0 ? healthyPool : basePool
-
-                const agentModelAllowed =
-                  agent.model !== undefined &&
-                  isAllowed(agent.model) &&
-                  pool.some((m) => m.providerID === agent.model?.providerID && m.id === agent.model?.id)
-
-                if (!agentModelAllowed) {
-                  const selection = yield* orchestratorOpt.value.selectModelForAgent(
-                    agent.id,
-                    `${input.description} ${input.prompt}`,
-                    pool,
-                  )
-                  const matched = selection.primary
-                    ? pool.find(
-                        (m) => m.providerID === selection.primary?.providerID && m.id === selection.primary?.id,
-                      )
-                    : undefined
-                  routedModel = matched
-                    ? {
-                        providerID: matched.providerID,
-                        id: matched.id,
-                        variant: isThinkingRoutingEnabled()
-                          ? safeVariantForModel(matched, selection.thinkingLevel)
-                          : undefined,
-                      }
-                    : undefined
+                const coolingDown = new Set<string>()
+                for (const model of availableList) {
+                  if (yield* orchestratorOpt.value.isModelInCooldown(model.providerID, model.id))
+                    coolingDown.add(`${model.providerID}/${model.id}`)
                 }
+                parentCoolingDown = parent.model !== undefined && coolingDown.has(`${parent.model.providerID}/${parent.model.id}`)
+                const decision = yield* Effect.try({
+                  try: () => ModelSelectionPolicy.select(availableList, {
+                    mode: "automatic",
+                    requiredTypes: ["chat"],
+                    requiredCapabilities: { tools: true },
+                    allowedModels: allowedSet ? [...allowedSet] : undefined,
+                    isCoolingDown: (ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
+                  }),
+                  catch: (error) => new ToolFailure({ message: "No connected model satisfies the selection policy.", error }),
+                })
+                routedModel = { providerID: decision.selected.providerID, id: decision.selected.id }
               }
+
+              if (
+                process.env.OMNICODE_ACTIVE === "1" &&
+                override === undefined &&
+                !agent.model &&
+                !(existing !== undefined && existing.agent === agent.id) &&
+                Option.isNone(orchestratorOpt)
+              )
+                return yield* new ToolFailure({ message: "Model cooldown service is unavailable for automatic subagent selection." })
 
               // Continuing with a different agent switches the child, mirroring create semantics
               // where an explicit model wins over the agent's configured model, which wins over the inherited one.
@@ -337,6 +344,10 @@ export const Plugin = {
                   (switched || needsModelFailover
                     ? ((isAllowed(agent.model) ? agent.model : undefined) ?? routedModel)
                     : undefined)
+                if (needsModelFailover && model === undefined)
+                  return yield* new ToolFailure({
+                    message: `Existing subagent model ${existing.model?.providerID}/${existing.model?.id} is denied by the model allowlist and no allowed replacement is available.`,
+                  })
                 yield* Effect.all([
                   switched ? sessions.switchAgent({ sessionID: existing.id, agent: agent.id }) : Effect.void,
                   model === undefined ? Effect.void : sessions.switchModel({ sessionID: existing.id, model }),
@@ -347,7 +358,6 @@ export const Plugin = {
                 )
               }
 
-              const availableList = yield* models.available()
               const configuredModelInfo =
                 agent.model ? availableList.find((m) => m.providerID === agent.model?.providerID && m.id === agent.model?.id) : undefined
 
@@ -365,11 +375,17 @@ export const Plugin = {
 
               const model =
                 override ??
-                routedModel ??
+                (existing !== undefined && existing.agent === agent.id ? existing.model : undefined) ??
                 configuredWithThinking ??
-                (isAllowed(parent.model) ? parent.model : undefined) ??
-                routedModel ??
-                parent.model
+                (isAllowed(parent.model) &&
+                (process.env.OMNICODE_ACTIVE !== "1" ||
+                  availableList.some(
+                    (candidate) => candidate.providerID === parent.model?.providerID && candidate.id === parent.model.id,
+                  )) &&
+                !parentCoolingDown
+                  ? parent.model
+                  : undefined) ??
+                routedModel
               const child =
                 existing ??
                 (yield* sessions

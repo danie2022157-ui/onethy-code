@@ -27,51 +27,34 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
     const found = new Map<string, ServerConfig>()
     if (process.env.OMNICODE_ACTIVE !== "1" || fsOpt._tag === "None") return found
     const fs = fsOpt.value
-    for (const entry of entries) {
-      if (entry.type !== "directory") continue
-      const files = yield* fs
-        .scan("{mcp,mcps}/**/*.json", { cwd: entry.path, absolute: true, dot: true, symlink: true })
+    const roots = config.compatibility ? yield* config.compatibility() : { claude: [], agents: [] }
+    const directories = [
+      ...entries.flatMap((entry) => (entry.type === "directory" ? [entry.path] : [])),
+      ...roots.claude,
+      ...roots.agents,
+    ]
+    const files = new Set<string>()
+    for (const directory of directories) {
+      const scanned = yield* fs
+        .scan("{mcp,mcps}/**/*.json", { cwd: directory, absolute: true, dot: true, symlink: false })
         .pipe(Effect.orElseSucceed(() => [] as string[]))
-      for (const file of files.toSorted()) {
-        const text = yield* fs.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
-        if (!text) continue
-        try {
-          const parsed = JSON.parse(text)
-          const rawServers = parsed?.mcpServers ?? parsed?.servers ?? {}
-          if (!rawServers || typeof rawServers !== "object") continue
-          for (const [rawName, srv] of Object.entries<Record<string, unknown>>(rawServers)) {
-            const safeName = rawName.toLowerCase().replace(/[^a-z0-9_-]/g, "-")
-            if (!srv || typeof srv !== "object") continue
-            const serialized = JSON.stringify(srv)
-            if (
-              /<your-|YOUR_[A-Z0-9_]*(KEY|TOKEN)|your[-_](api[-_])?(key|token)|<personal-access-token>|\$\{input:/i.test(
-                serialized,
-              )
-            ) {
-              continue
-            }
-            if (typeof srv.url === "string" && srv.url.startsWith("http")) {
-              found.set(safeName, {
-                type: "remote",
-                url: srv.url,
-                disabled: typeof srv.disabled === "boolean" ? srv.disabled : true,
-              })
-            } else if (typeof srv.command === "string") {
-              const args = Array.isArray(srv.args) ? srv.args.map(String) : []
-              found.set(safeName, {
-                type: "local",
-                command: [srv.command, ...args],
-                disabled: typeof srv.disabled === "boolean" ? srv.disabled : true,
-              })
-            } else if (Array.isArray(srv.command)) {
-              found.set(safeName, {
-                type: "local",
-                command: srv.command.map(String),
-                disabled: typeof srv.disabled === "boolean" ? srv.disabled : true,
-              })
-            }
-          }
-        } catch {}
+      for (const file of scanned) files.add(file)
+    }
+    for (const file of [...files].toSorted()) {
+      const root = directories.find((directory) => isContained(directory, file))
+      if (!root) continue
+      const [realRoot, realFile] = yield* Effect.all([fs.realPath(root), fs.realPath(file)]).pipe(
+        Effect.orElseSucceed(() => [undefined, undefined] as const),
+      )
+      if (!realRoot || !realFile || !isContained(realRoot, realFile)) continue
+      const text = yield* fs.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
+      if (!text) continue
+      for (const [safeName, server] of decodeDiscovered(text)) {
+        if (found.has(safeName)) {
+          yield* Effect.logWarning("ignoring colliding discovered MCP server name", { name: safeName })
+          continue
+        }
+        found.set(safeName, server)
       }
     }
     return found
@@ -119,15 +102,90 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
       {},
       ...documents.flatMap((entry) => (entry.info.mcp?.timeout ? [entry.info.mcp.timeout] : [])),
     )
-    const servers = new Map<string, ServerConfig>(loaded.directoryServers)
-    for (const document of documents) {
-      for (const [name, server] of Object.entries(document.info.mcp?.servers ?? {})) {
-        servers.set(name, server)
-      }
-    }
+    const servers = mergeServers(loaded.directoryServers, documents)
     for (const [name, server] of servers) {
       if (editor.get(name)) continue
       editor.set(name, { ...server, timeout: { ...timeout, ...server.timeout } })
     }
   })
 })
+
+export function decodeDiscovered(text: string) {
+  const found = new Map<string, ServerConfig>()
+  try {
+    const parsed = JSON.parse(text) as { mcpServers?: unknown; servers?: unknown }
+    const rawServers = parsed.mcpServers ?? parsed.servers ?? {}
+    if (!rawServers || typeof rawServers !== "object" || Array.isArray(rawServers)) return found
+    for (const [rawName, value] of Object.entries(rawServers)) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) continue
+      const srv = value as Record<string, unknown>
+      const safeName = discoveredName(rawName)
+      if (
+        !safeName ||
+        found.has(safeName) ||
+        /\$\{input:|<your-|your[-_](api[-_])?(key|token)|<personal-access-token>/i.test(JSON.stringify(srv))
+      )
+        continue
+      const common = {
+        // Discovered files cannot approve themselves; only canonical config can enable a server.
+        disabled: true,
+        ...(typeof srv.codemode === "boolean" ? { codemode: srv.codemode } : {}),
+        ...(isTimeout(srv.timeout) ? { timeout: srv.timeout } : {}),
+        ...(isProtocol(srv.protocol) ? { protocol: srv.protocol } : {}),
+      }
+      if (typeof srv.url === "string" && /^https?:\/\//i.test(srv.url)) {
+        found.set(safeName, {
+          type: "remote",
+          url: srv.url,
+          ...common,
+          ...(isStringRecord(srv.headers) ? { headers: srv.headers } : {}),
+          ...(srv.oauth === false || isOAuth(srv.oauth) ? { oauth: srv.oauth } : {}),
+        })
+        continue
+      }
+      if (typeof srv.command !== "string" && !Array.isArray(srv.command)) continue
+      const command = typeof srv.command === "string" ? [srv.command] : srv.command.filter((arg): arg is string => typeof arg === "string")
+      if (!command.length) continue
+      if (process.platform === "win32" && ["npx", "npm", "pnpm", "yarn"].includes(command[0])) command[0] += ".cmd"
+      found.set(safeName, {
+        type: "local",
+        command: [...command, ...(Array.isArray(srv.args) ? srv.args.map(String) : [])],
+        ...common,
+        ...(isStringRecord(srv.env) ? { environment: srv.env } : isStringRecord(srv.environment) ? { environment: srv.environment } : {}),
+      })
+    }
+  } catch {}
+  return found
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return !!value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item) => typeof item === "string")
+}
+
+export function discoveredName(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9_-]/g, "-")
+}
+
+export function mergeServers(discovered: Map<string, ServerConfig>, documents: readonly Document[]) {
+  const servers = new Map(discovered)
+  for (const document of documents) {
+    for (const [name, server] of Object.entries(document.info.mcp?.servers ?? {})) servers.set(name, server)
+  }
+  return servers
+}
+
+export function isContained(root: string, target: string) {
+  return FSUtil.contains(root, target)
+}
+
+function isTimeout(value: unknown): value is { startup?: number; catalog?: number; execution?: number } {
+  return !!value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item) => typeof item === "number" && item > 0)
+}
+
+function isProtocol(value: unknown): value is "legacy" | "auto" | "2026-07-28" {
+  return value === "legacy" || value === "auto" || value === "2026-07-28"
+}
+
+function isOAuth(value: unknown): value is Record<string, string> {
+  return isStringRecord(value)
+}

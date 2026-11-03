@@ -183,9 +183,11 @@ export const make = Effect.gen(function* () {
         const isQuotaOrFreeLimit =
           llmFailure !== undefined &&
           (llmFailure.reason._tag === "RateLimit" ||
-            /Free usage limit reached|QuotaExceeded|429|quota|rate limit/i.test(llmFailure.message))
+            /Free usage limit reached|usage limit reached|QuotaExceeded|429|quota|rate limit/i.test(llmFailure.message))
         if (isQuotaOrFreeLimit) {
-          OmniOrchestrator.markModelCooldown(input.model.ref.providerID, input.model.ref.id, 5 * 60_000)
+          const orchestrator = yield* Effect.serviceOption(OmniOrchestrator.Service)
+          if (Option.isSome(orchestrator))
+            yield* orchestrator.value.markModelCooldown(input.model.ref.providerID, input.model.ref.id, 5 * 60_000)
         }
         if (
           input.recoverContinuation &&

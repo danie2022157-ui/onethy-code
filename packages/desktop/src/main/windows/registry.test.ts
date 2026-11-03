@@ -69,4 +69,12 @@ describe("window registry", () => {
     app.registry.closed("b")
     expect(app.registry.lastFocused()).toBeUndefined()
   })
+
+  test("cycles windows after the last focused window and wraps around", () => {
+    const app = opened("a", "b", "c")
+    app.registry.focused("b")
+
+    expect(app.registry.next(app.registry.lastFocused())).toEqual({ name: "c" })
+    expect(app.registry.next({ name: "c" })).toEqual({ name: "a" })
+  })
 })

@@ -1,11 +1,13 @@
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { Command } from "@opencode/core/command"
+import { Model } from "@opencode/core/model"
+import { Provider } from "@opencode/core/provider"
 import { Bus } from "@opencode/core/bus"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { Location } from "@opencode/core/location"
 import { Mcp } from "@opencode/core/mcp/index"
-import { CommandPlugin } from "@opencode/core/plugin/command"
+import { CommandPlugin, planAndPersistMission, selectArenaModels } from "@opencode/core/plugin/command"
 import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/schema/session"
 import { SessionInbox } from "@opencode/schema/session-inbox"
@@ -33,6 +35,65 @@ const it = testEffect(
 )
 
 describe("CommandPlugin.Plugin", () => {
+  it.effect("does not invent Arena model references when the catalog is empty", () =>
+    Effect.gen(function* () {
+      const ineligible = {
+        ...Model.Info.default(Provider.ID.make("provider"), Model.ID.make("disabled")),
+        enabled: false,
+      }
+      const error = yield* Effect.flip(selectArenaModels([ineligible]))
+      expect(error.message).toBe("Arena requires at least one enabled, non-deprecated model")
+    }),
+  )
+
+  it.effect("selects up to three enabled non-deprecated Arena models", () =>
+    Effect.gen(function* () {
+      const info = (id: string, enabled = true, status: "active" | "deprecated" = "active") => ({
+        ...Model.Info.default(Provider.ID.make("provider"), Model.ID.make(id)),
+        enabled,
+        status,
+      })
+      expect(
+        yield* selectArenaModels([
+          info("disabled", false),
+          info("deprecated", true, "deprecated"),
+          info("one"),
+          info("two"),
+          info("three"),
+          info("four"),
+        ]),
+      ).toEqual(["provider/one", "provider/two", "provider/three"])
+    }),
+  )
+
+  it.effect("uses the planner mission ID when persisting Omni, Ultrawork, Arena, and Team missions", () =>
+    Effect.gen(function* () {
+      const subtasks = [{ id: "task-1", title: "Task", assignedAgent: "coder" }]
+      for (const mode of ["omni", "ultrawork", "arena", "team"]) {
+        const missionID = `mission-${mode}`
+        const calls: string[] = []
+        const mission = yield* planAndPersistMission({
+          missionID,
+          goal: "goal",
+          mode,
+          fallbackSessionID: "local",
+          plan: (id) =>
+            Effect.sync(() => {
+              calls.push(`plan:${id}`)
+              return subtasks
+            }),
+          save: (input) =>
+            Effect.sync(() => {
+              calls.push(`save:${input.id}:${input.mode}`)
+              return input.id ?? "missing-id"
+            }),
+        })
+        expect(calls).toEqual([`plan:${missionID}`, `save:${missionID}:${mode}`])
+        expect(mission).toEqual({ subtasks, sessionID: missionID })
+      }
+    }),
+  )
+
   it.effect("registers built-in init and review commands", () =>
     Effect.gen(function* () {
       const command = yield* Command.Service

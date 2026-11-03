@@ -60,7 +60,7 @@
     --v2-state-fg-success: var(--v2-green-800);
     --v2-state-border-success: var(--v2-green-300);
     --v2-state-bg-warning: var(--v2-yellow-100);
-    --v2-state-fg-warning: var(--v2-yellow-800);
+    --v2-state-fg-warning: var(--v2-yellow-1100);
     --v2-state-border-warning: var(--v2-yellow-300);
     --v2-state-bg-danger: var(--v2-red-100);
     --v2-state-fg-danger: var(--v2-red-800);
@@ -141,8 +141,8 @@
   }
 
   /* OS preference fallback (no JS needed) */
-  /*@media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-color-scheme]):not([data-theme]) {
       color-scheme: dark;
 
       --v2-background-bg-base: var(--v2-grey-1000);
@@ -255,7 +255,6 @@
       --v2-illustration-illustration-layer-03: var(--v2-grey-700);
     }
   }
-*/
   /* Explicit light mode via data attribute (overrides OS dark preference) */
   [data-color-scheme="light"] {
     color-scheme: light;
@@ -312,7 +311,7 @@
     --v2-state-fg-success: var(--v2-green-800);
     --v2-state-border-success: var(--v2-green-300);
     --v2-state-bg-warning: var(--v2-yellow-100);
-    --v2-state-fg-warning: var(--v2-yellow-800);
+    --v2-state-fg-warning: var(--v2-yellow-1100);
     --v2-state-border-warning: var(--v2-yellow-300);
     --v2-state-bg-danger: var(--v2-red-100);
     --v2-state-fg-danger: var(--v2-red-800);

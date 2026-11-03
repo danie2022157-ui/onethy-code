@@ -35,6 +35,13 @@ export function createWindowRegistry<W>(persistence: {
 
       return windows.get(lastFocusedID)
     },
+    next(current?: W) {
+      const list = [...windows.values()]
+      if (!list.length) return
+
+      const index = current ? list.indexOf(current) : lastFocusedID ? [...windows.keys()].indexOf(lastFocusedID) : -1
+      return list[(index + 1) % list.length]
+    },
     get(id: string) {
       return windows.get(id)
     },

@@ -70,10 +70,10 @@ function ResolvedDraftContent(props: { draft: DraftTab }) {
       }
     >
       <ErrorBoundary
-        fallback={(error) => (
+        fallback={(error, reset) => (
           <SessionRouteFrame padded>
             <SessionPanelFrame raised>
-              <ErrorPage error={error} />
+              <ErrorPage error={error} onRetry={reset} />
             </SessionPanelFrame>
           </SessionRouteFrame>
         )}

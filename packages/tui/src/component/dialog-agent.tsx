@@ -23,7 +23,7 @@ export function DialogAgent() {
         value: item.id,
         title: item.id,
         description: item.description,
-        category: item.mode === "subagent" ? "Especialistas e Subagentes" : "Agentes Principais",
+        category: item.mode === "subagent" ? "Specialists and Subagents" : "Primary Agents",
         footer: modelName ? `[${modelName}]` : undefined,
       }
     })
@@ -31,10 +31,10 @@ export function DialogAgent() {
     return [
       {
         value: "cfg:auto-customizations",
-        title: "⚙️ Configurar Auto-Uso de Customizações & Skills...",
-        description: `Status: ${local.customizations.summary()} · Definir se a IA deve usar agentes e skills automaticamente`,
-        category: "⚡ Orquestração Automática",
-        footer: "[Configurar]",
+        title: "⚙️ Configure Auto-Resource Management & Skills...",
+        description: `Status: ${local.customizations.summary()} · Configure whether AI automatically activates agents and skills`,
+        category: "⚡ Auto-Orchestration",
+        footer: "[Configure]",
       },
       ...agentOptions,
     ]
@@ -42,9 +42,9 @@ export function DialogAgent() {
 
   return (
     <DialogSelect
-      title="Selecionar agente"
+      title="Select agent"
       searchInTitle
-      titlePlaceholder="Buscar agentes..."
+      titlePlaceholder="Search agents..."
       current={local.agent.current()?.id}
       options={options()}
       onSelect={(option) => {

@@ -1553,6 +1553,7 @@ export function Session(props: {
                       row={row}
                       message={(messageID) => data.session.message.get(route.sessionID, messageID)}
                       boundaryID={boundaries()[index() + hidden()]}
+                      active={Boolean(navigationMessage() && boundaries()[index() + hidden()] === navigationMessage())}
                     />
                   )}
                 </For>
@@ -1669,6 +1670,7 @@ type SessionRowViewProps = {
   row: SessionRow
   message: (messageID: string) => SessionMessageInfo | undefined
   boundaryID?: string
+  active?: boolean
 }
 
 function SessionRowView(props: SessionRowViewProps) {
@@ -1678,22 +1680,33 @@ function SessionRowView(props: SessionRowViewProps) {
     node: target,
   })
   return (
-    <box ref={setTarget} id={sessionRowID(props.row, props.boundaryID)} marginTop={1} flexShrink={0}>
-      <Switch>
-        <Match when={props.row.type === "group" ? props.row : undefined}>
-          {(row) => (
-            <SessionGroupView
-              row={row()}
-              message={props.message}
-              entry={(entry, images) => <SessionEntryView row={entry} message={props.message} images={images} />}
-              images={(parts) => <ToolImages parts={parts} />}
-            />
-          )}
-        </Match>
-        <Match when={props.row.type !== "group" ? props.row : undefined}>
-          {(row) => <SessionEntryView row={row()} message={props.message} />}
-        </Match>
-      </Switch>
+    <box
+      ref={setTarget}
+      id={sessionRowID(props.row, props.boundaryID)}
+      marginTop={1}
+      flexShrink={0}
+      flexDirection="row"
+    >
+      <Show when={props.active}>
+        <text fg={RGBA.fromHex("#38BDF8")}>▌ </text>
+      </Show>
+      <box flexGrow={1}>
+        <Switch>
+          <Match when={props.row.type === "group" ? props.row : undefined}>
+            {(row) => (
+              <SessionGroupView
+                row={row()}
+                message={props.message}
+                entry={(entry, images) => <SessionEntryView row={entry} message={props.message} images={images} />}
+                images={(parts) => <ToolImages parts={parts} />}
+              />
+            )}
+          </Match>
+          <Match when={props.row.type !== "group" ? props.row : undefined}>
+            {(row) => <SessionEntryView row={row()} message={props.message} />}
+          </Match>
+        </Switch>
+      </box>
     </box>
   )
 }
@@ -2862,7 +2875,17 @@ function InlineTool(props: {
     return theme.text.muted
   })
 
-  return (
+  const handleTrigger = () => {
+    if (renderer.getSelection()?.getSelectedText()) return
+    if (failed()) {
+      if (props.onErrorClick) return props.onErrorClick()
+      setErrorExpanded((value) => !value)
+      return
+    }
+    props.onClick?.()
+  }
+
+  const content = (
     <InlineToolRow
       icon={props.icon}
       color={fg()}
@@ -2877,18 +2900,25 @@ function InlineTool(props: {
       status={props.status}
       onMouseOver={() => clickable() && setHover(true)}
       onMouseOut={() => setHover(false)}
-      onMouseUp={() => {
-        if (renderer.getSelection()?.getSelectedText()) return
-        if (failed()) {
-          if (props.onErrorClick) return props.onErrorClick()
-          setErrorExpanded((value) => !value)
-          return
-        }
-        props.onClick?.()
-      }}
+      onMouseUp={handleTrigger}
     >
       {props.children}
     </InlineToolRow>
+  )
+
+  return clickable() ? (
+    <box
+      focusable
+      onKeyDown={(event) => {
+        if (event.name !== "return" && event.name !== "space") return
+        event.preventDefault()
+        handleTrigger()
+      }}
+    >
+      {content}
+    </box>
+  ) : (
+    content
   )
 }
 

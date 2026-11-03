@@ -37,6 +37,7 @@ import { Permission } from "@opencode/core/permission"
 import { SubagentTool } from "@opencode/core/tool/plugin/subagent"
 import { Tool } from "@opencode/core/tool"
 import { tmpdir } from "./fixture/tmpdir"
+import { withEnv } from "./fixture/env"
 import { tempGlobalLayer } from "./fixture/global"
 import { offlineModels } from "./fixture/models"
 import { testEffect } from "./lib/effect"
@@ -182,6 +183,9 @@ const withSubagent = (location: Location.Ref) =>
       providers.transform((editor) => {
         editor.models.update(overrideModel.providerID, overrideModel.id, (model) => {
           model.variants = [{ id: Model.VariantID.make("fast") }]
+        })
+        editor.models.update(childModel.providerID, childModel.id, (model) => {
+          model.capabilities = { ...model.capabilities, tools: true }
         })
         editor.models.update(Provider.ID.make("test"), Model.ID.make("plain"), () => {})
         editor.models.update(Provider.ID.make("test"), Model.ID.make("painter"), (model) => {
@@ -795,6 +799,77 @@ describe("SubagentTool", () => {
               error: { type: "tool.execution", message },
             })
           }
+        }),
+      ),
+    ),
+  )
+
+  it.live("rejects a continuation whose model is denied without an allowed replacement", () =>
+    Effect.acquireRelease(
+      Effect.promise(() => tmpdir()),
+      (dir) => Effect.promise(() => dir[Symbol.asyncDispose]()),
+    ).pipe(
+      Effect.flatMap((dir) =>
+        Effect.gen(function* () {
+          const location = Location.Ref.make({ directory: AbsolutePath.make(dir.path) })
+          const sessions = yield* Session.Service
+          const parent = yield* sessions.create({ location, model: parentModel })
+          const child = yield* sessions.create({ parentID: parent.id, agent: Agent.ID.make("reviewer"), model: childModel })
+          yield* withSubagent(parent.location)
+          const locations = yield* LocationServiceMap.Service
+          const registry = yield* Tool.Service.pipe(Effect.provide(locations.get(parent.location)))
+
+          const result = yield* withEnv(
+            { OMNICODE_ACTIVE: "1", OMNICODE_ALLOWED_MODELS: '["test/parent"]' },
+            () => executeTool(registry, {
+              sessionID: parent.id,
+              ...toolIdentity,
+              call: {
+                type: "tool-call",
+                id: "call-denied-existing-model",
+                name: SubagentTool.name,
+                input: { agent: "reviewer", description: "follow up", prompt: "continue", sessionID: child.id },
+              },
+            }),
+          )
+          expect(result).toMatchObject({ status: "error", error: { message: expect.stringContaining("allowlist") } })
+          expect((yield* sessions.get(child.id)).model).toMatchObject(childModel)
+        }),
+      ),
+    ),
+  )
+
+  it.live("uses an explicit model even when the agent model is unavailable", () =>
+    Effect.acquireRelease(
+      Effect.promise(() => tmpdir()),
+      (dir) => Effect.promise(() => dir[Symbol.asyncDispose]()),
+    ).pipe(
+      Effect.flatMap((dir) =>
+        Effect.gen(function* () {
+          const location = Location.Ref.make({ directory: AbsolutePath.make(dir.path) })
+          const sessions = yield* Session.Service
+          const parent = yield* sessions.create({ location, model: parentModel })
+          yield* withSubagent(parent.location)
+          const locations = yield* LocationServiceMap.Service
+          const registry = yield* Tool.Service.pipe(Effect.provide(locations.get(parent.location)))
+          yield* Agent.Service.use((agents) =>
+            agents.transform((editor) => editor.update(Agent.ID.make("reviewer"), (agent) => {
+              agent.model = Model.Ref.make({ id: Model.ID.make("missing"), providerID: Provider.ID.make("test") })
+            })),
+          ).pipe(Effect.provide(locations.get(parent.location)))
+
+          const result = yield* executeTool(registry, {
+            sessionID: parent.id,
+            ...toolIdentity,
+            call: {
+              type: "tool-call",
+              id: "call-override-invalid-config",
+              name: SubagentTool.name,
+              input: { agent: "reviewer", description: "review", prompt: "review", model: "test/override" },
+            },
+          })
+          expect(result).toMatchObject({ status: "completed" })
+          expect((yield* sessions.get(outputSessionID(result.metadata))).model?.id).toBe(overrideModel.id)
         }),
       ),
     ),

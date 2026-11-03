@@ -31,6 +31,7 @@ import { windowRecovery } from "./recovery"
 import { takeEarlyWindow, type EarlyWindow } from "./early"
 import { manageWindowState, readWindowState, resolveWindowState, windowStateFile } from "./window-state"
 import { allowRendererPermissions, wireNavigationPolicy, wireRendererHeaders } from "./security"
+import { focusWindow } from "./focus"
 
 const themeReady = new WeakMap<BrowserWindow, () => void>()
 
@@ -102,6 +103,15 @@ export function getWindowByID(id: string) {
 /** App windows that host the renderer, excluding popups and other native windows. */
 export function getMainWindows() {
   return registry.list().filter((win) => !win.isDestroyed())
+}
+
+/** Focuses the next registered main window, wrapping at the end of the registry. */
+export function focusNextWindow() {
+  const current = BrowserWindow.getFocusedWindow()
+  const next = registry.next(current ?? registry.lastFocused())
+
+  if (!next || next.isDestroyed()) return
+  focusWindow(next, app)
 }
 
 /** Runs for each app window as it registers, before its renderer loads. */

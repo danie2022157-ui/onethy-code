@@ -759,7 +759,7 @@ function App() {
     [
       {
         name: COMMAND_PALETTE_COMMAND,
-        title: "Abrir paleta de comandos",
+        title: "Open command palette",
         category: "System",
         palette: undefined,
         run: () => {
@@ -768,7 +768,7 @@ function App() {
       },
       {
         name: "session.list",
-        title: "Alternar sessão",
+        title: "Switch session",
         category: "Session",
         suggested: data.session.list().length > 0,
         slash: { name: "sessions", aliases: ["resume", "continue"] },
@@ -778,7 +778,7 @@ function App() {
       },
       {
         name: "session.new",
-        title: "Nova sessão",
+        title: "New session",
         suggested: route.data.type === "session",
         category: "Session",
         slash: { name: "new" },
@@ -805,7 +805,7 @@ function App() {
       },
       {
         name: "session.clear",
-        title: "Limpar sessão",
+        title: "Clear session",
         category: "Session",
         slash: { name: "clear" },
         run: () => {
@@ -832,7 +832,7 @@ function App() {
       },
       {
         name: "open.menu",
-        title: "Abrir sessão ou projeto",
+        title: "Open session or project",
         category: "Session",
         slash: { name: "open", aliases: ["projects", "project"] },
         run: () => {
@@ -853,7 +853,7 @@ function App() {
       })),
       {
         name: "session.tab.next",
-        title: "Próxima aba",
+        title: "Next tab",
         category: "Session",
         palette: undefined,
         enabled: sessionTabs.enabled,
@@ -861,7 +861,7 @@ function App() {
       },
       {
         name: "session.tab.previous",
-        title: "Aba anterior",
+        title: "Previous tab",
         category: "Session",
         palette: undefined,
         enabled: sessionTabs.enabled,
@@ -885,7 +885,7 @@ function App() {
       },
       {
         name: "session.tab.close",
-        title: "Fechar aba",
+        title: "Close tab",
         category: "Session",
         enabled: sessionTabs.enabled,
         run: () => sessionTabs.close(),
@@ -907,7 +907,7 @@ function App() {
       })),
       {
         name: "model.list",
-        title: "Alternar modelo de IA",
+        title: "Switch AI model",
         suggested: true,
         category: "Agent",
         slash: { name: "models" },
@@ -956,102 +956,102 @@ function App() {
             {
               name: "omnicode.orchestrator",
               title: "OnethyCode Orchestrator (Multi-Agent)",
-              category: "OnethyCode",
+              category: "OmniCode",
               suggested: true,
-              slash: { name: "orchestrator", aliases: ["omni", "orquestrador"] },
+              slash: { name: "orchestrator", aliases: ["omni"] },
               run: () => {
                 local.agent.set("omni")
                 dialog.clear()
-                toast.show({ variant: "info", message: "OnethyCode Orchestrator ativo (@omni / @orchestrator)" })
+                toast.show({ variant: "info", message: "OnethyCode Orchestrator active (@omni / @orchestrator)" })
               },
             },
             {
               name: "omnicode.plan",
               title: "OnethyCode Plan Mode",
-              category: "OnethyCode",
-              slash: { name: "plan", aliases: ["planejar"] },
+              category: "OmniCode",
+              slash: { name: "plan" },
               run: () => {
                 local.agent.set("plan")
                 dialog.clear()
-                toast.show({ variant: "info", message: "Modo de Planejamento ativo (@planner / @plan)" })
+                toast.show({ variant: "info", message: "Plan Mode active (@planner / @plan)" })
               },
             },
             {
               name: "omnicode.review",
-              title: "OnethyCode Especialista Revisor (@reviewer)",
-              category: "OnethyCode",
-              slash: { name: "reviewer", aliases: ["revisar"] },
+              title: "OnethyCode Code Reviewer (@reviewer)",
+              category: "OmniCode",
+              slash: { name: "reviewer" },
               run: () => {
                 local.agent.set("reviewer")
                 dialog.clear()
-                toast.show({ variant: "info", message: "Especialista Revisor ativo (@reviewer)" })
+                toast.show({ variant: "info", message: "Reviewer specialist active (@reviewer)" })
               },
             },
             {
               name: "omnicode.architect",
               title: "OnethyCode Software Architect",
-              category: "OnethyCode",
-              slash: { name: "architect", aliases: ["arquiteto"] },
+              category: "OmniCode",
+              slash: { name: "architect" },
               run: () => {
                 local.agent.set("architect")
                 dialog.clear()
-                toast.show({ variant: "info", message: "Especialista Arquiteto ativo (@architect)" })
+                toast.show({ variant: "info", message: "Architect specialist active (@architect)" })
               },
             },
             {
               name: "omnicode.coder",
               title: "OnethyCode Coder",
-              category: "OnethyCode",
+              category: "OmniCode",
               slash: { name: "coder", aliases: ["dev"] },
               run: () => {
                 local.agent.set("coder")
                 dialog.clear()
-                toast.show({ variant: "info", message: "Especialista Programador ativo (@coder)" })
+                toast.show({ variant: "info", message: "Coder specialist active (@coder)" })
               },
             },
             {
               name: "omnicode.librarian",
-              title: "OnethyCode Especialista Bibliotecário (@librarian)",
-              category: "OnethyCode",
-              slash: { name: "librarian", aliases: ["bibliotecario"] },
+              title: "OnethyCode Librarian Specialist (@librarian)",
+              category: "OmniCode",
+              slash: { name: "librarian" },
               run: () => {
                 local.agent.set("librarian")
                 dialog.clear()
-                toast.show({ variant: "info", message: "Especialista Bibliotecário ativo (@librarian)" })
+                toast.show({ variant: "info", message: "Librarian specialist active (@librarian)" })
               },
             },
             {
               name: "omnicode.customizations",
-              title: "Central de Personalizações (Agentes, Skills, Plugins, Mods, Hooks, Comandos e MCPs)",
-              category: "OnethyCode",
+              title: "Customizations Hub (Agents, Skills, Plugins, Mods, Hooks, Commands & MCPs)",
+              category: "OmniCode",
               suggested: true,
-              slash: { name: "personalizacoes", aliases: ["customizations", "catalogo", "tudo"] },
+              slash: { name: "customizations", aliases: ["personalizacoes", "catalog", "all"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="all" />)
               },
             },
             {
               name: "omnicode.skills",
-              title: "Skills Instaladas e do Usuário (@skill)",
-              category: "OnethyCode",
-              slash: { name: "skills", aliases: ["habilidades"] },
+              title: "Installed & User Skills (@skill)",
+              category: "OmniCode",
+              slash: { name: "skills" },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="skills" />)
               },
             },
             {
               name: "omnicode.hooks",
-              title: "Ganchos / Hooks Instalados e do Usuário",
-              category: "OnethyCode",
-              slash: { name: "hooks", aliases: ["ganchos"] },
+              title: "Installed & User Hooks",
+              category: "OmniCode",
+              slash: { name: "hooks" },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="hooks" />)
               },
             },
             {
               name: "omnicode.mods",
-              title: "Mods e Plugins Instalados e do Usuário",
-              category: "OnethyCode",
+              title: "Installed & User Mods and Plugins",
+              category: "OmniCode",
               slash: { name: "mods", aliases: ["plugins"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="mods" />)
@@ -1059,40 +1059,40 @@ function App() {
             },
             {
               name: "omnicode.modes",
-              title: "Settings, Presets e Modos Operacionais",
-              category: "OnethyCode",
-              slash: { name: "modes", aliases: ["modos", "presets"] },
+              title: "Settings, Presets and Operational Modes",
+              category: "OmniCode",
+              slash: { name: "modes", aliases: ["presets"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="settings" />)
               },
             },
             {
               name: "omnicode.commands",
-              title: "Comandos Slash e Loops Instalados (/)",
-              category: "OnethyCode",
-              slash: { name: "commands", aliases: ["comandos", "loops"] },
+              title: "Installed Slash Commands and Loops (/)",
+              category: "OmniCode",
+              slash: { name: "commands", aliases: ["loops"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="commands" />)
               },
             },
             {
               name: "omnicode.auto_customizations",
-              title: "Auto-Uso de Recursos (Skills, Agentes, MCPs, Hooks, Mods & Settings)",
-              description: "Configura quais customizações a IA deve usar automaticamente de acordo com a tarefa",
-              category: "OnethyCode",
+              title: "Auto-Resource Management (Skills, Agents, MCPs, Hooks, Mods & Settings)",
+              description: "Configure which customizations the AI automatically activates per task",
+              category: "OmniCode",
               suggested: true,
-              slash: { name: "auto-customizations", aliases: ["customizations-auto", "auto-skills", "auto-recursos"] },
+              slash: { name: "auto-customizations", aliases: ["customizations-auto", "auto-skills"] },
               run: () => {
                 dialog.replace(() => <DialogAutoCustomizations />)
               },
             },
             {
               name: "omnicode.auto_model",
-              title: "Omni Fusion — Selecionar Variante (Modo Auto / Eficiência / Balanceado / Inteligente)",
-              description: "Alterna tiers de inteligência e roteamento dinâmico entre modelos conectados",
-              category: "OnethyCode",
+              title: "Omni Fusion — Select Optimization Tier (Auto / Efficiency / Balanced / Intelligence)",
+              description: "Switch intelligence tiers and dynamic routing between connected models",
+              category: "OmniCode",
               suggested: true,
-              slash: { name: "auto", aliases: ["fusion", "omnfusion", "omnifusion", "otimizar", "optimize"] },
+              slash: { name: "auto", aliases: ["fusion", "omnifusion", "optimize"] },
               run: () => {
                 local.model.auto.enable()
                 dialog.replace(() => <DialogVariant />)
@@ -1100,11 +1100,11 @@ function App() {
             },
             {
               name: "omnicode.fusion_models",
-              title: "Omni Fusion — Configurar Modelos Permitidos (Marcar modelos ou Usar Todos)",
-              description: "Abre checklist interativo para permitir ou restringir modelos no Omni Fusion",
-              category: "OnethyCode",
+              title: "Omni Fusion — Configure Allowed Models (Checklist or All Models)",
+              description: "Interactive checklist to restrict or enable models in Omni Fusion",
+              category: "OmniCode",
               suggested: true,
-              slash: { name: "fusion-models", aliases: ["modelos-fusion", "fusionmodels", "allowed-models"] },
+              slash: { name: "fusion-models", aliases: ["fusionmodels", "allowed-models"] },
               run: () => {
                 local.model.auto.enable()
                 dialog.replace(() => <DialogFusionModels />)
@@ -1112,137 +1112,62 @@ function App() {
             },
             {
               name: "omnicode.thinking_routing",
-              title: "Omni Fusion — Roteamento Inteligente de Thinking (Ativar/Desativar)",
-              description: "Ajusta tokens de raciocínio dinamicamente (low em buscas, max em arquitetura)",
-              category: "OnethyCode",
+              title: "Omni Fusion — Intelligent Thinking Routing (Enable/Disable)",
+              description: "Dynamically adjust reasoning tokens (low in search, max in architecture)",
+              category: "OmniCode",
               suggested: true,
-              slash: { name: "thinking", aliases: ["thinking-routing", "raciocinio", "pensamento"] },
+              slash: { name: "thinking", aliases: ["thinking-routing"] },
               run: () => {
                 local.model.auto.toggleThinkingRouting()
               },
             },
             {
               name: "omnicode.keep",
-              title: "ReviewBar — Manter / Confirmar Alterações (Keep)",
-              description: "Confirma as alterações de arquivos realizadas pelo agente na sessão",
-              category: "OnethyCode",
+              title: "ReviewBar — Keep / Confirm File Changes",
+              description: "Accept and dismiss the changed files review banner for this session",
+              category: "OmniCode",
               suggested: true,
-              slash: { name: "keep", aliases: ["manter", "confirmar", "aceitar"] },
+              slash: { name: "keep", aliases: ["accept"] },
               run: () => {
                 ReviewBarSignals.dismiss(route.data.type === "session" ? route.data.sessionID : undefined)
               },
             },
             {
               name: "omnicode.cycle_tier",
-              title: "Omni Fusion — Ciclar Modo de Otimização (Eficiência / Balanceado / Inteligente)",
-              description: "Alterna rapidamente o perfil de seleção automática de modelos (Atalho: Alt+O)",
-              category: "OnethyCode",
+              title: "Omni Fusion — Cycle Optimization Tier (Efficiency / Balanced / Intelligence)",
+              description: "Quickly cycle through automatic model selection tiers (Shortcut: Alt+O)",
+              category: "OmniCode",
               suggested: true,
-              slash: { name: "tier", aliases: ["cycle-tier", "modo", "perfil"] },
+              slash: { name: "tier", aliases: ["cycle-tier"] },
               run: () => {
                 local.model.auto.cycleTier()
               },
             },
             {
               name: "omnicode.memory",
-              title: "Memory Bank Persistente (.omnicode/memory-bank/)",
-              description: "Abre painel visual com os arquivos de memória arquitetural do projeto",
-              category: "OnethyCode",
+              title: "Persistent Memory Bank (.omnicode/memory-bank/)",
+              description: "Open visual manager for architectural memory files",
+              category: "OmniCode",
               suggested: true,
-              slash: { name: "memory", aliases: ["memory-bank", "lembrar", "memoria"] },
+              slash: { name: "memory", aliases: ["memory-bank"] },
               run: () => {
                 dialog.replace(() => <DialogMemoryBank />)
               },
-            },
-            {
-              name: "omnicode.checkpoint",
-              title: "Workspace Checkpoints (Salvar Snapshot Git)",
-              description: "Salva snapshot do workspace para permitir time-travel e rollback",
-              category: "OnethyCode",
-              suggested: true,
-              slash: { name: "checkpoint", aliases: ["checkpoints", "salvar-ponto"] },
-              run: () => {
-                toast.show({
-                  variant: "info",
-                  title: "💾 Checkpoints Git",
-                  message: "Use a ferramenta omni_checkpoint ou rode /checkpoint-undo para restaurar o estado.",
-                })
-              },
-            },
-            {
-              name: "omnicode.undo",
-              title: "Time-Travel Checkpoint Undo (Reverter Workspace para Snapshot Anterior)",
-              description: "Reverte alterações de código feitas pela IA para o snapshot git anterior",
-              category: "OnethyCode",
-              suggested: true,
-              slash: { name: "checkpoint-undo", aliases: ["desfazer-checkpoint", "reverter-checkpoint", "git-undo"] },
-              run: () => {
-                toast.show({
-                  variant: "warning",
-                  title: "⏪ Time-Travel Undo",
-                  message: "Revertendo arquivos modificados pela IA ao último snapshot git...",
-                })
-              },
-            },
-            {
-              name: "omnicode.heal",
-              title: "Self-Healing Test & Build Loop (Autocura Autônoma)",
-              description: "Inicia loop autônomo de execução de testes, diagnóstico e correção de falhas",
-              category: "OnethyCode",
-              suggested: true,
-              slash: { name: "heal", aliases: ["self-heal", "corrigir-loop", "autofix"] },
-              run: () => {
-                toast.show({
-                  variant: "info",
-                  title: "🔄 Self-Healing Loop",
-                  message: "Executando testes e diagnosticando falhas para correção automática...",
-                })
-              },
-            },
-            {
-              name: "omnicode.commit",
-              title: "Auto-Commit Inteligente (Mensagens Convencionais do Git Diff)",
-              description: "Analisa o git diff e gera mensagens de commit padronizadas",
-              category: "OnethyCode",
-              suggested: true,
-              slash: { name: "commit", aliases: ["autocommit", "git-commit", "salvar"] },
-              run: () => {
-                toast.show({
-                  variant: "info",
-                  title: "🏷️ Auto-Commit Inteligente",
-                  message: "Inspecionando diff e gerando commit convencional...",
-                })
-              },
-            },
-            {
-              name: "omnicode.team",
-              title: "Pipeline de Equipe Completa (Planner -> Architect -> Coder -> Reviewer)",
-              description: "Dispara esquadrão autônomo de 4 fases para construir funcionalidades complexas",
-              category: "OnethyCode",
-              suggested: true,
-              slash: { name: "team", aliases: ["equipe", "pipeline", "squad"] },
-              run: () => {
-                toast.show({
-                  variant: "info",
-                  title: "🎯 Pipeline de Equipe",
-                  message: "Iniciando orquestração em 4 fases com entregas formais.",
-                })
-              },
-            },
+            }
           ]
         : []),
       {
         name: "agent.list",
-        title: "Alternar agente",
+        title: "Switch agent",
         category: "Agent",
-        slash: { name: "agents", aliases: ["agent", "agentes"] },
+        slash: { name: "agents", aliases: ["agent"] },
         run: () => {
           dialog.replace(() => <DialogAgent />)
         },
       },
       {
         name: "usage.show",
-        title: "Ver consumo e estatísticas",
+        title: "View usage and statistics",
         category: "Agent",
         slash: { name: "usage" },
         run: () => {
@@ -1251,7 +1176,7 @@ function App() {
       },
       {
         name: "mcp.list",
-        title: "Servidores MCP",
+        title: "MCP Servers",
         category: "Agent",
         slash: { name: "mcps" },
         run: () => {
@@ -1303,7 +1228,7 @@ function App() {
       },
       {
         name: "provider.connect",
-        title: "Conectar integração / provedor",
+        title: "Connect integration / provider",
         suggested: !connected(),
         slash: { name: "connect" },
         run: () => {
@@ -1328,7 +1253,7 @@ function App() {
         : []),
       {
         name: "opencode.settings",
-        title: "Abrir configurações",
+        title: "Open settings",
         suggested: true,
         slash: { name: "settings" },
         run: () => {
@@ -1338,7 +1263,7 @@ function App() {
       },
       {
         name: "opencode.status",
-        title: "Ver status do sistema",
+        title: "View system status",
         slash: { name: "status" },
         run: () => {
           dialog.replace(() => <DialogStatus />)
@@ -1348,10 +1273,10 @@ function App() {
       {
         name: "opencode.update",
         title: (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1" || !updater.open)
-          ? "Atualizar OnethyCode"
+          ? "Update OnethyCode"
           : "Update OpenCode",
-        description: "Verifica e instala atualizações do OnethyCode via GitHub",
-        slash: { name: "update", aliases: ["atualizar", "upgrade"] },
+        description: "Check and install OnethyCode updates via GitHub",
+        slash: { name: "update", aliases: ["upgrade"] },
         run: () => {
           if (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1" || !updater.open) {
             dialog.replace(() => <DialogOmniUpdate />)
@@ -1374,7 +1299,7 @@ function App() {
         ? [
             {
               name: "service.restart",
-              title: "Reiniciar serviço",
+              title: "Restart service",
               slash: { name: "restart" },
               run: async () => {
                 const restart = client.restart
@@ -1393,7 +1318,7 @@ function App() {
         : []),
       {
         name: "location.reload",
-        title: "Recarregar configurações",
+        title: "Reload configuration",
         slash: { name: "reload" },
         run: async () => {
           dialog.clear()
@@ -1418,8 +1343,8 @@ function App() {
       },
       {
         name: "theme.switch",
-        title: "Alternar tema (Themes)",
-        slash: { name: "themes", aliases: ["theme", "tema", "temas"] },
+        title: "Switch theme",
+        slash: { name: "themes", aliases: ["theme"] },
         run: () => {
           dialog.replace(() => <DialogThemeList />)
         },
@@ -1759,6 +1684,40 @@ function App() {
         <Show when={verticalTabsVisible()}>
           <PaneResizeHandle resize={tabsResize} left={tabsResize.size() - 1} />
         </Show>
+      </box>
+      <box
+        height={1}
+        flexShrink={0}
+        flexDirection="row"
+        justifyContent="space-between"
+        paddingLeft={1}
+        paddingRight={1}
+        backgroundColor={theme.background.raised.base}
+      >
+        <box flexDirection="row" gap={2}>
+          <text fg={theme.text.muted} onMouseUp={() => dialog.push(() => <CommandPaletteDialog />)}>
+            <span style={{ fg: theme.text.base, bold: true }}>Ctrl+P</span> Commands
+          </text>
+          <text fg={theme.text.muted} onMouseUp={() => dialog.push(() => <DialogHelp />)}>
+            <span style={{ fg: theme.text.base, bold: true }}>?</span> Help
+          </text>
+          <text fg={theme.text.muted}>
+            <span style={{ fg: theme.text.base, bold: true }}>Alt+←/→</span> Tabs
+          </text>
+          <text fg={theme.text.muted}>
+            <span style={{ fg: theme.text.base, bold: true }}>Alt+W</span> Panes
+          </text>
+          <text fg={theme.text.muted}>
+            <span style={{ fg: theme.text.base, bold: true }}>Ctrl+B</span> Sidebar
+          </text>
+        </box>
+        <box flexDirection="row" gap={1}>
+          <Show when={route.data.type === "session"}>
+            <text fg={theme.text.muted}>
+              <span style={{ fg: theme.text.base, bold: true }}>Alt+↑/↓</span> Messages
+            </text>
+          </Show>
+        </box>
       </box>
       <Show when={devtools() && !(route.data.type === "plugin" && route.data.id === "opencode.stats")}>
         <DevToolsBar />

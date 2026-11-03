@@ -1,5 +1,6 @@
 export * as CommandPlugin from "./command.js"
 
+import crypto from "node:crypto"
 import { define } from "@opencode/plugin/effect/plugin"
 import { Effect, Option, Stream } from "effect"
 import { Bus } from "../bus.js"
@@ -36,20 +37,20 @@ export const Plugin = define({
     yield* ctx.command.transform((editor) => {
       
       if (process.env.OMNICODE_ACTIVE === "1") {
-        editor.add({
-          name: "orchestrate",
-          description: "Orquestrador Multi-Agente OmniCode: decompõe a meta em subtarefas para Planner, Architect, Coder e Reviewer",
-          execute: (input) =>
+        const executeOmni = (input: Parameters<Parameters<typeof editor.add>[0]["execute"]>[0]) =>
             Effect.gen(function* () {
-              const goal = input.prompt.text.trim() || "Analisar e orquestrar melhorias no projeto atual"
-              const subtasks = Option.isSome(orchestratorOpt) ? yield* orchestratorOpt.value.planMission(goal) : []
-              const missionSessionId = Option.isSome(omniSessionOpt)
-                ? yield* omniSessionOpt.value.save({
-                    goal,
-                    mode: "orchestrate",
-                    subtasks,
-                  })
-                : "local"
+              const goal = input.prompt.text.trim() || "Analyze and orchestrate improvements in the current project"
+              const missionID = `mission-${crypto.randomUUID()}`
+              const mission = yield* planAndPersistMission({
+                missionID,
+                goal,
+                mode: "omni",
+                fallbackSessionID: "local",
+                plan: (id) => Option.isSome(orchestratorOpt) ? orchestratorOpt.value.planMission(goal, id) : Effect.succeed([]),
+                save: Option.isSome(omniSessionOpt) ? omniSessionOpt.value.save : undefined,
+              })
+              const subtasks = mission.subtasks
+              const missionSessionId = mission.sessionID
               const taskSummary = subtasks
                 .map((t) => `- [${t.id}] (@${t.assignedAgent}): ${t.title}`)
                 .join("\n")
@@ -57,46 +58,23 @@ export const Plugin = define({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  `Você é o Orquestrador Multi-Agente OmniCode (Sessão de Missão: ${missionSessionId}).\nSubtarefas registradas no OmniBus:\n${taskSummary}\n\nCoordene os especialistas (@planner, @architect, @coder, @reviewer, @explore) para executar esta meta:\n\n$ARGUMENTS`,
+                  `You are the OmniCode Multi-Agent Orchestrator (Mission Session: ${missionSessionId}).\nSubtasks registered on OmniBus:\n${taskSummary}\n\nCoordinate specialists (@planner, @architect, @coder, @reviewer, @explore) to achieve this goal:\n\n$ARGUMENTS`,
                   goal,
                 ),
                 delivery: input.delivery,
               })
-            }).pipe(Effect.asVoid),
-        })
+            }).pipe(Effect.asVoid)
 
         editor.add({
           name: "omni",
-          description: "Orquestrador OmniCode: executa missão com coordenação completa de subagentes especialistas",
-          execute: (input) =>
-            Effect.gen(function* () {
-              const goal = input.prompt.text.trim() || "Executar missão coordenada no repositório"
-              const subtasks = Option.isSome(orchestratorOpt) ? yield* orchestratorOpt.value.planMission(goal) : []
-              const missionSessionId = Option.isSome(omniSessionOpt)
-                ? yield* omniSessionOpt.value.save({
-                    goal,
-                    mode: "omni",
-                    subtasks,
-                  })
-                : "local"
-              const taskSummary = subtasks
-                .map((t) => `- [${t.id}] (@${t.assignedAgent}): ${t.title}`)
-                .join("\n")
-              yield* ctx.session.prompt({
-                ...input.prompt,
-                sessionID: input.sessionID,
-                text: append(
-                  `Você é o Orquestrador Multi-Agente OmniCode (Sessão: ${missionSessionId}).\nPlano inicial no OmniBus:\n${taskSummary}\n\nCoordene os especialistas para resolver:\n\n$ARGUMENTS`,
-                  goal,
-                ),
-                delivery: input.delivery,
-              })
-            }).pipe(Effect.asVoid),
+          description: "OmniCode Orchestrator: executes mission with full coordination across specialist subagents",
+          execute: executeOmni,
         })
+        editor.add({ name: "orchestrate", description: "Deprecated alias for /omni", execute: executeOmni })
 
         editor.add({
           name: "memory-note",
-          description: "Nota Rápida de Memória: registra decisões arquiteturais em .omnicode/memory.md",
+          description: "Quick Memory Note: records architectural decisions into .omnicode/memory.md",
           execute: (input) =>
             Effect.gen(function* () {
               const note = input.prompt.text.trim()
@@ -107,7 +85,7 @@ export const Plugin = define({
               yield* ctx.session.prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
-                text: `Conteúdo atual de .omnicode/memory.md:\n\n${currentMemory}\n\n${note ? `Nova decisão registrada: "${note}". ` : ""}Resuma o contexto durável do projeto e confirme se há novas decisões arquiteturais para registrar.`,
+                text: `Current contents of .omnicode/memory.md:\n\n${currentMemory}\n\n${note ? `New decision recorded: "${note}". ` : ""}Summarize durable project context and confirm if additional architectural decisions should be recorded.`,
                 delivery: input.delivery,
               })
             }).pipe(Effect.asVoid),
@@ -115,26 +93,29 @@ export const Plugin = define({
 
         const executeUltrawork = (input: Parameters<Parameters<typeof editor.add>[0]["execute"]>[0]) =>
           Effect.gen(function* () {
-            const goal = input.prompt.text.trim() || "Executar missão completa de ponta a ponta com máxima autonomia"
-            const subtasks = Option.isSome(orchestratorOpt) ? yield* orchestratorOpt.value.planUltrawork(goal) : []
-            const missionSessionId = Option.isSome(omniSessionOpt)
-              ? yield* omniSessionOpt.value.save({
-                  goal,
-                  mode: "ultrawork",
-                  subtasks,
-                })
-              : "ulw-local"
+            const goal = input.prompt.text.trim() || "Execute end-to-end mission with maximum autonomy"
+            const missionID = `mission-${crypto.randomUUID()}`
+            const mission = yield* planAndPersistMission({
+              missionID,
+              goal,
+              mode: "ultrawork",
+              fallbackSessionID: "ulw-local",
+              plan: (id) => Option.isSome(orchestratorOpt) ? orchestratorOpt.value.planUltrawork(goal, id) : Effect.succeed([]),
+              save: Option.isSome(omniSessionOpt) ? omniSessionOpt.value.save : undefined,
+            })
+            const subtasks = mission.subtasks
+            const missionSessionId = mission.sessionID
             const planPath = Option.isSome(omniSessionOpt)
               ? yield* omniSessionOpt.value.savePlan(missionSessionId, goal, subtasks)
               : ".omnicode/plans"
             const taskSummary = subtasks
-              .map((t) => `- [${t.id}] (@${t.assignedAgent}${t.parallel ? " · PARALELO" : ""}): ${t.title}`)
+              .map((t) => `- [${t.id}] (@${t.assignedAgent}${t.parallel ? " · PARALLEL" : ""}): ${t.title}`)
               .join("\n")
             yield* ctx.session.prompt({
               ...input.prompt,
               sessionID: input.sessionID,
               text: append(
-                `⚡ [MODO ULTRAWORK ATIVO — Sessão: ${missionSessionId}]\nPlano persistido em: ${planPath}\n\nSubtarefas geradas:\n${taskSummary}\n\nDIRETRIZES ULTRAWORK:\n1. Dispare @explore e @librarian em paralelo (background=true) quando aplicável.\n2. Crie e mantenha a lista Todo atualizada.\n3. Delegue implementação ao @coder com retorno Boomerang enxuto.\n4. Aplique o RALPH LOOP ENFORCER: execute @reviewer + typecheck/testes e NÃO pare até 100% dos itens estarem verificados.\n\nMeta:\n$ARGUMENTS`,
+                `⚡ [ULTRAWORK MODE ACTIVE — Session: ${missionSessionId}]\nPlan persisted at: ${planPath}\n\nGenerated subtasks:\n${taskSummary}\n\nULTRAWORK DIRECTIVES:\n1. Launch @explore and @librarian in parallel (background=true) when applicable.\n2. Create and maintain the Todo checklist.\n3. Delegate implementation to @coder with concise Boomerang responses.\n4. Apply RALPH LOOP ENFORCER: run @reviewer + typecheck/tests and DO NOT stop until 100% of items are verified.\n\nGoal:\n$ARGUMENTS`,
                 goal,
               ),
               delivery: input.delivery,
@@ -143,39 +124,37 @@ export const Plugin = define({
 
         editor.add({
           name: "ulw",
-          description: "Modo Ultrawork (Alta Autonomia): paraleliza @explore/@librarian, implementa com @coder e valida via Ralph Loop",
+          description: "Ultrawork Mode (High Autonomy): parallelizes @explore/@librarian, implements with @coder, validates via Ralph Loop",
           execute: executeUltrawork,
         })
-
-        editor.add({
-          name: "ultrawork",
-          description: "Alias completo para /ulw — Execução autônoma multi-agente de ponta a ponta",
-          execute: executeUltrawork,
-        })
+        editor.add({ name: "ultrawork", description: "Deprecated alias for /ulw", execute: executeUltrawork })
 
         editor.add({
           name: "arena",
-          description: "Arena Multi-Modelo (Best-of-N): dispara 3 subagentes com modelos diferentes em paralelo para diagnosticar problemas difíceis",
+          description: "Multi-Model Arena (Best-of-N): runs up to 3 competing subagents with different models in parallel to evaluate hard trade-offs",
           execute: (input) =>
             Effect.gen(function* () {
-              const problem = input.prompt.text.trim() || "Diagnosticar gargalos e propor a melhor arquitetura"
+              const problem = input.prompt.text.trim() || "Diagnose bottlenecks and propose optimal architecture"
               const available = Option.isSome(modelsOpt) ? yield* modelsOpt.value.available() : []
-              const arenaModels = available.slice(0, 3).map((m) => `${m.providerID}/${m.id}`)
-              const selectedModels =
-                arenaModels.length > 0
-                  ? arenaModels
-                  : ["openai/gpt-6-astra", "opencode/big-pickle", "opencode/deepseek-v4.1-flash-free"]
-              const subtasks = Option.isSome(orchestratorOpt)
-                ? yield* orchestratorOpt.value.planArena(problem, selectedModels)
-                : []
+              const selectedModels = yield* selectArenaModels(available)
+              const missionID = `mission-${crypto.randomUUID()}`
+              const mission = yield* planAndPersistMission({
+                missionID,
+                goal: problem,
+                mode: "arena",
+                fallbackSessionID: "arena-local",
+                plan: (id) => Option.isSome(orchestratorOpt) ? orchestratorOpt.value.planArena(problem, selectedModels, id) : Effect.succeed([]),
+                save: Option.isSome(omniSessionOpt) ? omniSessionOpt.value.save : undefined,
+              })
+              const subtasks = mission.subtasks
               const arenaList = subtasks
-                .map((t) => `- [${t.id}] (@${t.assignedAgent} usando model="${t.preferredModel}"): ${t.title}`)
+                .map((t) => `- [${t.id}] (@${t.assignedAgent} using model="${t.preferredModel}"): ${t.title}`)
                 .join("\n")
               yield* ctx.session.prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  `🛡️ [MODO ARENA MULTI-MODELO (BEST-OF-N)]\nDispare os seguintes subagentes em paralelo (background=true) passando explicitamente o parâmetro 'model' em cada chamada da ferramenta subagent:\n${arenaList}\n\nAo receber os relatórios Boomerang dos 3 modelos, compare as abordagens, escolha ou combine a melhor solução técnica e aplique-a para:\n\n$ARGUMENTS`,
+                  `🛡️ [MULTI-MODEL ARENA (BEST-OF-N)]\nDispatch the following subagents in parallel (background=true) passing the 'model' parameter explicitly on each subagent tool call:\n${arenaList}\n\nUpon receiving Boomerang reports from all selected models, compare approaches, synthesize the best technical solution, and apply it for:\n\n$ARGUMENTS`,
                   problem,
                 ),
                 delivery: input.delivery,
@@ -185,17 +164,17 @@ export const Plugin = define({
 
         editor.add({
           name: "ralph",
-          description: "Ralph Loop Enforcer: força verificação contínua (Todo + typecheck + testes + @reviewer) até zerar pendências",
+          description: "Ralph Loop Enforcer: continuous verification loop (Todo + typecheck + tests + @reviewer) until 0 errors",
           execute: (input) =>
             Effect.gen(function* () {
               const check = Option.isSome(orchestratorOpt)
                 ? yield* orchestratorOpt.value.verifyCompletion({ todosPending: 1, hasUnverifiedEdits: true })
-                : { passed: false, reminder: "Verifique pendências." }
+                : { passed: false, reminder: "Verify pending tasks." }
               yield* ctx.session.prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  `🔁 ${check.reminder ?? "[RALPH LOOP ENFORCER]"}\n1. Inspecione todos os itens Todo pendentes.\n2. Execute typecheck e testes nos pacotes afetados.\n3. Acione @reviewer para auditar o diff.\n4. Corrija qualquer falha encontrada até que 100% passe sem erros.\n\nContexto adicional:\n$ARGUMENTS`,
+                  `🔁 ${check.reminder ?? "[RALPH LOOP ENFORCER]"}\n1. Inspect all pending Todo items.\n2. Run typecheck and tests in affected packages.\n3. Trigger @reviewer to audit the git diff.\n4. Fix any failure found until 100% passes with exit code 0.\n\nAdditional context:\n$ARGUMENTS`,
                   input.prompt.text,
                 ),
                 delivery: input.delivery,
@@ -205,14 +184,14 @@ export const Plugin = define({
 
         editor.add({
           name: "worktree",
-          description: "Isolamento Git Worktree: executa tarefas paralelas do @coder em worktrees dedicadas (.omnicode/worktrees/)",
+          description: "Git Worktree Isolation: executes parallel tasks in dedicated worktrees (.omnicode/worktrees/)",
           execute: (input) =>
             ctx.session
               .prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  "🌿 [ISOLAMENTO GIT WORKTREE]\nPara evitar conflitos de arquivos entre subagentes paralelos:\n1. Crie uma worktree isolada em `.omnicode/worktrees/<tarefa>` com branch própria.\n2. Delegue a implementação ao @coder dentro da worktree.\n3. Valide com @reviewer (typecheck + testes) e faça o merge limpo de volta na branch atual.\n\nTarefa:\n$ARGUMENTS",
+                  "🌿 [GIT WORKTREE ISOLATION]\nTo avoid file conflicts between parallel subagents:\n1. Create an isolated worktree at `.omnicode/worktrees/<task>` on its own branch.\n2. Delegate implementation to @coder inside the worktree.\n3. Validate with @reviewer (typecheck + tests) and perform a clean merge back to the current branch.\n\nTask:\n$ARGUMENTS",
                   input.prompt.text,
                 ),
                 delivery: input.delivery,
@@ -222,7 +201,7 @@ export const Plugin = define({
 
         editor.add({
           name: "bus",
-          description: "Barramento Entre Sessões (OmniBus): lê descobertas de outras sessões/subagentes ou envia mensagem para outra sessão",
+          description: "Cross-Session Bus (OmniBus): inspects discoveries across sessions or broadcasts cross-session messages",
           execute: (input) =>
             Effect.gen(function* () {
               const msgText = input.prompt.text.trim()
@@ -242,7 +221,7 @@ export const Plugin = define({
               yield* ctx.session.prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
-                text: `${digest || "Barramento OmniBus vazio no momento."}\n\nUse a ferramenta 'omni_bus' (actions: 'list_sessions', 'read', 'broadcast', 'send_session_message') para listar outras sessões ativas ou conversar diretamente com qualquer sessão pelo sessionID.${msgText ? `\n\nInstrução: ${msgText}` : ""}`,
+                text: `${digest || "OmniBus cross-session message bus is currently empty."}\n\nUse the 'omni_bus' tool (actions: 'list_sessions', 'read', 'broadcast', 'send_session_message') to list other active sessions or send direct session-to-session messages by sessionID.${msgText ? `\n\nInstruction: ${msgText}` : ""}`,
                 delivery: input.delivery,
               })
             }).pipe(Effect.asVoid),
@@ -250,14 +229,14 @@ export const Plugin = define({
 
         editor.add({
           name: "memory",
-          description: "Memory Bank Persistente (.omnicode/memory-bank/): lê ou atualiza os arquivos de memória do projeto",
+          description: "Persistent Memory Bank (.omnicode/memory-bank/): reads or updates project memory bank files",
           execute: (input) =>
             ctx.session
               .prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  "🧠 [MEMORY BANK PERSISTENTE — .omnicode/memory-bank/]\nUse a ferramenta 'omni_memory' para consultar ou atualizar a memória perpétua do projeto:\n1. 'project-brief.md' — Visão geral e escopo.\n2. 'system-patterns.md' — Padrões de código e decisões de arquitetura.\n3. 'tech-context.md' — Stack, ferramentas e comandos.\n4. 'active-context.md' — Foco atual e tarefas em andamento.\n\nInstrução:\n$ARGUMENTS",
+                  "🧠 [PERSISTENT MEMORY BANK — .omnicode/memory-bank/]\nUse the 'omni_memory' tool to consult or update the project's permanent memory:\n1. 'project-brief.md' — High-level goals, scope, and vision.\n2. 'system-patterns.md' — Architectural patterns and code conventions.\n3. 'tech-context.md' — Tech stack, tools, and run commands.\n4. 'active-context.md' — Current sprint focus and active work.\n\nInstruction:\n$ARGUMENTS",
                   input.prompt.text,
                 ),
                 delivery: input.delivery,
@@ -267,14 +246,14 @@ export const Plugin = define({
 
         editor.add({
           name: "checkpoint",
-          description: "Workspace Checkpoints: cria ou lista snapshots de restauração no Git (.omnicode/checkpoints/)",
+          description: "Workspace Checkpoints: creates or inspects clean Git restoration snapshots (.omnicode/checkpoints/)",
           execute: (input) =>
             ctx.session
               .prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  "💾 [WORKSPACE CHECKPOINT & TIME-TRAVEL]\nUse a ferramenta 'omni_checkpoint' (actions: 'create', 'list', 'restore', 'diff') para salvar um ponto de restauração limpo do repositório ou visualizar os snapshots existentes.\n\nInstrução:\n$ARGUMENTS",
+                  "💾 [WORKSPACE CHECKPOINTS & TIME-TRAVEL]\nUse the 'omni_checkpoint' tool (actions: 'create', 'list', 'restore', 'diff') to save a clean restoration snapshot of the repository or inspect existing checkpoints.\n\nInstruction:\n$ARGUMENTS",
                   input.prompt.text,
                 ),
                 delivery: input.delivery,
@@ -284,14 +263,14 @@ export const Plugin = define({
 
         editor.add({
           name: "undo",
-          description: "Time-Travel Undo: restaura os arquivos do workspace para o checkpoint anterior da IA",
+          description: "Time-Travel Undo: restores workspace files to the checkpoint prior to AI modifications",
           execute: (input) =>
             ctx.session
               .prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  "⏪ [TIME-TRAVEL UNDO]\nExecute a ferramenta 'omni_checkpoint' com action: 'restore' para reverter o workspace ao estado do último checkpoint antes das edições da IA.\n\nInstrução:\n$ARGUMENTS",
+                  "⏪ [TIME-TRAVEL UNDO]\nExecute the 'omni_checkpoint' tool with action: 'restore' to roll back the workspace to the state of the last checkpoint before AI edits.\n\nInstruction:\n$ARGUMENTS",
                   input.prompt.text,
                 ),
                 delivery: input.delivery,
@@ -301,14 +280,14 @@ export const Plugin = define({
 
         editor.add({
           name: "heal",
-          description: "Self-Healing Test Loop: executa a suíte de testes/typecheck e corrige falhas em loop até passar 100%",
+          description: "Self-Healing Test Loop: runs test suite/typecheck and fixes errors in a loop until 100% pass",
           execute: (input) =>
             ctx.session
               .prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  "🔄 [SELF-HEALING AUTONOMOUS LOOP]\n1. Execute 'omni_heal' (action: 'run_and_heal') com comando de teste ou typecheck.\n2. Se houver falha, inspecione o traceback extraído e os arquivos afetados.\n3. Aplique a correção via @coder.\n4. Re-execute o teste até que 100% dos testes e verificações passem com código 0.\n\nComando ou escopo:\n$ARGUMENTS",
+                  "🔄 [SELF-HEALING AUTONOMOUS LOOP]\n1. Execute 'omni_heal' (action: 'run_and_heal') with a test or typecheck command.\n2. If failures occur, inspect the extracted traceback and affected files.\n3. Apply targeted fixes via @coder.\n4. Re-run tests until 100% of checks pass with exit code 0.\n\nCommand or scope:\n$ARGUMENTS",
                   input.prompt.text,
                 ),
                 delivery: input.delivery,
@@ -318,14 +297,14 @@ export const Plugin = define({
 
         editor.add({
           name: "commit",
-          description: "Auto-Commit Inteligente: analisa o git diff e realiza um commit convencional atômico",
+          description: "Intelligent Auto-Commit: analyzes git diff and creates an atomic conventional commit",
           execute: (input) =>
             ctx.session
               .prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  "🏷️ [AUTO-COMMIT INTELIGENTE]\n1. Use 'omni_commit' (action: 'status') para inspecionar os arquivos alterados.\n2. Gere ou confirme a mensagem convencional com 'generate_message' ou use 'commit_all' para commitar atomicamente.\n\nMensagem opcional:\n$ARGUMENTS",
+                  "🏷️ [INTELLIGENT AUTO-COMMIT]\n1. Use 'omni_commit' (action: 'status') to inspect changed files.\n2. Generate or confirm a conventional message with 'generate_message' or use 'commit_all' to commit atomically.\n\nOptional message:\n$ARGUMENTS",
                   input.prompt.text,
                 ),
                 delivery: input.delivery,
@@ -335,18 +314,26 @@ export const Plugin = define({
 
         editor.add({
           name: "team",
-          description: "Pipeline de Equipe Completa: orquestra Planner -> Architect -> Coder -> Reviewer com entregas formais",
+          description: "Full Team Pipeline: 4 autonomous phases (@planner -> @architect -> @coder -> @reviewer)",
           execute: (input) =>
             Effect.gen(function* () {
-              const goal = input.prompt.text.trim() || "Executar pipeline completo de equipe"
+              const goal = input.prompt.text.trim() || "Execute complete team pipeline"
+              const missionID = `mission-${crypto.randomUUID()}`
               if (Option.isSome(orchestratorOpt)) {
-                yield* orchestratorOpt.value.planTeamPipeline(goal)
+                yield* planAndPersistMission({
+                  missionID,
+                  goal,
+                  mode: "team",
+                  fallbackSessionID: "team-local",
+                  plan: (id) => orchestratorOpt.value.planTeamPipeline(goal, id),
+                  save: Option.isSome(omniSessionOpt) ? omniSessionOpt.value.save : undefined,
+                })
               }
               yield* ctx.session.prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  "🎯 [PIPELINE DE EQUIPE COMPLETA — 4 FASES AUTÔNOMAS]\nIniciando execução com a equipe multidisciplinar de especialistas:\n1. @planner: Especificação formal de requisitos, critérios de aceite e escopo.\n2. @architect: Desenho de interfaces, schemas, contratos de tipos e limites modulares.\n3. @coder: Implementação atômica dos módulos e suíte de testes.\n4. @reviewer: Auditoria de segurança, verificação de diff e garantia de testes 100% verdes (Ralph Loop).\n\nMeta da missão:\n$ARGUMENTS",
+                  "🎯 [FULL TEAM PIPELINE — 4 AUTONOMOUS PHASES]\nStarting execution with multidisciplinary specialist team:\n1. @planner: Formal requirements specification, acceptance criteria, and scope.\n2. @architect: Interface design, schemas, type contracts, and module boundaries.\n3. @coder: Atomic implementation of modules and test suites.\n4. @reviewer: Security audit, git diff review, and 100% green tests verification (Ralph Loop).\n\nMission goal:\n$ARGUMENTS",
                   input.prompt.text,
                 ),
                 delivery: input.delivery,
@@ -356,24 +343,24 @@ export const Plugin = define({
 
         editor.add({
           name: "auto-customizations",
-          description: "Configuração de Auto-Uso: define quais skills, agentes, MCPs, hooks e mods são usados de acordo com o trabalho",
+          description: "Auto-Customizations Orchestrator: configures proactive use of skills, agents, MCPs, hooks, and mods",
           execute: (input) =>
             Effect.gen(function* () {
               const cfg = OmniOrchestrator.getAutoCustomizationsConfig()
               const summary = [
-                `Status Geral: ${cfg.enabled ? "ATIVADO" : "DESATIVADO"}`,
-                `- Skills Especializadas: ${cfg.useSkills ? "Sim" : "Não"}`,
-                `- Subagentes (@architect, @coder, etc.): ${cfg.useAgents ? "Sim" : "Não"}`,
-                `- Servidores MCP Conectados: ${cfg.useMcps ? "Sim" : "Não"}`,
-                `- Ganchos & Hooks: ${cfg.useHooks ? "Sim" : "Não"}`,
-                `- Mods e Plugins: ${cfg.useMods ? "Sim" : "Não"}`,
-                `- Comandos Slash & Loops: ${cfg.useCommands ? "Sim" : "Não"}`,
-                `- Modos e Settings: ${cfg.useSettings ? "Sim" : "Não"}`,
+                `Global Orchestration Status: ${cfg.enabled ? "ENABLED" : "DISABLED"}`,
+                `- Specialized Skills: ${cfg.useSkills ? "Yes" : "No"}`,
+                `- Specialist Subagents (@architect, @coder, etc.): ${cfg.useAgents ? "Yes" : "No"}`,
+                `- Connected MCP Servers: ${cfg.useMcps ? "Yes" : "No"}`,
+                `- Hooks & Triggers: ${cfg.useHooks ? "Yes" : "No"}`,
+                `- Mods & Plugins: ${cfg.useMods ? "Yes" : "No"}`,
+                `- Slash Commands & Loops: ${cfg.useCommands ? "Yes" : "No"}`,
+                `- Modes & Settings: ${cfg.useSettings ? "Yes" : "No"}`,
               ].join("\n")
               yield* ctx.session.prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
-                text: `⚙️ [CONFIGURAÇÃO DE AUTO-USO DE RECURSOS]\n${summary}\n\nDica: Para alterar essas opções visualmente com 1 tecla, abra o seletor em /variantes ou /agentes, ou alterne no menu de customizações.\n\n$ARGUMENTS`,
+                text: `⚙️ [PROACTIVE RESOURCE AUTO-ORCHESTRATION CONFIG]\n${summary}\n\nTip: To adjust these options interactively with a single keypress, open the selector via /variants, /agents, or the customizations dialog.\n\n$ARGUMENTS`,
                 delivery: input.delivery,
               })
             }).pipe(Effect.asVoid),
@@ -382,10 +369,7 @@ export const Plugin = define({
 
       editor.add({
         name: "init",
-        description:
-          process.env.OMNICODE_ACTIVE === "1"
-            ? "Configuração guiada do AGENTS.md para o projeto"
-            : "guided AGENTS.md setup",
+        description: "Guided AGENTS.md setup for the project",
         execute: (input) =>
           ctx.session
             .prompt({
@@ -398,10 +382,7 @@ export const Plugin = define({
       })
       editor.add({
         name: "review",
-        description:
-          process.env.OMNICODE_ACTIVE === "1"
-            ? "Revisar alterações [commit|branch|pr], padrão para alterações não commitadas"
-            : "review changes [commit|branch|pr], defaults to uncommitted",
+        description: "Review changes [commit|branch|pr], defaults to uncommitted",
         execute: (input) =>
           ctx.session
             .prompt({
@@ -471,3 +452,26 @@ function sanitize(value: string) {
 
 const argsRegex = /(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
 const quoteTrimRegex = /^["']|["']$/g
+
+export function selectArenaModels(available: ReadonlyArray<Model.Info>) {
+  const eligible = available.filter((model) => model.enabled && model.status !== "deprecated")
+  if (eligible.length === 0) return Effect.fail(new Error("Arena requires at least one enabled, non-deprecated model"))
+  return Effect.succeed(eligible.slice(0, 3).map((model) => `${model.providerID}/${model.id}`))
+}
+
+export function planAndPersistMission<T>(input: {
+  readonly missionID: string
+  readonly goal: string
+  readonly mode: string
+  readonly fallbackSessionID: string
+  readonly plan: (missionID: string) => Effect.Effect<ReadonlyArray<T>>
+  readonly save?: (input: OmniSession.SaveSessionInput) => Effect.Effect<string>
+}) {
+  return Effect.gen(function* () {
+    const subtasks = yield* input.plan(input.missionID)
+    const sessionID = input.save
+      ? yield* input.save({ id: input.missionID, goal: input.goal, mode: input.mode, subtasks })
+      : input.fallbackSessionID
+    return { subtasks, sessionID }
+  })
+}

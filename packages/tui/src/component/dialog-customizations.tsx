@@ -48,10 +48,10 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
       items.push({
         id: "cfg:auto-customizations",
         kind: "setting",
-        title: "⚙️ Configurar Auto-Uso de Recursos...",
-        description: `Status: ${local.customizations.summary()} · Escolher quais skills, agentes, MCPs, hooks e mods a IA usa automaticamente`,
-        category: "⚡ Orquestração Automática",
-        footer: "[Configurar]",
+        title: "⚙️ Configure Auto-Resource Management...",
+        description: `Status: ${local.customizations.summary()} · Choose which skills, agents, MCPs, hooks and mods the AI uses automatically`,
+        category: "⚡ Auto-Orchestration",
+        footer: "[Configure]",
       })
     }
 
@@ -62,9 +62,9 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
           id: `agent:${agent.id}`,
           kind: "agent",
           title: `@${agent.id}`,
-          description: agent.description ?? "Agente especialista",
-          category: agent.mode === "subagent" ? "Agentes Especialistas (@)" : "Agentes Principais",
-          footer: agent.model ? `[${agent.model.providerID}/${agent.model.id}]` : "[Agente]",
+          description: agent.description ?? "Specialist agent",
+          category: agent.mode === "subagent" ? "Specialist Agents (@)" : "Primary Agents",
+          footer: agent.model ? `[${agent.model.providerID}/${agent.model.id}]` : "[Agent]",
           content: agent.system,
         })
       }
@@ -90,11 +90,11 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
 
         const kind = isHook ? "hook" : isMod ? "mod" : isSetting ? "setting" : "skill"
         const category = isHook
-          ? "Ganchos / Hooks"
+          ? "Hooks"
           : isMod
-            ? "Mods e Plugins"
+            ? "Mods and Plugins"
             : isSetting
-              ? "Presets e Modos (Settings)"
+              ? "Presets and Settings"
               : "Skills (@)"
         const badge = isHook ? "[Hook]" : isMod ? "[Mod/Plugin]" : isSetting ? "[Setting]" : "[Skill]"
 
@@ -119,13 +119,13 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
           id: `cmd:${cmd.name}`,
           kind: "command",
           title: `/${cmd.name}`,
-          description: cmd.description ?? `Comando /${cmd.name}`,
+          description: cmd.description ?? `Command /${cmd.name}`,
           category: isLoop
-            ? "Loops de Verificação (/loop-*)"
+            ? "Verification Loops (/loop-*)"
             : isHookCmd
-              ? "Comandos de Ganchos (/hook-*)"
-              : "Comandos Slash (/)",
-          footer: isLoop ? "[Loop]" : isHookCmd ? "[Hook Cmd]" : "[Comando]",
+              ? "Hook Commands (/hook-*)"
+              : "Slash Commands (/)",
+          footer: isLoop ? "[Loop]" : isHookCmd ? "[Hook Cmd]" : "[Command]",
         })
       }
     }
@@ -137,8 +137,8 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
           id: `mcp:${srv.name}`,
           kind: "mcp",
           title: srv.name,
-          description: `Servidor MCP (${srv.status.status})`,
-          category: "Servidores MCP",
+          description: `MCP Server (${srv.status.status})`,
+          category: "MCP Servers",
           footer: `[MCP: ${srv.status.status}]`,
         })
       }
@@ -151,21 +151,21 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
     const count = allItems().length
     switch (props.filter) {
       case "skills":
-        return `Skills Instaladas (${count})`
+        return `Installed Skills (${count})`
       case "hooks":
-        return `Ganchos / Hooks (${count})`
+        return `Hooks (${count})`
       case "mods":
-        return `Mods e Plugins (${count})`
+        return `Mods and Plugins (${count})`
       case "settings":
-        return `Settings e Modos (${count})`
+        return `Settings and Modes (${count})`
       case "commands":
-        return `Comandos e Loops (${count})`
+        return `Commands and Loops (${count})`
       case "agents":
-        return `Agentes e Especialistas (${count})`
+        return `Agents and Specialists (${count})`
       case "mcps":
-        return `Servidores MCP (${count})`
+        return `MCP Servers (${count})`
       default:
-        return `Central de Personalizações OnethyCode (${count} itens ativos)`
+        return `OnethyCode Customizations Hub (${count} active items)`
     }
   })
 
@@ -186,7 +186,7 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
         <DialogSelect
           title={dialogTitle()}
           searchInTitle
-          titlePlaceholder="Buscar agentes, skills, plugins, mods, hooks, comandos ou MCPs..."
+          titlePlaceholder="Search agents, skills, plugins, mods, hooks, commands or MCPs..."
           options={options()}
           onSelect={(opt) => {
             const found = allItems().find((i) => i.id === opt.value)
@@ -199,7 +199,7 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
               const agentId = found.id.replace(/^agent:/, "")
               local.agent.set(agentId)
               dialog.clear()
-              toast.show({ variant: "info", message: `Agente selecionado: @${agentId}` })
+              toast.show({ variant: "info", message: `Agent selected: @${agentId}` })
               return
             }
             if (found.kind === "mcp") {
@@ -214,7 +214,7 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
             dialog.clear()
             toast.show({
               variant: "info",
-              message: `Use ${found.title} diretamente no chat para acionar este recurso.`,
+              message: `Use ${found.title} directly in the prompt to activate this resource.`,
             })
           }}
         />
@@ -228,7 +228,7 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
               {(detail().content ?? "").slice(0, 1800)}
             </text>
             <text fg={theme.text.muted}>
-              Dica: Digite {detail().title} no chat para usar esta personalização. Pressione ESC para fechar.
+              Tip: Type {detail().title} in prompt to use this customization. Press ESC to close.
             </text>
           </box>
         </DialogLayout>

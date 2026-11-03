@@ -24,7 +24,7 @@ export function SettingsServerUnavailable(props: {
   const language = useLanguage()
   const dialog = useDialog()
   const global = useGlobal()
-  const [state, setState] = createStore({ retrying: false })
+  const [state, setState] = createStore({ retrying: false, error: undefined as string | undefined })
 
   const http = () =>
     props.entry.connection?.type === "http" && !ServerConnection.builtin(props.entry.connection)
@@ -32,8 +32,11 @@ export function SettingsServerUnavailable(props: {
       : undefined
 
   const retry = () => {
-    setState("retrying", true)
-    void global.servers.retry().finally(() => setState("retrying", false))
+    setState({ retrying: true, error: undefined })
+    void global.servers
+      .retry()
+      .catch((error) => setState("error", error instanceof Error ? error.message : language.t("common.requestFailed")))
+      .finally(() => setState("retrying", false))
   }
 
   const edit = () => {
@@ -78,6 +81,7 @@ export function SettingsServerUnavailable(props: {
                 {language.t("settings.server.unreachable.edit")}
               </Button>
             </div>
+            {state.error && <div class="text-11-regular text-v2-state-fg-danger" role="alert">{state.error}</div>}
           </div>
         </SettingsList>
       </div>

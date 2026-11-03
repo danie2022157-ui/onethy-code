@@ -57,6 +57,14 @@
   outline: none;
 }
 
+@media (forced-colors: active) {
+  .search-list-row:focus-visible,
+  .search-list-search :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
 .search-list-row-text {
   display: flex;
   min-width: 0;

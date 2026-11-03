@@ -12,11 +12,13 @@ import {
   useCurrentRoute,
   usePluginServers,
   useTabs,
+  useLanguage,
   type LayoutRoute,
 } from "@opencode/app/desktop"
+import { Button } from "@opencode/ui/button"
 import { useTheme } from "@opencode/ui/theme/context"
 import type { BaseRouterProps } from "@solidjs/router"
-import { createEffect, createMemo, createResource, lazy, Show, Suspense } from "solid-js"
+import { createEffect, createMemo, createResource, ErrorBoundary, For, lazy, Show, Suspense } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { ElectronAPI } from "./api-types"
 import { DesktopFirstLaunchOnboarding } from "./onboarding"
@@ -42,6 +44,7 @@ export function DesktopApp(props: { api: ElectronAPI; version: string }) {
     themeReady: false,
     onboardingReady: false,
     drawingReady: false,
+    onboardingAttempt: 1,
     route,
   })
 
@@ -49,18 +52,14 @@ export function DesktopApp(props: { api: ElectronAPI; version: string }) {
   // onboarding decision yet, asks over IPC and waits for the port.
   const bootstrap = props.api.getWindowBootstrap()
 
-  const [firstLaunch] = createResource(() =>
+  const [firstLaunch, { refetch: retryFirstLaunch }] = createResource(() =>
     bootstrap.firstLaunchPending !== undefined
       ? Promise.resolve(bootstrap.firstLaunchPending)
-      : props.api.isFirstLaunchOnboardingPending().catch((error) => {
-          console.error("[desktop-onboarding] first launch check failed", error)
-
-          return false
-        }),
+      : props.api.isFirstLaunchOnboardingPending(),
   )
 
   const platform = createDesktopPlatform(props.api, windowState)
-  const [sidecar, { mutate: setSidecar }] = createResource(() => props.api.awaitInitialization())
+  const [sidecar, { mutate: setSidecar, refetch: retrySidecar }] = createResource(() => props.api.awaitInitialization())
 
   const [locale] = createResource(() => preloadStoredLocale(platform))
 
@@ -73,11 +72,18 @@ export function DesktopApp(props: { api: ElectronAPI; version: string }) {
 
   const readyToReveal = () =>
     startup.ready &&
-    (!import.meta.env.OPENCODE_TEST_ONBOARDING || !firstLaunch() || initialUrl !== "/" || startup.drawingReady)
+    (!import.meta.env.OPENCODE_TEST_ONBOARDING || firstLaunch.state !== "ready" || !firstLaunch() || initialUrl !== "/" || startup.drawingReady)
+
+  const startupError = () => firstLaunch.error ?? sidecar.error
+
+  const retryStartup = () => {
+    void Promise.all([retryFirstLaunch(), retrySidecar()]).catch(() => undefined)
+    setStartup("onboardingAttempt", (value) => value + 1)
+  }
 
   // Reveal only after the theme and the first-launch splash choice are both resolved.
   createEffect(() => {
-    if (!startup.themeReady || firstLaunch.loading) return
+    if (!startup.themeReady || firstLaunch.loading || startupError()) return
     void props.api.themeReady()
   })
 
@@ -111,12 +117,32 @@ export function DesktopApp(props: { api: ElectronAPI; version: string }) {
             onReady={() => setStartup("ready", true)}
             onRoute={(route) => setStartup("route", route)}
           />
-          <DesktopFirstLaunchOnboarding
-            api={props.api}
-            initialUrl={initialUrl}
-            pending={firstLaunch() ?? false}
-            onReady={() => setStartup("onboardingReady", true)}
-          />
+          <ErrorBoundary
+            fallback={(error, reset) => {
+              setStartup("ready", true)
+              return (
+                <StartupFailure
+                  error={error}
+                  onRetry={() => {
+                    setStartup("onboardingReady", false)
+                    setStartup("onboardingAttempt", (value) => value + 1)
+                    reset()
+                  }}
+                />
+              )
+            }}
+          >
+            <For each={[startup.onboardingAttempt]}>
+              {() => (
+                <DesktopFirstLaunchOnboarding
+                  api={props.api}
+                  initialUrl={initialUrl}
+                  pending={firstLaunch() ?? false}
+                  onReady={() => setStartup("onboardingReady", true)}
+                />
+              )}
+            </For>
+          </ErrorBoundary>
           <DesktopEffects api={props.api} />
           <Suspense fallback={null}>
             <Show when={initializationData(sidecar)} keyed>
@@ -138,8 +164,10 @@ export function DesktopApp(props: { api: ElectronAPI; version: string }) {
           setStartup("themeReady", true)
         }}
       >
-        <Show when={true}>{(_) => <ReadyApp />}</Show>
-        <Show when={!firstLaunch.loading && startup.visible}>
+        <Show when={startupError()} keyed fallback={<ReadyApp />}>
+          {(error) => <StartupFailure error={error()} onRetry={retryStartup} />}
+        </Show>
+        <Show when={!firstLaunch.loading && !startupError() && startup.visible}>
           <div
             data-component="startup-overlay"
             class="fixed inset-0 z-[100] transition-opacity duration-300 ease-out"
@@ -150,7 +178,7 @@ export function DesktopApp(props: { api: ElectronAPI; version: string }) {
             }}
           >
             <LoadingSplash
-              firstLaunch={!!firstLaunch() && initialUrl === "/"}
+              firstLaunch={firstLaunch.state === "ready" && !!firstLaunch() && initialUrl === "/"}
               deep={startup.route.type === "draft"}
               platform={platform}
               preview={import.meta.env.OPENCODE_TEST_ONBOARDING}
@@ -177,6 +205,22 @@ function DesktopStartupReady(props: {
   })
 
   return null
+}
+
+function StartupFailure(props: { error: unknown; onRetry: () => void }) {
+  const language = useLanguage()
+
+  return (
+    <div class="flex h-full w-full flex-col items-center justify-center gap-4 p-8 text-center">
+      <div class="text-16-medium text-text">{language.t("common.requestFailed")}</div>
+      <div class="text-13-regular text-text-weak max-w-md">
+        {props.error instanceof Error ? props.error.message : language.t("common.requestFailed")}
+      </div>
+      <Button size="large" onClick={props.onRetry}>
+        {language.t("common.retry")}
+      </Button>
+    </div>
+  )
 }
 
 function DesktopEffects(props: { api: ElectronAPI }) {

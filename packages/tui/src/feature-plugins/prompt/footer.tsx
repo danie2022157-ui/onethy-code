@@ -118,7 +118,7 @@ export function PromptFooter(props: {
                 [{shortcut("agent.cycle") ?? "shift+tab"}]
               </text>
               <text fg={props.context.theme.text.muted} selectable={false}>
-                agentes
+                agents
               </text>
             </box>
           </Match>
@@ -135,7 +135,7 @@ export function PromptFooter(props: {
               [{shortcut("command.palette.show") ?? "ctrl+p"}]
             </text>
             <text fg={props.context.theme.text.muted} selectable={false}>
-              comandos
+              commands
             </text>
           </box>
         </Show>
@@ -144,7 +144,7 @@ export function PromptFooter(props: {
         <text fg={props.context.theme.text.base} flexShrink={0}>
           esc{" "}
           <span style={{ fg: props.context.theme.text.muted }}>
-            {dimensions().width < 44 ? "shell" : "sair do modo shell"}
+            {dimensions().width < 44 ? "shell" : "exit shell mode"}
           </span>
         </text>
       </Match>

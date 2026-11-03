@@ -26,10 +26,10 @@ import { RGBA, TextAttributes } from "@opentui/core"
 let once = false
 const placeholder = {
   normal: [
-    "Resolva um TODO no código",
-    "Qual é a stack deste projeto?",
-    "Corrija os testes quebrados",
-    "Planeje uma nova funcionalidade com /ulw",
+    "Resolve a TODO in the codebase",
+    "What is the tech stack of this project?",
+    "Fix broken tests",
+    "Plan a new feature with /ulw",
   ],
   shell: ["ls -la", "git status", "pwd"],
 }
@@ -111,7 +111,7 @@ export function Home() {
     return [
       {
         icon: "👤",
-        label: "Agentes",
+        label: "Agents",
         count: String(agents),
         colorHex: "#00F5FF",
         onClick: () => dialog.replace(() => <DialogAgent />),
@@ -139,7 +139,7 @@ export function Home() {
       },
       {
         icon: "⚡",
-        label: "Comandos",
+        label: "Commands",
         count: String(commands),
         colorHex: "#F43F5E",
         onClick: () => dialog.replace(() => <DialogCustomizations filter="commands" />),
@@ -162,14 +162,14 @@ export function Home() {
   })
 
   const quickRow1 = [
-    { cmd: "/ulw", desc: "Ultrawork", fg: RGBA.fromHex("#00F5FF") },
-    { cmd: "/arena", desc: "Multi-Modelo", fg: RGBA.fromHex("#10B981") },
-    { cmd: "/raph", desc: "Loop Verificador", fg: RGBA.fromHex("#F43F5E") },
-    { cmd: "/bus", desc: "OnethyBus", fg: RGBA.fromHex("#00D2FF") },
+    { cmd: "/ulw", desc: "UltraWork", fg: RGBA.fromHex("#00F5FF") },
+    { cmd: "/arena", desc: "Multi-Model", fg: RGBA.fromHex("#10B981") },
+    { cmd: "/ralph", desc: "Self-Healing Loop", fg: RGBA.fromHex("#F43F5E") },
+    { cmd: "/omni", desc: "Orchestration", fg: RGBA.fromHex("#00D2FF") },
   ]
   const quickRow2 = [
-    { cmd: "/auto", desc: "Onethy Fusion", fg: RGBA.fromHex("#A855F7") },
-    { cmd: "/personalizacoes", desc: "Catálogo", fg: RGBA.fromHex("#F59E0B") },
+    { cmd: "/auto", desc: "Omni Fusion", fg: RGBA.fromHex("#A855F7") },
+    { cmd: "/auto-customizations", desc: "Capabilities", fg: RGBA.fromHex("#F59E0B") },
   ]
 
   return (
@@ -215,12 +215,18 @@ export function Home() {
                     return (
                       <box
                         flexDirection="row"
+                        focusable
                         paddingLeft={1}
                         paddingRight={1}
                         backgroundColor={bg()}
                         onMouseOver={() => setHovered(true)}
                         onMouseOut={() => setHovered(false)}
                         onMouseUp={badge.onClick}
+                        onKeyDown={(event) => {
+                          if (event.name !== "return" && event.name !== "space") return
+                          event.preventDefault()
+                          badge.onClick()
+                        }}
                       >
                         <text fg={fg()} attributes={TextAttributes.BOLD} selectable={false}>
                           {badge.icon} {badge.count}{" "}
@@ -242,12 +248,18 @@ export function Home() {
                     return (
                       <box
                         flexDirection="row"
+                        focusable
                         paddingLeft={1}
                         paddingRight={1}
                         backgroundColor={bg()}
                         onMouseOver={() => setHovered(true)}
                         onMouseOut={() => setHovered(false)}
                         onMouseUp={badge.onClick}
+                        onKeyDown={(event) => {
+                          if (event.name !== "return" && event.name !== "space") return
+                          event.preventDefault()
+                          badge.onClick()
+                        }}
                       >
                         <text fg={fg()} attributes={TextAttributes.BOLD} selectable={false}>
                           {badge.icon} {badge.count}{" "}
@@ -267,15 +279,22 @@ export function Home() {
                   <For each={quickRow1}>
                     {(chip) => {
                       const [hovered, setHovered] = createSignal(false)
+                      const apply = () => {
+                        const composer = ref()
+                        if (!composer) return
+                        composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
+                      }
                       return (
                         <box
                           flexDirection="row"
+                          focusable
                           onMouseOver={() => setHovered(true)}
                           onMouseOut={() => setHovered(false)}
-                          onMouseUp={() => {
-                            const composer = ref()
-                            if (!composer) return
-                            composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
+                          onMouseUp={apply}
+                          onKeyDown={(event) => {
+                            if (event.name !== "return" && event.name !== "space") return
+                            event.preventDefault()
+                            apply()
                           }}
                         >
                           <text
@@ -298,15 +317,22 @@ export function Home() {
                   <For each={quickRow2}>
                     {(chip) => {
                       const [hovered, setHovered] = createSignal(false)
+                      const apply = () => {
+                        const composer = ref()
+                        if (!composer) return
+                        composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
+                      }
                       return (
                         <box
                           flexDirection="row"
+                          focusable
                           onMouseOver={() => setHovered(true)}
                           onMouseOut={() => setHovered(false)}
-                          onMouseUp={() => {
-                            const composer = ref()
-                            if (!composer) return
-                            composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
+                          onMouseUp={apply}
+                          onKeyDown={(event) => {
+                            if (event.name !== "return" && event.name !== "space") return
+                            event.preventDefault()
+                            apply()
                           }}
                         >
                           <text

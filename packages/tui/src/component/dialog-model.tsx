@@ -129,12 +129,12 @@ function DialogConnectedModels(props: {
       })
     }
 
-    const favoriteOptions = toOptions(favorites, "Favoritos")
+    const favoriteOptions = toOptions(favorites, "Favorites")
     const recentOptions = toOptions(
       recents.filter(
         (item) => !favorites.some((fav) => fav.providerID === item.providerID && fav.modelID === item.modelID),
       ),
-      "Recentes",
+      "Recent",
     )
 
     const modelOptions = sortModelOptions(
@@ -153,7 +153,7 @@ function DialogConnectedModels(props: {
             title: model.name,
             releaseDate: model.time.released,
             description: newDesigns() ? undefined : favorite ? "(Favorite)" : undefined,
-            category: connected() ? (freeGroup(model) ? "Gratuitos" : (provider?.name ?? model.providerID)) : undefined,
+            category: connected() ? (freeGroup(model) ? "Free" : (provider?.name ?? model.providerID)) : undefined,
             footer: trailing(model, favorite),
             free: isFreeModel(model),
             detail: newDesigns() ? () => <ModelDetail model={model} usage={usage(model)} /> : undefined,
@@ -182,17 +182,17 @@ function DialogConnectedModels(props: {
     const connProviders = local.model.auto.connectedProviders()
     const connModels = local.model.auto.connectedModels()
     const connNames =
-      connProviders.length > 0 ? connProviders.map((p) => p.name).join(", ") : "Nenhum provedor conectado"
+      connProviders.length > 0 ? connProviders.map((p) => p.name).join(", ") : "No providers connected"
 
     const autoOptions =
       !props.providerID && process.env.OMNICODE_ACTIVE === "1"
         ? [
             {
               value: { providerID: "__auto__", modelID: "auto" },
-              title: `⚡ ${local.model.auto.modeName()} (Seleção Automática de Modelos)`,
-              description: `Provedores: ${connNames} (${connModels.length} modelos) · Variante: ${local.model.auto.tierLabel()}`,
-              category: "Seleção Automática",
-              footer: local.model.auto.enabled() ? `Ativo (${local.model.auto.tierLabel()}) ✓` : "Selecionar variante →",
+              title: `⚡ ${local.model.auto.modeName()} (Automatic Model Selection)`,
+              description: `Providers: ${connNames} (${connModels.length} models) · Tier: ${local.model.auto.tierLabel()}`,
+              category: "Automatic Selection",
+              footer: local.model.auto.enabled() ? `Active (${local.model.auto.tierLabel()}) ✓` : "Select tier →",
               onSelect: () => {
                 local.model.auto.enable()
                 dialog.replace(() => <DialogVariant />)
@@ -228,8 +228,8 @@ function DialogConnectedModels(props: {
       ...autoOptions,
       ...favoriteOptions,
       ...recentOptions,
-      ...modelOptions.filter((option) => option.category !== "Gratuitos"),
-      ...modelOptions.filter((option) => option.category === "Gratuitos"),
+      ...modelOptions.filter((option) => option.category !== "Free"),
+      ...modelOptions.filter((option) => option.category === "Free"),
     ]
   })
 
@@ -237,38 +237,38 @@ function DialogConnectedModels(props: {
 
   const title = createMemo(() => {
     const value = provider()
-    if (!value) return "Selecionar modelo"
+    if (!value) return "Select model"
     return value.name
   })
 
   return (
     <DialogSelect<ReturnType<typeof options>[number]["value"]>
       searchInTitle
-      titlePlaceholder="Buscar modelos..."
+      titlePlaceholder="Search models..."
       options={options()}
       actions={[
         {
           command: "model.dialog.provider",
           title: newDesigns()
             ? connected()
-              ? "conectar integração"
-              : "ver integrações"
+              ? "connect integration"
+              : "view integrations"
             : connected()
-              ? "Conectar integração"
-              : "Ver integrações",
+              ? "Connect integration"
+              : "View integrations",
           selection: "none",
           onTrigger: props.onConnect,
         },
         {
           command: "model.dialog.usage",
-          title: newDesigns() ? "uso & limites" : "Uso & Limites",
+          title: newDesigns() ? "usage & limits" : "Usage & Limits",
           selection: "none",
           hidden: !limits.info(),
           onTrigger: () => dialog.replace(() => <DialogUsage />),
         },
         {
           command: "model.dialog.optimize",
-          title: `otimizar: ${local.model.auto.tierLabel()}`,
+          title: `optimize: ${local.model.auto.tierLabel()}`,
           selection: "none",
           hidden: process.env.OMNICODE_ACTIVE !== "1",
           onTrigger: () => {
@@ -277,7 +277,7 @@ function DialogConnectedModels(props: {
         },
         {
           command: "model.dialog.favorite",
-          title: newDesigns() ? (option) => (isFavorite(option?.value) ? "desfavoritar" : "favoritar") : "Favoritar",
+          title: newDesigns() ? (option) => (isFavorite(option?.value) ? "unfavorite" : "favorite") : "Favorite",
           hidden: !connected(),
           onTrigger: (option) => {
             local.model.toggleFavorite(option.value as { providerID: string; modelID: string })

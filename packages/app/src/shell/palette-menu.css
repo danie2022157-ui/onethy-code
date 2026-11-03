@@ -22,6 +22,14 @@
   box-shadow: none;
 }
 
+@media (forced-colors: active) {
+  .palette-menu-search [data-component="text-input-v2"]:focus-within,
+  .palette-menu-row:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
 .palette-menu-search [data-slot="text-input-v2-value"] {
   border-radius: 6px;
   background: transparent;

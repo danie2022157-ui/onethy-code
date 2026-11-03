@@ -1,6 +1,8 @@
 import { BrowserWindow } from "electron"
 import { nextDesktopZoomLevel, type DesktopMenuAction } from "@opencode/app/desktop-menu"
-import { setZoomLevel } from "../windows"
+import { focusNextWindow, setZoomLevel } from "../windows"
+
+type NativeDesktopMenuAction = DesktopMenuAction | "window.next"
 
 export type DesktopMenuActionHandlers = Partial<{
   installCli: () => void
@@ -10,7 +12,7 @@ export type DesktopMenuActionHandlers = Partial<{
 
 export function runDesktopMenuAction(
   win: BrowserWindow | null,
-  action: DesktopMenuAction,
+  action: NativeDesktopMenuAction,
   handlers: DesktopMenuActionHandlers = {},
 ) {
   switch (action) {
@@ -24,6 +26,10 @@ export function runDesktopMenuAction(
       return
     case "window.new":
       handlers.createWindow?.()
+
+      return
+    case "window.next":
+      focusNextWindow()
 
       return
     case "window.close":

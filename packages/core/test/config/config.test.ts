@@ -1601,6 +1601,19 @@ describe("Config", () => {
     }).pipe(Effect.provide(AppNodeBuilder.build(FSUtil.node))),
   )
 
+  it.effect("accepts Claude-style dollar env references", () =>
+    Effect.gen(function* () {
+      const text = yield* ConfigVariable.substitute({
+        type: "virtual",
+        source: "test",
+        dir: "/",
+        text: '{ "token": "${env:TOKEN}" }',
+        env: { TOKEN: "secret" },
+      })
+      expect(JSON.parse(text)).toEqual({ token: "secret" })
+    }).pipe(Effect.provide(AppNodeBuilder.build(FSUtil.node))),
+  )
+
   it.live("does not load legacy config.json files", () =>
     Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
       Effect.flatMap((tmp) =>

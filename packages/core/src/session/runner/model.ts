@@ -7,6 +7,7 @@ import { Provider } from "@opencode/schema/provider"
 import { Context, Effect, Layer, Schema } from "effect"
 import { Agent } from "../../agent.js"
 import { ModelResolver } from "../../model-resolver.js"
+import { ModelSelectionPolicy } from "../../model-selection-policy.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { SessionSchema } from "../schema.js"
 
@@ -31,7 +32,15 @@ export class ModelUnavailableError extends Schema.TaggedError<ModelUnavailableEr
     return `Model unavailable: ${this.providerID}/${this.modelID}`
   }
 }
-export type Error = ModelNotSelectedError | ModelUnavailableError | ModelResolver.Error
+export class CooldownServiceUnavailableError extends Schema.TaggedError<CooldownServiceUnavailableError>()(
+  "SessionRunnerModel.CooldownServiceUnavailableError",
+  { sessionID: SessionSchema.ID },
+) {
+  override get message() {
+    return `Model cooldown service is unavailable for session ${this.sessionID}`
+  }
+}
+export type Error = ModelNotSelectedError | ModelUnavailableError | CooldownServiceUnavailableError | ModelResolver.Error
 export type Resolved = ModelResolver.Resolved
 
 export interface Interface {
@@ -77,64 +86,55 @@ const layer = Layer.effect(
     return Service.of({
       resolve: Effect.fn("SessionRunnerModel.resolve")(function* (session, available) {
         // Location plugins populate and filter the catalog asynchronously during layer startup.
+        const allowedModels = Effect.try({
+          try: () => {
+            if (process.env.OMNICODE_ALLOWED_MODELS === undefined) return undefined
+            const parsed: unknown = JSON.parse(process.env.OMNICODE_ALLOWED_MODELS)
+            if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.every((item) => typeof item === "string"))
+              throw new Error("OMNICODE_ALLOWED_MODELS must be a non-empty JSON array of model refs")
+            return parsed
+          },
+          catch: () => new ModelNotSelectedError({ sessionID: session.id }),
+        })
         if (!session.model) {
           const agent = (yield* agents.select(session.agent)).info?.model
-          const preferred =
-            agent &&
-            (yield* available()).find((model) => model.providerID === agent.providerID && model.id === agent.id)
-          const resolved = preferred
-            ? yield* resolver.resolveModel(preferred, agent.variant)
-            : yield* resolver.resolve()
+          const list = yield* available()
+          const configuredAllowlist = yield* allowedModels
+          // The general runner graph does not install the Omni plugin graph. Active Omni automatic routing
+          // therefore requires the caller's Location context to provide this service explicitly.
+          const orchestrator = yield* Effect.serviceOption(OmniOrchestrator.Service)
+          if (process.env.OMNICODE_ACTIVE === "1" && !agent && orchestrator._tag === "None")
+            return yield* new CooldownServiceUnavailableError({ sessionID: session.id })
+          const coolingDown = new Set<string>()
+          if (process.env.OMNICODE_ACTIVE === "1" && !agent && orchestrator._tag === "Some") {
+            for (const model of list) {
+              if (yield* orchestrator.value.isModelInCooldown(model.providerID, model.id))
+                coolingDown.add(`${model.providerID}/${model.id}`)
+            }
+          }
+          const preferred = yield* Effect.try({
+            try: () => ModelSelectionPolicy.select(list, {
+              mode: agent ? "explicit" : "automatic",
+              allowedModels: configuredAllowlist,
+              requiredTypes: ["chat"],
+              requiredCapabilities: { tools: true },
+              isCoolingDown: (ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
+            }, agent).selected,
+            catch: () => new ModelNotSelectedError({ sessionID: session.id }),
+          })
+          const resolved = yield* resolver.resolveModel(preferred, agent?.variant)
           if (resolved) return resolved
           return yield* new ModelNotSelectedError({ sessionID: session.id })
         }
 
+        const sessionModel = session.model
         const list = yield* available()
-        const isCooldownOrDeadFree =
-          OmniOrchestrator.isModelInCooldown(session.model.providerID, session.model.id) ||
-          (session.model.providerID === "opencode" &&
-            session.model.id === "flint-40b-free" &&
-            list.some((m) => m.providerID !== "opencode"))
-
-        if (isCooldownOrDeadFree) {
-          const preferredFallbackOrder = [
-            "google/antigravity-gemini-3.8-flash",
-            "openai/gpt-5.6-luna",
-            "openai/gpt-6-luna",
-            "google/gemini-4-argon",
-            "google/gemini-3.8-flash",
-            "opencode/nemotron-3.5-super-vl-free",
-          ]
-          const healthyList = list.filter((m) => !OmniOrchestrator.isModelInCooldown(m.providerID, m.id))
-          const pool = healthyList.length > 0 ? healthyList : list
-          let fallbackModel = undefined
-          for (const candidate of preferredFallbackOrder) {
-            const [pId, mId] = candidate.split("/")
-            const match = pool.find((m) => m.providerID === pId && m.id === mId)
-            if (match) {
-              fallbackModel = match
-              break
-            }
-          }
-          if (!fallbackModel) {
-            fallbackModel = pool.find(
-              (m) => m.providerID !== session.model?.providerID || m.id !== session.model?.id,
-            )
-          }
-          if (fallbackModel) {
-            return yield* resolver.resolveModel(fallbackModel, undefined)
-          }
-        }
-
-        const selected = list.find(
-          (model) => model.providerID === session.model?.providerID && model.id === session.model.id,
-        )
-        if (!selected)
-          return yield* new ModelUnavailableError({
-            providerID: session.model.providerID,
-            modelID: session.model.id,
-          })
-        return yield* resolver.resolveModel(selected, session.model.variant)
+        const configuredAllowlist = yield* allowedModels
+        const selected = yield* Effect.try({
+          try: () => ModelSelectionPolicy.select(list, { mode: "explicit", allowedModels: configuredAllowlist }, sessionModel).selected,
+          catch: () => new ModelUnavailableError({ providerID: sessionModel.providerID, modelID: sessionModel.id }),
+        })
+        return yield* resolver.resolveModel(selected, sessionModel.variant)
       }),
     })
   }),

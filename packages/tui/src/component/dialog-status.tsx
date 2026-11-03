@@ -45,14 +45,14 @@ export function DialogStatus() {
   }
 
   return (
-    <DialogLayout header={<DialogHeader title="Status do Sistema & Personalizações OmniCode" />}>
+    <DialogLayout header={<DialogHeader title="System Status & Customizations" />}>
       <box flexDirection="column" gap={1}>
         <box flexDirection="column">
           <text fg={theme.text.base}>
-            <b>Personalizações Ativas (Carregamento em Tempo Real)</b>
+            <b>Active Customizations (Real-Time Loading)</b>
           </text>
           <text fg={theme.text.base}>
-            • Agentes (@): <b>{breakdown().agents}</b> (/agents)
+            • Agents (@): <b>{breakdown().agents}</b> (/agents)
           </text>
           <text fg={theme.text.base}>
             • Skills (@): <b>{breakdown().pureSkills}</b> (/skills)
@@ -61,26 +61,26 @@ export function DialogStatus() {
             • Mods & Plugins: <b>{breakdown().mods}</b> (/mods · /plugins)
           </text>
           <text fg={theme.text.base}>
-            • Ganchos / Hooks: <b>{breakdown().hooks}</b> (/hooks)
+            • Hooks: <b>{breakdown().hooks}</b> (/hooks)
           </text>
           <text fg={theme.text.base}>
-            • Settings & Modos: <b>{breakdown().settings}</b> (/modes)
+            • Settings & Modes: <b>{breakdown().settings}</b> (/modes)
           </text>
           <text fg={theme.text.base}>
-            • Comandos Slash & Loops (/): <b>{breakdown().commands}</b> ({breakdown().loops} loops) (/commands)
+            • Slash Commands & Loops (/): <b>{breakdown().commands}</b> ({breakdown().loops} loops) (/commands)
           </text>
           <text fg={theme.text.base}>
-            • Servidores MCP: <b>{breakdown().mcps}</b> (/mcps)
+            • MCP Servers: <b>{breakdown().mcps}</b> (/mcps)
           </text>
           <text fg={theme.text.muted}>
-            Use /personalizacoes (ou Ctrl+P) para pesquisar tudo. Novos arquivos em %APPDATA%\omnicode ou .omnicode aparecem automaticamente.
+            Use /customizations (or Ctrl+P) to search everything. New files in %APPDATA%\omnicode or .omnicode load automatically.
           </text>
         </box>
 
-        <Show when={mcp().length > 0} fallback={<text fg={theme.text.base}>Nenhum servidor MCP</text>}>
+        <Show when={mcp().length > 0} fallback={<text fg={theme.text.base}>No MCP servers configured</text>}>
           <box flexDirection="column">
             <text fg={theme.text.base}>
-              <b>Servidores MCP ({mcp().length} registrados — use /mcps para conectar/desconectar)</b>
+              <b>MCP Servers ({mcp().length} registered — use /mcps to manage connections)</b>
             </text>
             <For each={mcp().slice(0, 12)}>
               {(item) => (
@@ -92,11 +92,11 @@ export function DialogStatus() {
                     <b>{item.name}</b>{" "}
                     <span style={{ fg: theme.text.muted }}>
                       <Switch fallback={item.status.status}>
-                        <Match when={item.status.status === "connected"}>Conectado</Match>
+                        <Match when={item.status.status === "connected"}>Connected</Match>
                         <Match when={item.status.status === "failed" && item.status}>{(val) => val().error}</Match>
-                        <Match when={item.status.status === "disabled"}>Disponível (desativado por padrão)</Match>
+                        <Match when={item.status.status === "disabled"}>Disabled</Match>
                         <Match when={item.status.status === "needs_auth" && item.status}>
-                          {(val) => `Requer autenticação: ${val().error}`}
+                          {(val) => `Requires auth: ${val().error}`}
                         </Match>
                       </Switch>
                     </span>
@@ -105,7 +105,7 @@ export function DialogStatus() {
               )}
             </For>
             <Show when={mcp().length > 12}>
-              <text fg={theme.text.muted}>... e mais {mcp().length - 12} servidores em /mcps</text>
+              <text fg={theme.text.muted}>... and {mcp().length - 12} more servers in /mcps</text>
             </Show>
           </box>
         </Show>

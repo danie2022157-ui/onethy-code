@@ -88,3 +88,28 @@ for (const flag of [undefined, "0", "1", "true"]) {
       ),
     )
 }
+
+it.effect("fails with a typed selection error for a malformed model allowlist", () =>
+  withEnv({ OMNICODE_ALLOWED_MODELS: "{}" }, () =>
+    Effect.gen(function* () {
+      const models = yield* Model.Service
+      const runner = yield* SessionRunnerModel.Service
+      const failure = yield* runner
+        .resolve(
+          Session.Info.make({
+            id: Session.ID.make("ses_bad_allowlist"),
+            projectID: Project.ID.global,
+            title: "test",
+            model: { id: Model.ID.make("missing"), providerID: Provider.ID.make("missing") },
+            cost: Money.USD.zero,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            time: { created: DateTime.makeUnsafe(0), updated: DateTime.makeUnsafe(0) },
+            location: ref,
+          }),
+          models.available,
+        )
+        .pipe(Effect.flip)
+      expect(failure._tag).toBe("SessionRunnerModel.ModelNotSelectedError")
+    }).pipe(Effect.provide(layer)),
+  ),
+)

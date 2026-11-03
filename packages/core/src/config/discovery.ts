@@ -77,7 +77,7 @@ export const discover = Effect.fn("ConfigDiscovery.discover")(function* (options
   const directories =
     globalRoots.slice(0, configDirectories.length).includes(current) || options?.project === false
       ? []
-      : yield* fs.up({ targets: ["."], start: location.directory }).pipe(Effect.orDie)
+      : yield* fs.up({ targets: ["."], start: location.directory, stop: os.homedir() }).pipe(Effect.orDie)
   const discovered = yield* Effect.forEach(directories, (directory) =>
     Effect.gen(function* () {
       // Resolve the parent too: missing children must honor symlinked global roots.

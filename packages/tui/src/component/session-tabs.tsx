@@ -170,7 +170,12 @@ function TabIndicator(props: {
   }
   const spinner = () => TAB_SPINNERS[props.spinner ?? "dots"]
   const label = () => {
-    if (props.numbers) return props.label
+    if (props.numbers) {
+      if (props.status.attention === "permission") return `${props.label}!`
+      if (props.status.attention === "question") return `${props.label}?`
+      if (props.status.unread || fading()) return `${props.label}●`
+      return props.label
+    }
     if (props.status.attention === "permission") return "!"
     if (props.status.attention === "question") return "?"
     if (runs()) return spinner().frames[0]
@@ -188,14 +193,21 @@ function TabIndicator(props: {
       paddingRight={props.centered ? 0 : 1}
     >
       <Show
-        when={runs() && props.animations && !props.numbers}
+        when={runs() && props.animations}
         fallback={
           <text fg={color()} selectable={false} attributes={props.attributes}>
             {label()}
           </text>
         }
       >
-        <spinner frames={spinner().frames} interval={spinner().interval} color={props.color} />
+        <box flexDirection="row">
+          <Show when={props.numbers}>
+            <text fg={color()} selectable={false} attributes={props.attributes}>
+              {props.label}
+            </text>
+          </Show>
+          <spinner frames={spinner().frames} interval={spinner().interval} color={props.color} />
+        </box>
       </Show>
     </box>
   )
@@ -1553,7 +1565,17 @@ function HorizontalSessionTabs(props: {
       onMouseDragEnd={release}
     >
       <Show when={layout().before > 0}>
-        <text width={sessionTabOverflowWidth(layout().before)} fg={theme.text.muted} selectable={false}>
+        <text
+          width={sessionTabOverflowWidth(layout().before)}
+          fg={theme.text.muted}
+          selectable={false}
+          onMouseUp={() => {
+            const prevIndex = layout().start - 1
+            if (prevIndex >= 0 && items()[prevIndex]) {
+              tabs.select(items()[prevIndex].sessionID)
+            }
+          }}
+        >
           ‹{layout().before}
         </text>
       </Show>
@@ -1759,7 +1781,17 @@ function HorizontalSessionTabs(props: {
         }}
       </For>
       <Show when={layout().after > 0}>
-        <text width={sessionTabOverflowWidth(layout().after)} fg={theme.text.muted} selectable={false}>
+        <text
+          width={sessionTabOverflowWidth(layout().after)}
+          fg={theme.text.muted}
+          selectable={false}
+          onMouseUp={() => {
+            const nextIndex = layout().start + layout().tabs.length
+            if (nextIndex < items().length && items()[nextIndex]) {
+              tabs.select(items()[nextIndex].sessionID)
+            }
+          }}
+        >
           {" " + layout().after}›
         </text>
       </Show>
