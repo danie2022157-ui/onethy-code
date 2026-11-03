@@ -23,7 +23,7 @@ const testLocation = Layer.succeed(
 
 const { effect } = testEffect(
   AppNodeBuilder.build(
-    LayerNode.group([OmniConfig.node, OmniBus.node, OmniOrchestrator.node]),
+    LayerNode.group([OmniConfig.node, OmniBus.node, OmniSession.node, OmniOrchestrator.node]),
     [Location.node.replace(testLocation)],
   ),
 )
