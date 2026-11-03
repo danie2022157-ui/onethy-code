@@ -3,7 +3,7 @@ export * as OmniBus from "./omni-bus.js"
 import crypto from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Semaphore } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Location } from "./location.js"
 
@@ -49,6 +49,7 @@ const layer = Layer.effect(
     const workspace = location.directory ?? location.project.canonical ?? location.project.directory
     const busFilePath = path.join(workspace, ".omnicode", "bus.json")
     const messages: AgentMessage[] = []
+    const persistenceLock = Semaphore.makeUnsafe(1)
 
     const loadPersisted = Effect.promise(async () => {
       try {
@@ -91,19 +92,22 @@ const layer = Layer.effect(
         payload: input.payload ?? null,
         timestamp: Date.now(),
       }
-      messages.push(message)
-      if (process.env.OMNICODE_ACTIVE === "1") {
-        const all = yield* mergedMessages
-        yield* savePersisted(all)
-      }
+      yield* persistenceLock.withPermit(
+        Effect.gen(function* () {
+          messages.push(message)
+          if (process.env.OMNICODE_ACTIVE === "1") {
+            const all = yield* mergedMessages
+            yield* savePersisted(all)
+          }
+        }),
+      )
       return message
     })
 
     const list = Effect.fn("OmniBus.list")(function* () {
-      if (process.env.OMNICODE_ACTIVE === "1") {
-        return yield* mergedMessages
-      }
-      return [...messages]
+      return yield* persistenceLock.withPermit(
+        process.env.OMNICODE_ACTIVE === "1" ? mergedMessages : Effect.sync(() => [...messages]),
+      )
     })
 
     const listByTask = Effect.fn("OmniBus.listByTask")(function* (taskId: string) {
@@ -140,10 +144,12 @@ const layer = Layer.effect(
     })
 
     const clear = Effect.fn("OmniBus.clear")(function* () {
-      messages.length = 0
-      if (process.env.OMNICODE_ACTIVE === "1") {
-        yield* savePersisted([])
-      }
+      yield* persistenceLock.withPermit(
+        Effect.gen(function* () {
+          messages.length = 0
+          if (process.env.OMNICODE_ACTIVE === "1") yield* savePersisted([])
+        }),
+      )
     })
 
     return Service.of({ publish, list, listByTask, listBySession, formatContextDigest, clear })
@@ -155,4 +161,3 @@ export const node = makeLocationNode({
   layer,
   deps: [Location.node],
 })
-

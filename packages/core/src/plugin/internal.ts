@@ -86,6 +86,7 @@ import { OmniBusTool } from "../tool/plugin/omni-bus.js"
 import { OmniMemoryTool } from "../tool/plugin/omni-memory.js"
 import { OmniCheckpointTool } from "../tool/plugin/omni-checkpoint.js"
 import { OmniHealTool } from "../tool/plugin/omni-heal.js"
+import { OmniMissionDispatchTool } from "../tool/plugin/omni-mission-dispatch.js"
 import { OmniCommitTool } from "../tool/plugin/omni-commit.js"
 import { OpenCodeTools } from "../tool/plugin/opencode.js"
 import { QuestionTool } from "../tool/plugin/question.js"
@@ -275,6 +276,7 @@ const pre = [
   OmniMemoryTool.Plugin,
   OmniCheckpointTool.Plugin,
   OmniHealTool.Plugin,
+  OmniMissionDispatchTool.Plugin,
   OmniCommitTool.Plugin,
   OpenCodeTools.Plugin,
   McpResourceTools.Plugin,

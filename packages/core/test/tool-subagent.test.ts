@@ -44,8 +44,10 @@ import { testEffect } from "./lib/effect"
 import { executeTool, registerToolPlugin, toolIdentity } from "./lib/tool"
 
 const childText = "child final response"
+const metricsFooter =
+  "Child usage: tokens input 0, output 0, reasoning 0, cache read 0, cache write 0.\nTool calls: 0 completed, 0 errors."
 const completedOutput = (sessionID: Session.ID) =>
-  `<subagent sessionID="${sessionID}" state="completed">\n${childText}\n</subagent>`
+  `<subagent sessionID="${sessionID}" state="completed">\n${childText}\n\n${metricsFooter}\n</subagent>`
 const childModel = Model.Ref.make({ id: Model.ID.make("child"), providerID: Provider.ID.make("test") })
 const parentModel = Model.Ref.make({ id: Model.ID.make("parent"), providerID: Provider.ID.make("test") })
 const overrideModel = Model.Ref.make({
@@ -263,19 +265,18 @@ describe("SubagentTool", () => {
           yield* jobs.pendingBackground.pipe(Effect.repeat({ until: (pending) => pending.length === 0 }))
           yield* sessions.wait(parent.id)
           const messages = (yield* sessions.context(parent.id)).filter((message) => message.type === "synthetic")
-          expect(messages).toEqual([
-            expect.objectContaining({
-              id: marker.notificationID,
-              description: "background review",
-              text: `<subagent sessionID="${outputSessionID(result.metadata)}" state="completed" description="background review">\n${childText}\n</subagent>`,
-              metadata: {
-                source: "subagent",
-                childID: outputSessionID(result.metadata),
-                agent: "reviewer",
-                state: "completed",
-              },
-            }),
-          ])
+          expect(messages).toHaveLength(1)
+          expect(messages[0]).toMatchObject({
+            id: marker.notificationID,
+            description: "background review",
+            text: `<subagent sessionID="${outputSessionID(result.metadata)}" state="completed" description="background review">\n${childText}\n\n${metricsFooter}\n</subagent>`,
+            metadata: {
+              source: "subagent",
+              childID: outputSessionID(result.metadata),
+              agent: "reviewer",
+              state: "completed",
+            },
+          })
 
           // Reproduce a crash after admission but before acknowledgment using the real persisted marker.
           const kv = yield* KV.Service
@@ -954,6 +955,7 @@ describe("SubagentTool", () => {
           expect(admission?.data.item.type).toBe("synthetic")
           if (admission?.data.item.type !== "synthetic") return yield* Effect.die("Expected synthetic inbox item")
           expect(admission?.data.item.payload.text).toContain(`<subagent sessionID="${childID}" state="completed"`)
+          expect(admission?.data.item.payload.text).toContain(metricsFooter)
           expect(admission?.data.item.payload).toMatchObject({
             description: "background review",
             metadata: {
@@ -969,6 +971,7 @@ describe("SubagentTool", () => {
           expect(synthetic).toHaveLength(1)
           expect(synthetic[0]?.text).toContain(`<subagent sessionID="${childID}" state="completed"`)
           expect(synthetic[0]?.text).toContain(childText)
+          expect(synthetic[0]?.text).toContain(metricsFooter)
         }),
       ),
     ),

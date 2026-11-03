@@ -137,7 +137,7 @@ export function permissionPresentation(
   }
 
   return {
-    icon: "⚙",
+    icon: "P",
     title: `Call tool ${source.action}`,
     lines: [`Tool: ${source.action}`],
   }

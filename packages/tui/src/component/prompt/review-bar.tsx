@@ -284,7 +284,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
       keymap.dispatch("session.undo")
       toast.show({
         variant: "info",
-        message: "⏪ Reverting changes...",
+        message: "Reverting changes...",
         duration: 2500,
       })
       setTimeout(() => {
@@ -347,7 +347,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
         execFile("git", ["clean", "-f", "--", item.file], { cwd }, () => {
           toast.show({
             variant: "info",
-            message: `⏪ File reverted: ${item.file}`,
+            message: `File reverted: ${item.file}`,
             duration: 2400,
           })
           scheduleLoadDiff(150)
@@ -356,7 +356,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
       }
       toast.show({
         variant: err ? "warning" : "info",
-        message: err ? `Unable to revert ${item.file} via git` : `⏪ File reverted: ${item.file}`,
+        message: err ? `Unable to revert ${item.file} via git` : `File reverted: ${item.file}`,
         duration: 2400,
       })
       scheduleLoadDiff(150)

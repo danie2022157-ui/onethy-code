@@ -110,21 +110,21 @@ export function Home() {
     const mcps = (data.location.mcp.server.list(loc) ?? []).length
     return [
       {
-        icon: "👤",
+        icon: "AG",
         label: "Agents",
         count: String(agents),
         colorHex: "#00F5FF",
         onClick: () => dialog.replace(() => <DialogAgent />),
       },
       {
-        icon: "📊",
+        icon: "SK",
         label: "Skills",
         count: String(skills),
         colorHex: "#A855F7",
         onClick: () => dialog.replace(() => <DialogCustomizations filter="skills" />),
       },
       {
-        icon: "🔗",
+        icon: "MD",
         label: "Mods",
         count: String(mods),
         colorHex: "#10B981",
@@ -138,21 +138,21 @@ export function Home() {
         onClick: () => dialog.replace(() => <DialogCustomizations filter="hooks" />),
       },
       {
-        icon: "⚡",
+        icon: "CM",
         label: "Commands",
         count: String(commands),
         colorHex: "#F43F5E",
         onClick: () => dialog.replace(() => <DialogCustomizations filter="commands" />),
       },
       {
-        icon: "🔌",
+        icon: "MCP",
         label: "MCPs",
         count: String(mcps),
         colorHex: "#06B6D4",
         onClick: () => dialog.replace(() => <DialogMcp />),
       },
       {
-        icon: "⚡",
+        icon: "AI",
         label: local.model.auto.modeName(),
         count: local.model.auto.enabled() ? local.model.auto.tierLabel() : "Auto",
         colorHex: "#8B5CF6",

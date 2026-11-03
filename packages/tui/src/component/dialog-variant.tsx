@@ -58,7 +58,7 @@ export function DialogVariant() {
         },
         {
           value: "allowed models",
-          title: "🎯 Allowed Models by Provider...",
+          title: "Allowed Models by Provider...",
           category: "Omni Fusion Settings",
           description: `${summary} · Organized in provider columns (OpenAI, Google, OpenCode)`,
           onSelect: () => {
@@ -68,8 +68,8 @@ export function DialogVariant() {
         {
           value: "thinking routing",
           title: local.model.auto.thinkingRouting()
-            ? "✓ 🧠 Thinking Budget Routing: [ENABLED]"
-            : "○ 🧠 Thinking Budget Routing: [DISABLED]",
+            ? "✓ Thinking Budget Routing: [ENABLED]"
+            : "○ Thinking Budget Routing: [DISABLED]",
           category: "Omni Fusion Settings",
           description: local.model.auto.thinkingRouting()
             ? "Active: dynamically allocates reasoning effort (low on lookups, max on architecture)"
@@ -80,7 +80,7 @@ export function DialogVariant() {
         },
         {
           value: "auto customizations",
-          title: `⚙️ Capabilities Auto-Usage: [${local.customizations.summary()}]`,
+          title: `Capabilities Auto-Usage: [${local.customizations.summary()}]`,
           category: "Omni Fusion Settings",
           description: "Configure which skills, agents, MCPs, hooks and mods the AI uses autonomously",
           onSelect: () => {
@@ -118,7 +118,7 @@ export function DialogVariant() {
   return (
     <DialogSelect<string>
       options={options()}
-      title={local.model.auto.enabled() ? "Select Model Variant — ⚡ Omni Fusion" : "Select Model Variant"}
+      title={local.model.auto.enabled() ? "Select Model Variant — Omni Fusion" : "Select Model Variant"}
       renderFilter={!newDesigns()}
       current={local.model.variant.current() ?? (local.model.auto.enabled() ? "auto mode" : "default")}
       flat={false}

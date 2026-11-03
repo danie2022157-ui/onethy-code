@@ -65,7 +65,7 @@ export type TabSpinner = keyof typeof TAB_SPINNERS
 export const TAB_UNREAD_MARKERS = {
   "small-dot": "•",
   dot: "●",
-  square: "▪",
+  square: "+",
   "large-square": "■",
 }
 export type TabUnreadMarker = keyof typeof TAB_UNREAD_MARKERS

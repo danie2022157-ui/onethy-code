@@ -118,11 +118,14 @@ export interface TaskItem {
   readonly missionID: string
   readonly title: string
   readonly assignedAgent: string
+  dependsOn: ReadonlyArray<string>
+  readonly acceptanceCriteria: ReadonlyArray<string>
   readonly category?: TaskCategory
   readonly parallel?: boolean
   readonly preferredModel?: string
   status: "pending" | "running" | "completed" | "failed"
   result?: string
+  childSessionID?: string
 }
 
 export interface MissionResult {
@@ -166,7 +169,11 @@ export interface Interface {
     hasUnverifiedEdits: boolean
   }) => Effect.Effect<{ passed: boolean; reminder?: string }, never>
   readonly executeTask: (missionID: string, taskId: string, resultSummary: string) => Effect.Effect<TaskItem, never>
+  readonly startTask: (missionID: string, taskId: string, childSessionID?: string) => Effect.Effect<TaskItem, never>
+  readonly failTask: (missionID: string, taskId: string, reason: string) => Effect.Effect<TaskItem, never>
   readonly getActiveTasks: (missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
+  readonly getReadyTasks: (missionID: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
+  readonly getMissionGoal: (missionID: string) => Effect.Effect<string | undefined>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/OmniOrchestrator") {}
@@ -181,7 +188,7 @@ const DEFAULT_AGENTS: AgentDefinition[] = [
     capabilities: ["planning", "coordination", "synthesis"],
   },
   {
-    id: "researcher",
+    id: "explore",
     name: "Explorador Técnico",
     role: "Investigador e Leitor",
     description: "Inspeciona arquivos, busca padrões e reúne contexto sem realizar mutações.",
@@ -261,6 +268,7 @@ const layer = Layer.effect(
       return false
     })
     const missions = new Map<string, TaskItem[]>()
+    const missionGoals = new Map<string, string>()
 
     const getAgents = Effect.fn("OmniOrchestrator.getAgents")(function* () {
       return [...DEFAULT_AGENTS]
@@ -274,7 +282,9 @@ const layer = Layer.effect(
           id: `task-${crypto.randomUUID()}`,
           missionID,
           title: `Explorar e mapear contexto para: ${goal}`,
-          assignedAgent: "researcher",
+          assignedAgent: "explore",
+          dependsOn: [],
+          acceptanceCriteria: ["Relevant files and constraints are identified."],
           status: "pending",
         },
         {
@@ -282,6 +292,8 @@ const layer = Layer.effect(
           missionID,
           title: `Implementar alterações solicitadas`,
           assignedAgent: "coder",
+          dependsOn: [],
+          acceptanceCriteria: ["Requested changes are implemented and covered by tests."],
           status: "pending",
         },
         {
@@ -289,16 +301,21 @@ const layer = Layer.effect(
           missionID,
           title: `Revisar diff e verificar segurança/testes`,
           assignedAgent: "reviewer",
+          dependsOn: [],
+          acceptanceCriteria: ["Diff is reviewed and relevant tests pass."],
           status: "pending",
         },
       ]
+      subtasks[1].dependsOn = [subtasks[0].id]
+      subtasks[2].dependsOn = [subtasks[1].id]
 
       missions.set(missionID, subtasks)
+      missionGoals.set(missionID, goal)
 
       yield* bus.publish({
         sender: "supervisor",
         type: "plan",
-        payload: { missionID, goal, subtasks: subtasks.map((t) => ({ id: t.id, title: t.title, agent: t.assignedAgent })) },
+        payload: { missionID, goal, subtasks: subtasks.map((t) => ({ id: t.id, title: t.title, agent: t.assignedAgent, dependsOn: t.dependsOn, acceptanceCriteria: t.acceptanceCriteria })) },
       })
 
       return subtasks.map((task) => ({ ...task }))
@@ -312,6 +329,8 @@ const layer = Layer.effect(
           missionID,
           title: `[Paralelo 1] Varredura rápida de arquivos e símbolos para: ${goal}`,
           assignedAgent: "explore",
+          dependsOn: [],
+          acceptanceCriteria: ["Relevant files and symbols are mapped."],
           category: "fast_explore",
           parallel: true,
           status: "pending",
@@ -321,6 +340,8 @@ const layer = Layer.effect(
           missionID,
           title: `[Paralelo 2] Pesquisa de documentação e contratos de API para: ${goal}`,
           assignedAgent: "librarian",
+          dependsOn: [],
+          acceptanceCriteria: ["Applicable documentation and API constraints are summarized."],
           category: "external_research",
           parallel: true,
           status: "pending",
@@ -330,6 +351,8 @@ const layer = Layer.effect(
           missionID,
           title: `Validar arquitetura, invariantes de segurança e impacto entre pacotes`,
           assignedAgent: "architect",
+          dependsOn: [],
+          acceptanceCriteria: ["Architecture and security impact are documented."],
           category: "deep_architecture",
           parallel: false,
           status: "pending",
@@ -339,6 +362,8 @@ const layer = Layer.effect(
           missionID,
           title: `Implementar código de produção e testes unitários completos`,
           assignedAgent: "coder",
+          dependsOn: [],
+          acceptanceCriteria: ["Implementation and unit tests are complete."],
           category: "code_implementation",
           parallel: false,
           status: "pending",
@@ -348,13 +373,19 @@ const layer = Layer.effect(
           missionID,
           title: `Gate final (Ralph Loop): executar typecheck, testes e auditoria de diff`,
           assignedAgent: "reviewer",
+          dependsOn: [],
+          acceptanceCriteria: ["Typecheck, tests, and diff audit pass."],
           category: "security_review",
           parallel: false,
           status: "pending",
         },
       ]
+      subtasks[2].dependsOn = [subtasks[0].id, subtasks[1].id]
+      subtasks[3].dependsOn = [subtasks[2].id]
+      subtasks[4].dependsOn = [subtasks[3].id]
 
       missions.set(missionID, subtasks)
+      missionGoals.set(missionID, goal)
 
       yield* bus.publish({
         sender: "supervisor",
@@ -369,6 +400,8 @@ const layer = Layer.effect(
             agent: t.assignedAgent,
             category: t.category,
             parallel: t.parallel,
+            dependsOn: t.dependsOn,
+            acceptanceCriteria: t.acceptanceCriteria,
           })),
         },
       })
@@ -391,9 +424,12 @@ const layer = Layer.effect(
         parallel: true,
         preferredModel: modelRef,
         status: "pending",
+        dependsOn: [],
+        acceptanceCriteria: ["Candidate solution is described with supporting rationale."],
       }))
 
       missions.set(missionID, subtasks)
+      missionGoals.set(missionID, problem)
 
       yield* bus.publish({
         sender: "supervisor",
@@ -423,6 +459,8 @@ const layer = Layer.effect(
           missionID,
           title: `[Fase 1 · Especificação] Decompor requisitos, critérios de aceite e escopo: ${goal}`,
           assignedAgent: "planner",
+          dependsOn: [],
+          acceptanceCriteria: ["Scope, requirements, and acceptance criteria are explicit."],
           category: "orchestration",
           parallel: false,
           status: "pending",
@@ -432,6 +470,8 @@ const layer = Layer.effect(
           missionID,
           title: `[Fase 2 · Arquitetura] Desenhar interfaces, contratos de tipos e limites modulares`,
           assignedAgent: "architect",
+          dependsOn: [],
+          acceptanceCriteria: ["Interfaces, contracts, and module boundaries are documented."],
           category: "deep_architecture",
           parallel: false,
           status: "pending",
@@ -441,6 +481,8 @@ const layer = Layer.effect(
           missionID,
           title: `[Fase 3 · Implementação] Desenvolver código em conformidade e criar testes`,
           assignedAgent: "coder",
+          dependsOn: [],
+          acceptanceCriteria: ["Implementation and tests satisfy the specification."],
           category: "code_implementation",
           parallel: false,
           status: "pending",
@@ -450,13 +492,19 @@ const layer = Layer.effect(
           missionID,
           title: `[Fase 4 · Auditoria & Gate] Executar testes/typecheck e auditar qualidade/segurança`,
           assignedAgent: "reviewer",
+          dependsOn: [],
+          acceptanceCriteria: ["Tests and typecheck pass; quality and security are reviewed."],
           category: "security_review",
           parallel: false,
           status: "pending",
         },
       ]
+      subtasks[1].dependsOn = [subtasks[0].id]
+      subtasks[2].dependsOn = [subtasks[1].id]
+      subtasks[3].dependsOn = [subtasks[2].id]
 
       missions.set(missionID, subtasks)
+      missionGoals.set(missionID, goal)
 
       yield* bus.publish({
         sender: "supervisor",
@@ -470,6 +518,8 @@ const layer = Layer.effect(
             title: t.title,
             agent: t.assignedAgent,
             category: t.category,
+            dependsOn: t.dependsOn,
+            acceptanceCriteria: t.acceptanceCriteria,
           })),
         },
       })
@@ -546,6 +596,9 @@ const layer = Layer.effect(
       if (!task) {
         throw new Error(`Tarefa '${taskId}' não pertence à missão '${missionID}'.`)
       }
+      if (task.status !== "running") throw new Error(`Tarefa '${taskId}' não está em execução.`)
+      const incomplete = task.dependsOn.filter((dependency) => missions.get(missionID)?.find((candidate) => candidate.id === dependency)?.status !== "completed")
+      if (incomplete.length) throw new Error(`Tarefa '${taskId}' depende de tarefas incompletas: ${incomplete.join(", ")}.`)
 
       task.status = "completed"
       task.result = resultSummary
@@ -560,8 +613,41 @@ const layer = Layer.effect(
       return { ...task }
     })
 
+    const startTask = Effect.fn("OmniOrchestrator.startTask")(function* (missionID: string, taskId: string, childSessionID?: string) {
+      const task = missions.get(missionID)?.find((item) => item.id === taskId)
+      if (!task) throw new Error(`Tarefa '${taskId}' não pertence à missão '${missionID}'.`)
+      if (task.status === "running" && childSessionID) {
+        task.childSessionID = childSessionID
+        return { ...task }
+      }
+      if (task.status !== "pending") throw new Error(`Tarefa '${taskId}' não está pendente.`)
+      const incomplete = task.dependsOn.filter((dependency) => missions.get(missionID)?.find((item) => item.id === dependency)?.status !== "completed")
+      if (incomplete.length) throw new Error(`Tarefa '${taskId}' depende de tarefas incompletas: ${incomplete.join(", ")}.`)
+      task.status = "running"
+      task.childSessionID = childSessionID
+      yield* bus.publish({ sender: "supervisor", taskId: task.id, type: "status", payload: { missionID, status: "running", childSessionID } })
+      return { ...task }
+    })
+
+    const failTask = Effect.fn("OmniOrchestrator.failTask")(function* (missionID: string, taskId: string, reason: string) {
+      const task = missions.get(missionID)?.find((item) => item.id === taskId)
+      if (!task) throw new Error(`Tarefa '${taskId}' não pertence à missão '${missionID}'.`)
+      if (task.status !== "running") throw new Error(`Tarefa '${taskId}' não está em execução.`)
+      task.status = "failed"
+      task.result = reason
+      yield* bus.publish({ sender: task.assignedAgent, taskId: task.id, type: "status", payload: { missionID, status: "failed", result: reason } })
+      return { ...task }
+    })
+
     const getActiveTasks = Effect.fn("OmniOrchestrator.getActiveTasks")(function* (missionID?: string) {
       return missionID ? (missions.get(missionID) ?? []).map((task) => ({ ...task })) : []
+    })
+    const getReadyTasks = Effect.fn("OmniOrchestrator.getReadyTasks")(function* (missionID: string) {
+      const tasks = missions.get(missionID) ?? []
+      return tasks.filter((task) => task.status === "pending" && task.dependsOn.every((dependency) => tasks.find((candidate) => candidate.id === dependency)?.status === "completed")).map((task) => ({ ...task }))
+    })
+    const getMissionGoal = Effect.fn("OmniOrchestrator.getMissionGoal")(function* (missionID: string) {
+      return missionGoals.get(missionID)
     })
 
     return Service.of({
@@ -579,7 +665,11 @@ const layer = Layer.effect(
       summarizeBoomerang,
       verifyCompletion,
       executeTask,
+      startTask,
+      failTask,
       getActiveTasks,
+      getReadyTasks,
+      getMissionGoal,
     })
   }),
 )

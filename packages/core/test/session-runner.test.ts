@@ -47,6 +47,7 @@ import { Money } from "@opencode/schema/money"
 import { SessionProjector } from "@opencode/core/session/projector"
 import { SessionExecution } from "@opencode/core/session/execution"
 import { SessionRunCoordinator } from "@opencode/core/session/run-coordinator"
+import { SubagentJob } from "@opencode/core/session/subagent-job"
 import { SessionRunner } from "@opencode/core/session/runner/index"
 import { SessionRunnerLLM } from "@opencode/core/session/runner/llm"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
@@ -63,10 +64,13 @@ import { Config } from "@opencode/core/config"
 import { Document, Info } from "@opencode/schema/config"
 import { ConfigCompaction } from "@opencode/schema/config/compaction"
 import { Tool } from "@opencode/core/tool"
+import { ToolOutput } from "@opencode/core/tool-output"
+import { SubagentTool } from "@opencode/core/tool/plugin/subagent"
 import type { Info as ToolInfo } from "@opencode/schema/tool"
 import { InstructionStateTable, SessionInboxTable, SessionMessageTable, SessionTable } from "@opencode/core/session/sql"
 import { InstructionEntry } from "@opencode/core/session/instruction-entry"
 import { SessionStore } from "@opencode/core/session/store"
+import { InstructionState } from "@opencode/core/session/instruction-state"
 import { Instructions } from "@opencode/core/instructions/index"
 import { InstructionBuiltIns } from "@opencode/core/instructions/builtins"
 import { InstructionDiscovery } from "@opencode/core/instruction-discovery"
@@ -87,6 +91,7 @@ import { Expected } from "./lib/session-message"
 import { permissionLayer } from "./lib/permission"
 import { agentHost, modelHost, host, noProviders } from "./plugin/host"
 import { CodeModeInstructions } from "@opencode/core/codemode/instructions"
+import { registerToolPlugin } from "./lib/tool"
 
 const emptyCodeMode = `${CodeModeInstructions.render({ total: 0, shown: 0, namespaces: [] })}\n\n`
 type ToolBarrier = {
@@ -330,6 +335,16 @@ const layer = Layer.unwrap(
       ),
     )
     const echoNode = makeLocationNode({ name: "test/session-runner-tools", layer: echo, deps: [Tool.node] })
+    const subagentNode = makeLocationNode({
+      name: "test/session-runner-subagent",
+      layer: Layer.effectDiscard(
+        Effect.gen(function* () {
+          const hooks = yield* PluginHooks.Service
+          yield* registerToolPlugin(SubagentTool.Plugin, {}, (name, callback) => hooks.register("tool", name, callback))
+        }),
+      ),
+      deps: [Agent.node, Config.node, Model.node, Permission.node, Session.node, Job.node, SubagentJob.node, Tool.node, PluginHooks.node],
+    })
     const models = Layer.mock(SessionRunnerModel.Service)({
       resolve: (session) =>
         state.modelResolveHook.pipe(
@@ -481,6 +496,7 @@ const layer = Layer.unwrap(
         Agent.node,
         Model.node,
         Tool.node,
+        subagentNode,
         PluginHooks.node,
         Job.node,
         echoNode,
@@ -497,6 +513,8 @@ const layer = Layer.unwrap(
         SessionRunnerLLM.node,
         SessionExecution.node,
         Session.node,
+        SubagentJob.node,
+        ToolOutput.node,
       ]),
       [
         ...replacements,
@@ -4894,6 +4912,35 @@ describe("SessionRunnerLLM", () => {
     const modelResult = JSON.stringify(s.requests[0]?.messages.at(-1))
     expect(modelResult).toContain("ses_existing_child")
     expect(modelResult).not.toContain("private")
+  })
+
+  scenario("truncates oversized tool output at the runner boundary while retaining the complete output", function* (s) {
+    const fullOutput = "runner tool output\n".repeat(20)
+    const output = yield* ToolOutput.Service
+    yield* output.transform((editor) => editor.configure({ maxLines: 2, maxBytes: 32 }))
+    yield* InstructionState.initialize(s.db, sessionID, 0, {})
+    yield* s.admit("Run a tool")
+    yield* s.llm.push(
+      TestLLM.tool("call-large-output", "echo", { text: fullOutput }),
+      TestLLM.text("Finished", "tool-output-finished"),
+    )
+    yield* s.resume
+
+    const parent = yield* s.context
+    const tool = parent.flatMap((message) => message.type === "assistant" ? message.content : []).find(
+      (part) => part.type === "tool" && part.name === "echo",
+    )
+    expect(tool).toBeDefined()
+    if (tool?.type !== "tool") return
+    expect(tool.state.status).toBe("completed")
+    if (tool.state.status !== "completed") return
+    const persisted = JSON.stringify(tool.state)
+    expect(persisted).toContain("[showing")
+    expect(tool.state.metadata).toMatchObject({ truncated: true })
+    const outputPath = tool.state.metadata?.outputPath
+    expect(typeof outputPath).toBe("string")
+    if (typeof outputPath !== "string") return
+    expect(yield* Effect.promise(() => Bun.file(outputPath).text())).toContain(fullOutput.trimEnd())
   })
 
   scenario("durably fails hosted tools left running by a prior process before continuing inline", function* (s) {

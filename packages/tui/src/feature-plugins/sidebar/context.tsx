@@ -227,7 +227,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
 
       <box paddingBottom={1}>
         <text fg={theme.text.base}>
-          <b>🧠 Memory Bank</b>
+          <b>Memory Bank</b>
         </text>
         <text fg={theme.text.feedback.info.base} wrapMode="none">
           ● Active · .omnicode/
@@ -263,8 +263,8 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
               onMouseUp={() => toggleSection("fusion")}
             >
               <text fg={theme.text.base}>
-                {accordion.fusion ? "▼" : "▶"}{" "}
-                <b>⚡ Omni Fusion & Models ({fusion().modelCount} {fusion().isFiltered ? "selected" : "models"})</b>
+                {accordion.fusion ? "v" : ">"}{" "}
+                <b>Omni Fusion & Models ({fusion().modelCount} {fusion().isFiltered ? "selected" : "models"})</b>
               </text>
             </box>
             <Show when={accordion.fusion}>
@@ -277,13 +277,13 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
                 </text>
               </Show>
               <text fg={theme.text.muted} wrapMode="none">
-                🌱 Efficiency: {truncateMiddle(fusion().efficiency)}
+                Efficiency: {truncateMiddle(fusion().efficiency)}
               </text>
               <text fg={theme.text.muted} wrapMode="none">
-                ⚖️ Balanced: {truncateMiddle(fusion().balanced)}
+                Balanced: {truncateMiddle(fusion().balanced)}
               </text>
               <text fg={theme.text.muted} wrapMode="none">
-                🧠 Intelligence: {truncateMiddle(fusion().intelligence)}
+                Intelligence: {truncateMiddle(fusion().intelligence)}
               </text>
               <Show when={configuredSubagents().length > 0}>
                 <box paddingTop={1} paddingBottom={0}>
@@ -314,7 +314,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
               onMouseUp={() => toggleSection("customizations")}
             >
               <text fg={theme.text.base}>
-                {accordion.customizations ? "▼" : "▶"}{" "}
+                {accordion.customizations ? "v" : ">"}{" "}
                 <b>Customizations ({summary().skills + summary().mods + summary().hooks + summary().settings} items)</b>
               </text>
             </box>
@@ -332,7 +332,7 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
                 MCPs: {summary().mcps} · /customizations
               </text>
               <text fg={theme.text.base} wrapMode="none">
-                ⚙️ Auto-Use: {local?.customizations?.summary() ?? "Active"}
+                Auto-Use: {local?.customizations?.summary() ?? "Active"}
               </text>
             </Show>
           </box>

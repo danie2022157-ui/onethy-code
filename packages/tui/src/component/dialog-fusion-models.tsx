@@ -25,12 +25,12 @@ type ProviderColumn = {
 }
 
 const PROVIDER_META: Record<string, { title: string; icon: string; accentHex: string; order: number }> = {
-  openai: { title: "OpenAI", icon: "🟢", accentHex: "#10B981", order: 1 },
-  google: { title: "Google", icon: "🔵", accentHex: "#38BDF8", order: 2 },
-  opencode: { title: "OpenCode", icon: "🟣", accentHex: "#A855F7", order: 3 },
-  anthropic: { title: "Anthropic", icon: "🟠", accentHex: "#F59E0B", order: 4 },
-  deepseek: { title: "DeepSeek", icon: "🔷", accentHex: "#00F5FF", order: 5 },
-  xai: { title: "xAI / Grok", icon: "⚡", accentHex: "#F43F5E", order: 6 },
+  openai: { title: "OpenAI", icon: "OA", accentHex: "#10B981", order: 1 },
+  google: { title: "Google", icon: "GO", accentHex: "#38BDF8", order: 2 },
+  opencode: { title: "OpenCode", icon: "OC", accentHex: "#A855F7", order: 3 },
+  anthropic: { title: "Anthropic", icon: "AN", accentHex: "#F59E0B", order: 4 },
+  deepseek: { title: "DeepSeek", icon: "DS", accentHex: "#00F5FF", order: 5 },
+  xai: { title: "xAI / Grok", icon: "xAI", accentHex: "#F43F5E", order: 6 },
 }
 
 function cleanModelLabel(name: string, id: string, maxLen = 23): string {
@@ -79,7 +79,7 @@ export function DialogFusionModels() {
     for (const [providerID, models] of grouped.entries()) {
       const meta = PROVIDER_META[providerID.toLowerCase()] ?? {
         title: provNames.get(providerID) ?? providerID,
-        icon: "⚡",
+        icon: providerID.slice(0, 2).toUpperCase(),
         accentHex: "#00F5FF",
         order: 99,
       }
@@ -158,7 +158,7 @@ export function DialogFusionModels() {
     local.model.auto.applyRecommendedPreset()
     toast.show({
       variant: "info",
-      message: "⭐ Recommended Preset applied (1 Fast + 1 Reasoning/Code + 1 Backup)",
+      message: "Recommended Preset applied (1 Fast + 1 Reasoning/Code + 1 Backup)",
       duration: 2800,
     })
   }
@@ -276,15 +276,15 @@ export function DialogFusionModels() {
   }))
 
   const bucketBadge = (bucket: "efficiency" | "balanced" | "intelligence") => {
-    if (bucket === "efficiency") return { label: "⚡Fast", color: RGBA.fromHex("#10B981") }
-    if (bucket === "intelligence") return { label: "🧠Int", color: RGBA.fromHex("#A855F7") }
-    return { label: "⚖Bal", color: RGBA.fromHex("#38BDF8") }
+    if (bucket === "efficiency") return { label: "Fast", color: RGBA.fromHex("#10B981") }
+    if (bucket === "intelligence") return { label: "Int", color: RGBA.fromHex("#A855F7") }
+    return { label: "Bal", color: RGBA.fromHex("#38BDF8") }
   }
 
   const bucketFullName = (bucket: "efficiency" | "balanced" | "intelligence") => {
-    if (bucket === "efficiency") return "⚡ Efficiency (Fast / Cost-Effective)"
-    if (bucket === "intelligence") return "🧠 Deep Intelligence (Code & Architecture)"
-    return "⚖️ Balanced (General Purpose)"
+    if (bucket === "efficiency") return "Efficiency (Fast / Cost-Effective)"
+    if (bucket === "intelligence") return "Deep Intelligence (Code & Architecture)"
+    return "Balanced (General Purpose)"
   }
 
   return (
@@ -294,7 +294,7 @@ export function DialogFusionModels() {
           titleView={
             <box flexDirection="row" gap={1}>
               <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD}>
-                ⚡ Omni Fusion — Allowed Models by Provider
+                Omni Fusion — Allowed Models by Provider
               </text>
               <text fg={theme.text.muted}>({local.model.auto.allowedModelsSummary()})</text>
             </box>
@@ -337,7 +337,7 @@ export function DialogFusionModels() {
               onMouseUp={() => triggerPreset()}
             >
               <text fg={RGBA.fromHex("#F59E0B")} attributes={TextAttributes.BOLD} selectable={false}>
-                ⭐ Recommended Preset (2-3 Models) [R]
+                Recommended Preset (2-3 Models) [R]
               </text>
             </box>
           </box>
@@ -355,7 +355,7 @@ export function DialogFusionModels() {
               attributes={local.model.auto.thinkingRouting() ? TextAttributes.BOLD : undefined}
               selectable={false}
             >
-              {local.model.auto.thinkingRouting() ? "✓ 🧠 Thinking Auto: ON [T]" : "○ 🧠 Thinking Auto: OFF [T]"}
+              {local.model.auto.thinkingRouting() ? "✓ Thinking Auto: ON [T]" : "○ Thinking Auto: OFF [T]"}
             </text>
           </box>
         </box>

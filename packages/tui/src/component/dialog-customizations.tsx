@@ -48,9 +48,9 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
       items.push({
         id: "cfg:auto-customizations",
         kind: "setting",
-        title: "⚙️ Configure Auto-Resource Management...",
+        title: "Configure Auto-Resource Management...",
         description: `Status: ${local.customizations.summary()} · Choose which skills, agents, MCPs, hooks and mods the AI uses automatically`,
-        category: "⚡ Auto-Orchestration",
+        category: "Auto-Orchestration",
         footer: "[Configure]",
       })
     }

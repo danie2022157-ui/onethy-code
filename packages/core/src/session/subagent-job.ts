@@ -52,12 +52,48 @@ const make: Effect.Effect<Interface, never, Session.Service | Job.Service | Scop
           recovery,
           run: Effect.gen(function* () {
             yield* sessions.resume(recovery.childSessionID)
-            const messages = yield* sessions.messages({ sessionID: recovery.childSessionID, order: "desc", limit: 20 })
-            const assistant = messages.find(
+            const messages = yield* sessions.messages({ sessionID: recovery.childSessionID, order: "asc" })
+            const assistant = messages.findLast(
               (message) =>
                 message.type === "assistant" && message.time.completed !== undefined && message.error === undefined,
             )
-            return SubagentCompletion.text(assistant)
+            const response = messages.findLast(
+              (message) =>
+                message.type === "assistant" &&
+                message.time.completed !== undefined &&
+                message.error === undefined &&
+                message.content.some((part) => part.type === "text"),
+            )
+            // These totals describe the entire persisted child session, including prior work if it was resumed.
+            const usage = messages.reduce(
+              (total, message) => {
+                if (message.type !== "assistant" || !message.tokens) return total
+                total.input += message.tokens.input
+                total.output += message.tokens.output
+                total.reasoning += message.tokens.reasoning
+                total.cacheRead += message.tokens.cache.read
+                total.cacheWrite += message.tokens.cache.write
+                return total
+              },
+              { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 },
+            )
+            const toolCalls = messages.reduce(
+              (total, message) => {
+                if (message.type !== "assistant") return total
+                for (const part of message.content) {
+                  if (part.type !== "tool") continue
+                  if (part.state.status === "completed") total.completed++
+                  if (part.state.status === "error") total.errors++
+                }
+                return total
+              },
+              { completed: 0, errors: 0 },
+            )
+            const summary = [
+              `Child usage: tokens input ${usage.input}, output ${usage.output}, reasoning ${usage.reasoning}, cache read ${usage.cacheRead}, cache write ${usage.cacheWrite}.`,
+              `Tool calls: ${toolCalls.completed} completed, ${toolCalls.errors} errors.`,
+            ].join("\n")
+            return `${SubagentCompletion.text(response ?? assistant)}\n\n${summary}`
           }),
         })
         .pipe(Effect.setContext(context)),

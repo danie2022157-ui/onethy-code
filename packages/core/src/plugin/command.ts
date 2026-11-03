@@ -52,13 +52,13 @@ export const Plugin = define({
               const subtasks = mission.subtasks
               const missionSessionId = mission.sessionID
               const taskSummary = subtasks
-                .map((t) => `- [${t.id}] (@${t.assignedAgent}): ${t.title}`)
+                 .map((t) => `- [${t.id}] (@${t.assignedAgent}; depends on: ${t.dependsOn.length ? t.dependsOn.join(", ") : "none"}): ${t.title}`)
                 .join("\n")
               yield* ctx.session.prompt({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  `You are the OmniCode Multi-Agent Orchestrator (Mission Session: ${missionSessionId}).\nSubtasks registered on OmniBus:\n${taskSummary}\n\nCoordinate specialists (@planner, @architect, @coder, @reviewer, @explore) to achieve this goal:\n\n$ARGUMENTS`,
+                  `You are the OmniCode Multi-Agent Orchestrator (Mission Session: ${missionSessionId}).\nSubtasks registered on OmniBus:\n${taskSummary}\n\nDispatch only dependency-ready tasks with omni_mission_dispatch, one task per call. The dispatch tool runs the assigned specialist in the foreground and updates task lifecycle from its actual result. Do not mark tasks complete or failed yourself; report status only from the dispatch result. After each completion, request ready tasks again through the mission state/tool workflow and continue until all tasks are completed or blocked.\n\nGoal:\n$ARGUMENTS`,
                   goal,
                 ),
                 delivery: input.delivery,
@@ -109,13 +109,13 @@ export const Plugin = define({
               ? yield* omniSessionOpt.value.savePlan(missionSessionId, goal, subtasks)
               : ".omnicode/plans"
             const taskSummary = subtasks
-              .map((t) => `- [${t.id}] (@${t.assignedAgent}${t.parallel ? " · PARALLEL" : ""}): ${t.title}`)
+               .map((t) => `- [${t.id}] (@${t.assignedAgent}${t.parallel ? " · PARALLEL" : ""}; depends on: ${t.dependsOn.length ? t.dependsOn.join(", ") : "none"}): ${t.title}`)
               .join("\n")
             yield* ctx.session.prompt({
               ...input.prompt,
               sessionID: input.sessionID,
               text: append(
-                `⚡ [ULTRAWORK MODE ACTIVE — Session: ${missionSessionId}]\nPlan persisted at: ${planPath}\n\nGenerated subtasks:\n${taskSummary}\n\nULTRAWORK DIRECTIVES:\n1. Launch @explore and @librarian in parallel (background=true) when applicable.\n2. Create and maintain the Todo checklist.\n3. Delegate implementation to @coder with concise Boomerang responses.\n4. Apply RALPH LOOP ENFORCER: run @reviewer + typecheck/tests and DO NOT stop until 100% of items are verified.\n\nGoal:\n$ARGUMENTS`,
+                  `⚡ [ULTRAWORK MODE ACTIVE — Session: ${missionSessionId}]\nPlan persisted at: ${planPath}\n\nGenerated subtasks:\n${taskSummary}\n\nULTRAWORK DIRECTIVES:\n1. Dispatch ready tasks with omni_mission_dispatch; it runs each assigned subagent in the foreground.\n2. Never dispatch a task until its dependencies are completed.\n3. Trust lifecycle updates only when omni_mission_dispatch returns an actual completed result; do not mark tasks complete based on intention or partial output.\n4. Create and maintain the Todo checklist.\n5. Run the final reviewer/typecheck/tests tasks as defined in the plan.\n\nGoal:\n$ARGUMENTS`,
                 goal,
               ),
               delivery: input.delivery,

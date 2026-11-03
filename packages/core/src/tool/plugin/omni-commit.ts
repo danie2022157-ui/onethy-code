@@ -34,9 +34,9 @@ export const description = [
   "- 'commit_all': Stages all modified files and commits atomically.",
 ].join("\n")
 
-function runGit(cwd: string, args: string[]): { stdout: string; stderr: string; code: number } {
+function runGit(cwd: string, args: string[], input?: string): { stdout: string; stderr: string; code: number } {
   try {
-    const res = child_process.spawnSync("git", args, { cwd, encoding: "utf-8" })
+    const res = child_process.spawnSync("git", args, { cwd, encoding: "utf-8", input })
     return {
       stdout: res.stdout || "",
       stderr: res.stderr || "",
@@ -44,6 +44,18 @@ function runGit(cwd: string, args: string[]): { stdout: string; stderr: string; 
     }
   } catch (e: any) {
     return { stdout: "", stderr: String(e), code: 1 }
+  }
+}
+
+export function parseStatus(output: string) {
+  const entries = output.split("\0").filter(Boolean)
+  const statusEntries = entries.flatMap((entry, index) => {
+    if (index > 0 && /[RC]/.test(entries[index - 1]!.slice(0, 2))) return []
+    return [entry]
+  })
+  return {
+    statusLines: statusEntries.map((entry) => entry.slice(0, 2) + " " + entry.slice(3)),
+    modifiedFiles: statusEntries.map((entry) => entry.slice(3)),
   }
 }
 
@@ -91,13 +103,9 @@ export const Plugin = {
             Effect.gen(function* () {
               const rootDir = location.project.directory
 
-              const statusRes = runGit(rootDir, ["status", "--porcelain"])
-              const statusLines = statusRes.stdout
-                .split("\n")
-                .map((l) => l.trim())
-                .filter(Boolean)
-
-              const modifiedFiles = statusLines.map((l) => l.slice(3).trim())
+              const statusRes = runGit(rootDir, ["status", "--porcelain", "-z", "--untracked-files=all"])
+              if (statusRes.code !== 0) return yield* new ToolFailure({ message: `Erro ao inspecionar git status: ${statusRes.stderr}` })
+              const { statusLines, modifiedFiles } = parseStatus(statusRes.stdout)
 
               if (params.action === "status") {
                 if (statusLines.length === 0) {
@@ -142,8 +150,8 @@ export const Plugin = {
                   })
                 }
 
-                // git add -A
-                const addRes = runGit(rootDir, ["add", "-A"])
+                // NUL-delimited pathspec input preserves spaces, newlines, and leading dashes.
+                const addRes = runGit(rootDir, ["--literal-pathspecs", "add", "--pathspec-from-file=-", "--pathspec-file-nul"], modifiedFiles.join("\0") + "\0")
                 if (addRes.code !== 0) {
                   return yield* new ToolFailure({
                     message: `Erro ao adicionar arquivos ao git: ${addRes.stderr}`,

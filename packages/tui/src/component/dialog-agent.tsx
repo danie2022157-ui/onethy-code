@@ -31,9 +31,9 @@ export function DialogAgent() {
     return [
       {
         value: "cfg:auto-customizations",
-        title: "⚙️ Configure Auto-Resource Management & Skills...",
+        title: "Configure Auto-Resource Management & Skills...",
         description: `Status: ${local.customizations.summary()} · Configure whether AI automatically activates agents and skills`,
-        category: "⚡ Auto-Orchestration",
+        category: "Auto-Orchestration",
         footer: "[Configure]",
       },
       ...agentOptions,

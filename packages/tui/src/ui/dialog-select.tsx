@@ -947,7 +947,7 @@ function DialogSelectRow(props: {
       </Show>
       <Show when={props.current && !props.gutter}>
         <text flexShrink={0} fg={newDesigns() ? theme.text.formfield.selected : text()}>
-          {newDesigns() ? "▪" : "●"}
+          {newDesigns() ? "*" : "●"}
         </text>
       </Show>
       <Show when={props.gutter}>

@@ -110,12 +110,12 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             })
           batch(() => {
             const changed = this.current()?.id !== id
+            const selected = changed && route.data.type === "session" ? model.selection() : undefined
             if (changed) model.remember()
             setAgentStore("current", id)
             if (route.data.type === "session") setAgentStore("draftBySession", route.data.sessionID, { agent: id })
             // Retain both selections while agent and model commits arrive separately.
-            const selected = changed && route.data.type === "session" ? model.current() : undefined
-            if (selected) model.set(selected)
+            if (selected) model.preserveOnAgentSwitch(selected)
           })
         },
         move(direction: 1 | -1) {
@@ -471,7 +471,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         })
       }
 
-      function setSessionDraft(sessionID: string, selection: ModelSelection) {
+      function setSessionDraft(sessionID: string, selection: ModelSelection, preserve = false) {
         const current = agent.current()
         if (!current) return
         const durable = durableSelection(sessionID)
@@ -479,7 +479,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         setSessionSelection(
           sessionID,
           current.id,
-          (!session?.agent || session.agent === current.id) &&
+          !preserve &&
+            (!session?.agent || session.agent === current.id) &&
             durable &&
             selectionKey(durable) === selectionKey(selection)
             ? undefined
@@ -541,6 +542,17 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           const selection = currentSelection()
           if (route.data.type !== "session" || !current || !selection) return
           setSessionSelection(route.data.sessionID, current.id, { ...selection })
+        },
+        preserveOnAgentSwitch(selection: ModelSelection) {
+          if (route.data.type !== "session") return
+          if (autoStore.enabled) {
+            setAutoStore("enabled", false)
+            saveAutoStore()
+          }
+          const sessionID = route.data.sessionID
+          const current = agent.current()
+          if (!current) return
+          setSessionDraft(sessionID, selection, true)
         },
         available(model = currentModel()) {
           return model ? isModelValid(model) : false

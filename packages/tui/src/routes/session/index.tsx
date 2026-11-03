@@ -2037,7 +2037,7 @@ function AssistantFooter(props: { message: SessionMessageAssistant }) {
   )
   const autoBadge = createMemo(() => {
     if (!local.model.auto?.enabled()) return undefined
-    return `⚡ ${local.model.auto.modeName()} (${local.model.auto.tierLabel(local.model.auto.effectiveTier())}) → `
+    return `${local.model.auto.modeName()} (${local.model.auto.tierLabel(local.model.auto.effectiveTier())}) → `
   })
   const hoverDetails = createMemo(() => {
     const tok = props.message.tokens
@@ -2593,7 +2593,7 @@ function AssistantRetry(props: { retry: SessionMessageAssistant["retry"] }) {
       {(retry) => (
         <box paddingLeft={3}>
           <text fg={theme.text.feedback.warning.base}>
-            ⚠ {seconds() > 0 ? `Retrying in ${seconds()}s` : "Retry due"} · attempt {retry().attempt} ·{" "}
+            {seconds() > 0 ? `Retrying in ${seconds()}s` : "Retry due"} · attempt {retry().attempt} ·{" "}
             {retry().error.message}
           </text>
         </box>
@@ -3725,7 +3725,7 @@ function TodoWrite(props: ToolProps) {
       </Match>
       <Match when={true}>
         <InlineTool
-          icon="⚙"
+          icon="T"
           pending="Updating todos…"
           complete={props.part.state.status === "completed" || props.part.state.status === "error"}
           part={props.part}

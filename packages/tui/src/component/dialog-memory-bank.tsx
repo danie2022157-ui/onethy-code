@@ -259,7 +259,7 @@ export function DialogMemoryBank() {
 
     list.push({
       value: "__init__",
-      title: `⚡ Initialize All Standard Files (${totalExists}/${STANDARD_FILES.length} active)`,
+      title: `Initialize All Standard Files (${totalExists}/${STANDARD_FILES.length} active)`,
       description: "Ensures .omnicode/memory-bank/ and memory.md are scaffolded with templates",
       category: "Management Actions",
       footer: "[Initialize]",
@@ -278,7 +278,7 @@ export function DialogMemoryBank() {
           setVersion((v) => v + 1)
           toast.show({
             variant: "info",
-            title: "🧠 Memory Bank Initialized",
+            title: "Memory Bank Initialized",
             message: "Persistent memory bank files created successfully.",
           })
         } catch {
@@ -303,7 +303,7 @@ export function DialogMemoryBank() {
       list.push({
         value: f.path,
         title: isPendingDelete
-          ? `⚠️ DELETE: ${f.label}`
+          ? `DELETE: ${f.label}`
           : `${statusIcon} ${f.label} [${statusLabel}]`,
         description: isPendingDelete
           ? "Press Enter or Ctrl+D again to confirm deletion of this memory file"
@@ -353,8 +353,8 @@ export function DialogMemoryBank() {
       list.push({
         value: "__clear_all__",
         title: isPendingClearAll
-          ? "⚠️ CONFIRM: Clear Entire Memory Bank (.omnicode/memory-bank/)"
-          : `🗑️ Clear Entire Memory Bank (${totalExists} file${totalExists > 1 ? "s" : ""})`,
+          ? "CONFIRM: Clear Entire Memory Bank (.omnicode/memory-bank/)"
+          : `Clear Entire Memory Bank (${totalExists} file${totalExists > 1 ? "s" : ""})`,
         description: isPendingClearAll
           ? "Warning: All memory files will be permanently erased. Press Enter or Ctrl+D to confirm."
           : "Permanently deletes all persistent memory files in this workspace",
@@ -378,7 +378,7 @@ export function DialogMemoryBank() {
 
   return (
     <DialogSelect
-      title="🧠 OmniCode — Persistent Memory Bank"
+      title="OmniCode — Persistent Memory Bank"
       placeholder="Search memory files..."
       options={options()}
       onMove={() => setToDelete(undefined)}

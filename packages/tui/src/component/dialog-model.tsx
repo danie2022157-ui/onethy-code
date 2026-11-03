@@ -189,7 +189,7 @@ function DialogConnectedModels(props: {
         ? [
             {
               value: { providerID: "__auto__", modelID: "auto" },
-              title: `⚡ ${local.model.auto.modeName()} (Automatic Model Selection)`,
+              title: `${local.model.auto.modeName()} (Automatic Model Selection)`,
               description: `Providers: ${connNames} (${connModels.length} models) · Tier: ${local.model.auto.tierLabel()}`,
               category: "Automatic Selection",
               footer: local.model.auto.enabled() ? `Active (${local.model.auto.tierLabel()}) ✓` : "Select tier →",

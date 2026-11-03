@@ -48,13 +48,48 @@ test("switching agents restores their model and variant within the session", asy
   expect(setup.local.model.selection()).toEqual({ providerID: "provider", modelID: "first", variant: "low" })
   setup.local.agent.move(1)
   expect(setup.local.agent.current()?.id).toBe("plan")
-  expect(setup.local.model.selection()).toEqual({ providerID: "provider", modelID: "second", variant: "low" })
+  expect(setup.local.model.selection()).toEqual({ providerID: "provider", modelID: "first", variant: "low" })
   setup.local.model.set({ providerID: "provider", modelID: "third" })
   setup.local.model.variant.set("high")
   setup.local.agent.move(-1)
-  expect(setup.local.model.selection()).toEqual({ providerID: "provider", modelID: "first", variant: "low" })
+  expect(setup.local.model.selection()).toEqual({ providerID: "provider", modelID: "third", variant: "high" })
   setup.local.agent.set("plan")
   expect(setup.local.model.selection()).toEqual({ providerID: "provider", modelID: "third", variant: "high" })
+})
+
+test("switching to an agent without a remembered selection preserves the current model and variant", async () => {
+  await using setup = await renderLocal({
+    models: [model("first", ["low", "high"]), model("second", ["low", "high"])],
+    agents: [agent("build"), agent("plan", { providerID: "provider", id: "second", variant: "high" })],
+    sessions: [session("ses_first", { providerID: "provider", id: "first", variant: "low" })],
+  })
+  await setup.data.session.sync("ses_first")
+  setup.route.navigate({ type: "session", sessionID: "ses_first" })
+  setup.local.agent.set("plan")
+  expect(setup.local.model.selection()).toEqual({ providerID: "provider", modelID: "first", variant: "low" })
+})
+
+test("switching agents preserves the current selection despite remembered choices", async () => {
+  await using setup = await renderLocal({
+    models: [model("first", ["low", "high"]), model("second", ["low", "high"]), model("third", ["low", "high"])],
+    agents: [agent("build"), agent("plan", { providerID: "provider", id: "second", variant: "high" })],
+    sessions: [
+      session("ses_first", { providerID: "provider", id: "first", variant: "low" }),
+      session("ses_second", { providerID: "provider", id: "third" }),
+    ],
+  })
+  await Promise.all([setup.data.session.sync("ses_first"), setup.data.session.sync("ses_second")])
+  setup.route.navigate({ type: "session", sessionID: "ses_first" })
+  setup.local.agent.set("plan")
+  setup.local.model.set({ providerID: "provider", modelID: "third" })
+  setup.local.model.variant.set("high")
+  setup.local.agent.set("build")
+  expect(setup.local.model.selection()).toEqual({ providerID: "provider", modelID: "third", variant: "high" })
+  setup.local.agent.set("plan")
+  expect(setup.local.model.selection()).toEqual({ providerID: "provider", modelID: "third", variant: "high" })
+  setup.route.navigate({ type: "session", sessionID: "ses_second" })
+  setup.local.agent.set("plan")
+  expect(setup.local.model.selection()).toEqual({ providerID: "provider", modelID: "third", variant: undefined })
 })
 
 test("agent and model drafts are isolated across sessions and survive navigation", async () => {

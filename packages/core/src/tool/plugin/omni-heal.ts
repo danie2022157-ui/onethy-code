@@ -6,8 +6,10 @@ import os from "node:os"
 import path from "node:path"
 import { ToolFailure } from "@opencode/ai/effect"
 import type { Context } from "@opencode/plugin/effect/plugin"
+import type { Context as ToolContext } from "@opencode/schema/tool"
 import { Effect, Schema } from "effect"
 import { Location } from "../../location.js"
+import { Tool } from "../../tool.js"
 
 export const name = "omni_heal"
 
@@ -39,8 +41,12 @@ export const description = [
   "Self-Healing Autonomous Test & Build Loop (Claude Code / Ralph loop pattern).",
   "Executes test suites or typechecks, captures error outputs, isolates failing files and assertion traces, and formulates step-by-step healing plans for @coder.",
   "- 'run_and_heal': Runs test suite, verifies results, and if failing, returns actionable healing instructions.",
+  "- On validation failure, 'run_and_heal' automatically dispatches a bounded @coder repair and revalidates (at most three validations per session and command, keyed by trimming surrounding whitespace only).",
   "- 'diagnose': Parses compiler or runtime tracebacks into targeted bugfix action items.",
 ].join("\n")
+
+const MAX_ATTEMPTS = 3
+const attemptsBySession = new Map<string, Map<string, { attempts: number; limit: number }>>()
 
 function detectProjectTestCommand(rootDir: string): string {
   const pkgJsonPath = path.join(rootDir, "package.json")
@@ -180,6 +186,7 @@ export const Plugin = {
   id: "opencode.tool.omni_heal",
   effect: Effect.fn("OmniHealTool.Plugin")(function* (ctx: Context) {
     const location = yield* Location.Service
+    const tools = yield* Tool.Service
 
     yield* ctx.tool
       .transform((editor) => {
@@ -190,7 +197,7 @@ export const Plugin = {
           description,
           input: Input,
           output: Output,
-          execute: (params) =>
+          execute: (params, context: ToolContext) =>
             Effect.gen(function* () {
               const rootDir = location.project.directory
               const commandToRun = params.command || detectProjectTestCommand(rootDir)
@@ -214,43 +221,91 @@ export const Plugin = {
               }
 
               if (params.action === "run_and_heal") {
-                const { stdout, stderr, exitCode } = yield* runCommandAsync(commandToRun, rootDir, 120_000)
-                const combinedOutput = `${stdout}\n${stderr}`.trim()
+                if (
+                  params.maxAttempts !== undefined &&
+                  (!Number.isFinite(params.maxAttempts) || !Number.isInteger(params.maxAttempts) || params.maxAttempts <= 0)
+                )
+                  return yield* new ToolFailure({ message: "maxAttempts must be a positive finite integer." })
 
-                if (exitCode === 0) {
+                const commandKey = commandToRun.trim()
+                const sessionAttempts = attemptsBySession.get(context.sessionID) ?? new Map<string, { attempts: number; limit: number }>()
+                const budget = sessionAttempts.get(commandKey) ?? {
+                  attempts: 0,
+                  limit: Math.min(params.maxAttempts ?? MAX_ATTEMPTS, MAX_ATTEMPTS),
+                }
+                if (budget.attempts >= budget.limit) {
+                  const summary = `⛔ Limite de validações esgotado para este comando nesta sessão (${budget.attempts}/${budget.limit}). Nenhuma execução foi iniciada.`
+                  return {
+                    output: { action: "run_and_heal", passed: false, command: commandToRun, summary },
+                    content: summary,
+                    metadata: { action: "run_and_heal", passed: false, command: commandToRun },
+                  }
+                }
+                budget.attempts++
+                sessionAttempts.set(commandKey, budget)
+                attemptsBySession.set(context.sessionID, sessionAttempts)
+
+                let result = yield* runCommandAsync(commandToRun, rootDir, 120_000)
+                let repairReason: string | undefined
+                while (result.exitCode !== 0 && budget.attempts < budget.limit) {
+                  const snapshot = yield* tools.snapshot()
+                  if (!snapshot.definitions.some((definition) => definition.name === "subagent")) {
+                    repairReason = "Repair skipped: the registered subagent tool is unavailable."
+                    break
+                  }
+                  const failure = extractFailureDetails(`${result.stdout}\n${result.stderr}`.trim())
+                  const dispatched = yield* snapshot.execute({
+                    sessionID: context.sessionID,
+                    agent: context.agent,
+                    messageID: context.messageID,
+                    call: {
+                      type: "tool-call",
+                      id: `${context.id}-repair-${budget.attempts}`,
+                      name: "subagent",
+                      input: {
+                        agent: "coder",
+                        description: "Repair validation failure",
+                        background: false,
+                        prompt: `Repair only the provided failure; do not broaden scope. This repair agent is not permitted to invoke omni_heal or dispatch another subagent.\n\nCommand:\n${commandToRun}\n\nFailure output:\n${failure}`,
+                      },
+                    },
+                  }).pipe(Effect.catchTag("Tool.Error", (error) => Effect.succeed({ dispatchError: error.message } as const)))
+                  if ("dispatchError" in dispatched) {
+                    repairReason = `Repair dispatch failed: ${dispatched.dispatchError}`
+                    break
+                  }
+                  const subagent = dispatched.output
+                  if (subagent.status !== "completed") {
+                    repairReason = `Repair was not completed (status: ${subagent.status}). Validation was not retried.`
+                    break
+                  }
+                  budget.attempts++
+                  result = yield* runCommandAsync(commandToRun, rootDir, 120_000)
+                }
+                const combinedOutput = `${result.stdout}\n${result.stderr}`.trim()
+                if (result.exitCode === 0) {
                   const summary = `✅ SUCESSO: Todos os testes e validações passaram limpos!\nComando: ${commandToRun}\n\nSaída:\n${combinedOutput.slice(-500) || "OK"}`
                   return {
-                    output: {
-                      action: "run_and_heal",
-                      passed: true,
-                      command: commandToRun,
-                      summary,
-                    },
+                    output: { action: "run_and_heal", passed: true, command: commandToRun, summary },
                     content: summary,
                     metadata: { action: "run_and_heal", passed: true, command: commandToRun },
                   }
                 }
 
                 const diag = extractFailureDetails(combinedOutput)
-                const summary = `❌ FALHA DETECTADA (Exit code ${exitCode}):\nComando: ${commandToRun}\n\nIniciando ciclo de autocura (Self-Healing Loop)...`
+                const remaining = Math.max(0, budget.limit - budget.attempts)
+                const summary = `❌ FALHA DETECTADA (Exit code ${result.exitCode}):\nComando: ${commandToRun}\n\nValidações restantes para este comando nesta sessão: ${remaining}.`
                 const diagnostics = [
                   "=== TRACEBACK DE FALHA ===",
                   diag,
                   "",
-                  "=== PLANO DE AUTOCURA PARA @CODER ===",
-                  "1. Identifique a causa raiz nos arquivos apontados pelo traceback acima.",
-                  "2. Aplique a correção nos arquivos afetados.",
-                  "3. Re-execute 'omni_heal' para testar novamente até atingir 100% verde.",
+                  "=== PRÓXIMOS PASSOS ===",
+                  repairReason ?? (budget.attempts >= budget.limit
+                    ? `Validation budget exhausted (${budget.attempts}/${budget.limit}); no further repair was dispatched.`
+                    : "Use os diagnósticos para corrigir a falha; depois execute omni_heal novamente para validar."),
                 ].join("\n")
-
                 return {
-                  output: {
-                    action: "run_and_heal",
-                    passed: false,
-                    command: commandToRun,
-                    summary,
-                    diagnostics,
-                  },
+                  output: { action: "run_and_heal", passed: false, command: commandToRun, summary, diagnostics },
                   content: `${summary}\n\n${diagnostics}`,
                   metadata: { action: "run_and_heal", passed: false, command: commandToRun },
                 }

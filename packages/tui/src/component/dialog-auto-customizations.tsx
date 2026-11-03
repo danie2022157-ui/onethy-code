@@ -17,7 +17,7 @@ export function DialogAutoCustomizations() {
     return [
       {
         value: "toggle-global",
-        title: isGlobal ? "✓ ⚡ Proactive Auto-Usage: [ENABLED]" : "○ ⚡ Proactive Auto-Usage: [DISABLED]",
+        title: isGlobal ? "✓ Proactive Auto-Usage: [ENABLED]" : "○ Proactive Auto-Usage: [DISABLED]",
         description: isGlobal
           ? "Active: AI autonomously selects and executes capabilities below matching the task"
           : "Inactive: AI will not automatically invoke additional resources (strict passive mode)",
@@ -33,7 +33,7 @@ export function DialogAutoCustomizations() {
       },
       {
         value: "useSkills",
-        title: cfg.useSkills ? "✓ 🛠️ Specialized Skills (@skills)" : "○ 🛠️ Specialized Skills (@skills)",
+        title: cfg.useSkills ? "✓ Specialized Skills (@skills)" : "○ Specialized Skills (@skills)",
         description: "Automatically invoke specialized skills (testing, UI, video, SEO, security, git)",
         category: "Allowed Capabilities Matching Task",
         footer: cfg.useSkills ? "[Allowed]" : "[Ignore]",
@@ -43,7 +43,7 @@ export function DialogAutoCustomizations() {
       },
       {
         value: "useAgents",
-        title: cfg.useAgents ? "✓ 🤖 Expert Subagents (@agents)" : "○ 🤖 Expert Subagents (@agents)",
+        title: cfg.useAgents ? "✓ Expert Subagents (@agents)" : "○ Expert Subagents (@agents)",
         description: "Delegate to @architect, @researcher, @coder, @reviewer on complex tasks",
         category: "Allowed Capabilities Matching Task",
         footer: cfg.useAgents ? "[Allowed]" : "[Ignore]",
@@ -53,7 +53,7 @@ export function DialogAutoCustomizations() {
       },
       {
         value: "useMcps",
-        title: cfg.useMcps ? "✓ 🔌 Connected MCP Servers" : "○ 🔌 Connected MCP Servers",
+        title: cfg.useMcps ? "✓ Connected MCP Servers" : "○ Connected MCP Servers",
         description: "Proactively utilize external tools (browsers, databases, git, APIs)",
         category: "Allowed Capabilities Matching Task",
         footer: cfg.useMcps ? "[Allowed]" : "[Ignore]",
@@ -63,7 +63,7 @@ export function DialogAutoCustomizations() {
       },
       {
         value: "useHooks",
-        title: cfg.useHooks ? "✓ 🪝 Automated Hooks (hook-*, /hook-*)" : "○ 🪝 Automated Hooks (hook-*, /hook-*)",
+        title: cfg.useHooks ? "✓ Automated Hooks (hook-*, /hook-*)" : "○ Automated Hooks (hook-*, /hook-*)",
         description: "Trigger pre/post task rules and automated integrity assertions",
         category: "Allowed Capabilities Matching Task",
         footer: cfg.useHooks ? "[Allowed]" : "[Ignore]",
@@ -73,7 +73,7 @@ export function DialogAutoCustomizations() {
       },
       {
         value: "useMods",
-        title: cfg.useMods ? "✓ 🧩 Active Mods & Plugins" : "○ 🧩 Active Mods & Plugins",
+        title: cfg.useMods ? "✓ Active Mods & Plugins" : "○ Active Mods & Plugins",
         description: "Leverage code extensions and plugins installed in the workspace",
         category: "Allowed Capabilities Matching Task",
         footer: cfg.useMods ? "[Allowed]" : "[Ignore]",
@@ -83,7 +83,7 @@ export function DialogAutoCustomizations() {
       },
       {
         value: "useCommands",
-        title: cfg.useCommands ? "✓ ⚡ Slash Commands & Loops (/loop-*)" : "○ ⚡ Slash Commands & Loops (/loop-*)",
+        title: cfg.useCommands ? "✓ Slash Commands & Loops (/loop-*)" : "○ Slash Commands & Loops (/loop-*)",
         description: "Suggest and run verification loops and testing pipelines",
         category: "Allowed Capabilities Matching Task",
         footer: cfg.useCommands ? "[Allowed]" : "[Ignore]",
@@ -93,7 +93,7 @@ export function DialogAutoCustomizations() {
       },
       {
         value: "useSettings",
-        title: cfg.useSettings ? "✓ ⚙️ Modes, Presets & Settings" : "○ ⚙️ Modes, Presets & Settings",
+        title: cfg.useSettings ? "✓ Modes, Presets & Settings" : "○ Modes, Presets & Settings",
         description: "Respect active autonomy mode and workspace environment settings",
         category: "Allowed Capabilities Matching Task",
         footer: cfg.useSettings ? "[Allowed]" : "[Ignore]",
@@ -103,7 +103,7 @@ export function DialogAutoCustomizations() {
       },
       {
         value: "enable-all",
-        title: "🟢 Enable All Capabilities",
+        title: "Enable All Capabilities",
         description: "Allow full autonomous usage (Skills, Agents, MCPs, Hooks, Mods, Commands, Settings)",
         category: "Quick Actions",
         footer: "[Enable All]",
@@ -117,7 +117,7 @@ export function DialogAutoCustomizations() {
       },
       {
         value: "disable-all",
-        title: "🔴 Disable All Capabilities",
+        title: "Disable All Capabilities",
         description: "Disable automatic selection of any additional resources",
         category: "Quick Actions",
         footer: "[Disable All]",
@@ -145,7 +145,7 @@ export function DialogAutoCustomizations() {
   return (
     <DialogSelect<string>
       options={options()}
-      title="⚙️ Proactive Capabilities Auto-Usage — OmniCode"
+      title="Proactive Capabilities Auto-Usage — OmniCode"
       titlePlaceholder="Filter capabilities (Enter to toggle)..."
       renderFilter={true}
       flat={false}

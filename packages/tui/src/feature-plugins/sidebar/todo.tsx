@@ -30,7 +30,7 @@ export function SidebarTodo(props: { context: Plugin.Context; sessionID: string 
           }}
         >
           <Show when={list().length > 2}>
-            <text fg={theme.text.base}>{view.open ? "▼" : "▶"}</text>
+            <text fg={theme.text.base}>{view.open ? "v" : ">"}</text>
           </Show>
           <text fg={theme.text.base}>
             <b>Todo</b>

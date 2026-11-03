@@ -16,11 +16,11 @@ export function DialogThemeList(props: { onClose?: () => void }) {
 
   const options = [...onethyNames, ...otherNames].map((value) => {
     let title = value
-    if (value === "onethy") title = `⚡ onethy (Oficial Cosmic Cyberpunk)`
-    else if (value === "onethy-cosmic") title = `⚡ onethy-cosmic (Cyberpunk)`
-    else if (value === "onethy-lunar") title = `🌙 onethy-lunar (Midnight Moon)`
-    else if (value === "onethy-aurora") title = `🌌 onethy-aurora (Aurora Borealis Mint)`
-    else if (value === "onethy-eclipse") title = `🌑 onethy-eclipse (OLED Pitch Black)`
+    if (value === "onethy") title = `onethy (Oficial Cosmic Cyberpunk)`
+    else if (value === "onethy-cosmic") title = `onethy-cosmic (Cyberpunk)`
+    else if (value === "onethy-lunar") title = `onethy-lunar (Midnight Moon)`
+    else if (value === "onethy-aurora") title = `onethy-aurora (Aurora Borealis Mint)`
+    else if (value === "onethy-eclipse") title = `onethy-eclipse (OLED Pitch Black)`
     return {
       title,
       value,

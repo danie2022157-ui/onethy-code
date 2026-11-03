@@ -276,10 +276,10 @@ function span(frame: ToolFrame): string {
 function fail(ctx: ToolFrame): string {
   const error = toolError(ctx)
   if (error) {
-    return `✖ ${ctx.name} failed: ${error}`
+    return `${ctx.name} failed: ${error}`
   }
 
-  return `✖ ${ctx.name} failed`
+  return `${ctx.name} failed`
 }
 
 function toolError(ctx: ToolFrame): string {
@@ -298,10 +298,10 @@ function toolError(ctx: ToolFrame): string {
 function fallbackStart(ctx: ToolFrame): string {
   const extra = primitiveInputSummary(ctx.input)
   if (!extra) {
-    return `⚙ ${ctx.name}`
+    return `${ctx.name}`
   }
 
-  return `⚙ ${ctx.name} ${extra}`
+  return `${ctx.name} ${extra}`
 }
 
 function fallbackFinal(ctx: ToolFrame): string {
@@ -337,7 +337,7 @@ function fallbackInline(ctx: ToolFrame): ToolInline {
   const title = Object.keys(ctx.input).length > 0 ? JSON.stringify(ctx.input) : "Unknown"
 
   return {
-    icon: "⚙",
+    icon: "T",
     title: `${ctx.name} ${title}`,
   }
 }

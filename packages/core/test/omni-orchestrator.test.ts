@@ -81,7 +81,7 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       expect(agents.length).toBe(6)
       expect(agents.map((a) => a.id)).toEqual([
         "supervisor",
-        "researcher",
+        "explore",
         "librarian",
         "architect",
         "coder",
@@ -89,10 +89,22 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       ])
 
       const tasks = yield* orchestrator.planMission("Corrigir autenticação e validar com testes", "mission-auth")
+      expect(yield* orchestrator.getMissionGoal("mission-auth")).toBe("Corrigir autenticação e validar com testes")
       expect(tasks.length).toBe(3)
-      expect(tasks[0].assignedAgent).toBe("researcher")
+      expect(tasks[0].assignedAgent).toBe("explore")
       expect(tasks[1].assignedAgent).toBe("coder")
       expect(tasks[2].assignedAgent).toBe("reviewer")
+      expect(tasks[0].dependsOn).toEqual([])
+      expect(tasks[1].dependsOn).toEqual([tasks[0].id])
+      expect(tasks[2].dependsOn).toEqual([tasks[1].id])
+      expect(tasks.every((task) => task.acceptanceCriteria.length > 0)).toBe(true)
+      expect((yield* orchestrator.getReadyTasks("mission-auth")).map((task) => task.id)).toEqual([tasks[0].id])
+      const started = yield* orchestrator.startTask("mission-auth", tasks[0].id)
+      expect(started.status).toBe("running")
+      expect((yield* orchestrator.getReadyTasks("mission-auth"))).toHaveLength(0)
+      const blocked = yield* Effect.exit(orchestrator.executeTask("mission-auth", tasks[1].id, "premature"))
+      expect(blocked._tag).toBe("Failure")
+      expect((yield* orchestrator.getActiveTasks("mission-auth"))[1].status).toBe("pending")
       const planMessage = (yield* bus.list()).find((message) => message.type === "plan")
       expect(planMessage?.payload).toMatchObject({ missionID: "mission-auth" })
 
@@ -100,11 +112,13 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       expect(yield* orchestrator.getActiveTasks("mission-other")).toHaveLength(0)
       expect(yield* orchestrator.getActiveTasks()).toHaveLength(0)
       tasks[0].status = "failed"
-      expect((yield* orchestrator.getActiveTasks("mission-auth"))[0].status).toBe("pending")
+      expect((yield* orchestrator.getActiveTasks("mission-auth"))[0].status).toBe("running")
       const completed = yield* orchestrator.executeTask("mission-auth", tasks[0].id, "Rotas identificadas com sucesso")
       expect(completed.status).toBe("completed")
       expect(completed.result).toBe("Rotas identificadas com sucesso")
-      const statusMessage = (yield* bus.list()).find((message) => message.type === "status")
+      expect((yield* orchestrator.getActiveTasks("mission-auth"))[0].result).toBe("Rotas identificadas com sucesso")
+      expect((yield* orchestrator.getReadyTasks("mission-auth")).map((task) => task.id)).toEqual([tasks[1].id])
+      const statusMessage = (yield* bus.list()).find((message) => message.type === "status" && (message.payload as { status?: string }).status === "completed")
       expect(statusMessage?.payload).toMatchObject({ missionID: "mission-auth", status: "completed" })
       const crossMission = yield* Effect.exit(orchestrator.executeTask("mission-other", tasks[1].id, "must not complete"))
       expect(crossMission._tag).toBe("Failure")
@@ -125,6 +139,20 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
     }),
   )
 
+  effect("OmniOrchestrator: records task failure and child correlation without unblocking dependents", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* OmniOrchestrator.Service
+      const tasks = yield* orchestrator.planMission("lifecycle", "mission-lifecycle")
+      const running = yield* orchestrator.startTask("mission-lifecycle", tasks[0].id, "ses-child")
+      expect(running.status).toBe("running")
+      expect(running.childSessionID).toBe("ses-child")
+      const failed = yield* orchestrator.failTask("mission-lifecycle", tasks[0].id, "dispatch error")
+      expect(failed.status).toBe("failed")
+      expect(failed.result).toBe("dispatch error")
+      expect(yield* orchestrator.getReadyTasks("mission-lifecycle")).toHaveLength(0)
+    }),
+  )
+
   effect("OmniOrchestrator: plans Ultrawork, Arena, routes models by category, and enforces Ralph Loop", () =>
     Effect.gen(function* () {
       const orchestrator = yield* OmniOrchestrator.Service
@@ -133,6 +161,9 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       expect(ulwTasks.length).toBe(5)
       expect(ulwTasks[0].parallel).toBe(true)
       expect(ulwTasks[1].assignedAgent).toBe("librarian")
+      expect(ulwTasks[2].dependsOn).toEqual([ulwTasks[0].id, ulwTasks[1].id])
+      expect(ulwTasks[3].dependsOn).toEqual([ulwTasks[2].id])
+      expect(ulwTasks[4].acceptanceCriteria[0].toLowerCase()).toContain("typecheck")
       const bus = yield* OmniBus.Service
       const ulwPlan = (yield* bus.list()).find((message) => message.type === "plan" && (message.payload as { mode?: string }).mode === "ultrawork")
       expect(ulwPlan?.payload).toMatchObject({ missionID: ulwTasks[0].missionID })
@@ -150,6 +181,9 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       const teamTasks = yield* orchestrator.planTeamPipeline("Construir funcionalidade", "mission-team")
       const teamPlan = (yield* bus.list()).find((message) => message.type === "plan" && (message.payload as { mode?: string }).mode === "team_pipeline")
       expect(teamPlan?.payload).toMatchObject({ missionID: teamTasks[0].missionID })
+      expect(teamTasks[1].dependsOn).toEqual([teamTasks[0].id])
+      expect(teamTasks[2].dependsOn).toEqual([teamTasks[1].id])
+      expect(teamTasks[3].dependsOn).toEqual([teamTasks[2].id])
 
       const routed = yield* orchestrator.selectModelForAgent("explore", "Buscar arquivos rapidamente", [
         Model.Info.default(Provider.ID.make("test"), Model.ID.make("z-model")),

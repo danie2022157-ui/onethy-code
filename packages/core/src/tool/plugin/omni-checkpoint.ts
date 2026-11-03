@@ -30,10 +30,10 @@ export const Output = Schema.Struct({
 
 export const description = [
   "Workspace Checkpoint & Time-Travel Git Engine (.omnicode/checkpoints/).",
-  "Creates instantaneous snapshots of all tracked and untracked repository changes before AI edits.",
+  "Creates Git stash snapshots of tracked repository changes before AI edits; untracked files are listed but are not included in the snapshot.",
   "- 'create': Creates a named checkpoint before executing risky code changes or running subagents.",
   "- 'list': Lists existing checkpoints, timestamps, and commit/stash pointers.",
-  "- 'restore': Reverts file changes back to a previous checkpoint (Time-Travel / Undo).",
+  "- 'restore': Safely reapplies a tracked-file snapshot only when the workspace is clean; untracked files are not captured.",
   "- 'diff': Shows git diff between current workspace and the selected checkpoint.",
 ].join("\n")
 
@@ -178,11 +178,39 @@ export const Plugin = {
                 }
 
                 if (target.stashRef) {
-                  // Se tínhamos um stash do estado
-                  runGit(rootDir, ["stash", "apply", target.stashRef])
-                } else if (target.commitHash) {
-                  // Reverte mudanças não commitadas para o estado do commit
-                  runGit(rootDir, ["checkout", "HEAD", "--", "."])
+                  const status = runGit(rootDir, ["status", "--porcelain", "-z", "--untracked-files=all"])
+                  if (status.code !== 0) return yield* new ToolFailure({ message: `Erro ao verificar workspace antes da restauração: ${status.stderr}` })
+                  const currentHead = runGit(rootDir, ["rev-parse", "HEAD"])
+                  if (currentHead.code !== 0 || currentHead.stdout.trim() !== target.commitHash) {
+                    return yield* new ToolFailure({ message: "Restauração recusada: HEAD mudou desde o checkpoint; alterações locais não serão sobrescritas." })
+                  }
+                  if (target.modifiedFiles.length === 0 && status.stdout.length === 0) {
+                    const summary = `Restaurado com sucesso para o checkpoint '${target.id}' (${target.description}). Workspace restabelecido.`
+                    return {
+                      output: { action: "restore", summary },
+                      content: summary,
+                      metadata: { action: "restore", id: target.id },
+                    }
+                  }
+                  const workspaceChanges = status.stdout
+                    .split("\0")
+                    .filter((entry) => entry && !entry.slice(3).startsWith(".omnicode/checkpoints/"))
+                  if (workspaceChanges.length > 0)
+                    return yield* new ToolFailure({ message: "Restauração recusada: workspace contém alterações locais; stash apply poderia mesclá-las ao checkpoint." })
+                  const applied = runGit(rootDir, ["stash", "apply", target.stashRef])
+                  if (applied.code !== 0) return yield* new ToolFailure({ message: `Erro ao restaurar checkpoint: ${applied.stderr || applied.stdout}` })
+                  const verified = runGit(rootDir, ["status", "--porcelain", "-z", "--untracked-files=all"])
+                  if (verified.code !== 0 || verified.stdout.length === 0) {
+                    return yield* new ToolFailure({ message: "Restauração não verificada; estado do workspace permanece incerto." })
+                  }
+                } else {
+                  const currentHead = runGit(rootDir, ["rev-parse", "HEAD"])
+                  if (currentHead.code !== 0) return yield* new ToolFailure({ message: `Erro ao verificar workspace antes da restauração: ${currentHead.stderr}` })
+                  if (currentHead.stdout.trim() !== target.commitHash) return yield* new ToolFailure({ message: "Restauração recusada: HEAD mudou desde o checkpoint; alterações locais não serão sobrescritas." })
+                  const status = runGit(rootDir, ["status", "--porcelain", "-z", "--untracked-files=all"])
+                  if (status.code !== 0) return yield* new ToolFailure({ message: `Erro ao verificar workspace antes da restauração: ${status.stderr}` })
+                  const workspaceChanges = status.stdout.split("\0").filter((entry) => entry && !entry.slice(3).startsWith(".omnicode/checkpoints/"))
+                  if (workspaceChanges.length > 0) return yield* new ToolFailure({ message: "Restauração recusada: checkpoint sem snapshot e workspace contém alterações locais; alterações não serão sobrescritas." })
                 }
 
                 const summary = `Restaurado com sucesso para o checkpoint '${target.id}' (${target.description}). Workspace restabelecido.`

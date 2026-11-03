@@ -167,7 +167,7 @@ export function DialogOmniUpdate() {
       setStep("success")
       toast.show({
         variant: "success",
-        title: "⚡ OnethyCode Updated!",
+        title: "OnethyCode Updated!",
         message: `Version ${newShaRes.stdout}: ${lastMsgRes.stdout.slice(0, 50)}`,
         duration: 5000,
       })
@@ -198,8 +198,8 @@ export function DialogOmniUpdate() {
     toast.show({
       variant: "success",
       message: decision
-        ? `🩺 Session & cache repaired! Active model: ${decision.modelName} (${decision.providerID})`
-        : "🩺 Rate-limit cache (429) and session state repaired!",
+        ? `Session & cache repaired! Active model: ${decision.modelName} (${decision.providerID})`
+        : "Rate-limit cache (429) and session state repaired!",
       duration: 3800,
     })
   }
@@ -240,7 +240,7 @@ export function DialogOmniUpdate() {
         <DialogHeader
           title={
             <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD}>
-              ⚡ OnethyCode Updater
+              OnethyCode Updater
             </text>
           }
           description="Sync with official GitHub repository"
@@ -258,7 +258,7 @@ export function DialogOmniUpdate() {
                 onMouseUp={() => void applyUpdate(false)}
               >
                 <text fg={RGBA.fromHex("#0A0F1D")} attributes={TextAttributes.BOLD} selectable={false}>
-                  ⚡ Update Now [Enter]
+                  Update Now [Enter]
                 </text>
               </box>
               <box paddingLeft={1} paddingRight={1} onMouseUp={() => dialog.clear()}>
@@ -275,7 +275,7 @@ export function DialogOmniUpdate() {
                 onMouseUp={() => repairSessionAndCache()}
               >
                 <text fg={RGBA.fromHex("#38BDF8")} attributes={TextAttributes.BOLD} selectable={false}>
-                  🩺 Repair Session & Cache [D]
+                  Repair Session & Cache [D]
                 </text>
               </box>
               <box
@@ -285,7 +285,7 @@ export function DialogOmniUpdate() {
                 onMouseUp={() => void applyUpdate(true)}
               >
                 <text fg={RGBA.fromHex("#FFFFFF")} attributes={TextAttributes.BOLD} selectable={false}>
-                  🔄 Force Sync [Enter]
+                  Force Sync [Enter]
                 </text>
               </box>
               <box paddingLeft={1} paddingRight={1} onMouseUp={() => dialog.clear()}>
@@ -302,7 +302,7 @@ export function DialogOmniUpdate() {
                 onMouseUp={() => void restartApp()}
               >
                 <text fg={RGBA.fromHex("#FFFFFF")} attributes={TextAttributes.BOLD} selectable={false}>
-                  🚀 Restart OnethyCode [Enter]
+                  Restart OnethyCode [Enter]
                 </text>
               </box>
               <box paddingLeft={1} paddingRight={1} onMouseUp={() => dialog.clear()}>
@@ -393,7 +393,7 @@ export function DialogOmniUpdate() {
               onMouseUp={() => void openUrl(repoUrl).catch(() => undefined)}
             >
               <text fg={RGBA.fromHex("#38BDF8")}>
-                🌐 Open repository on GitHub: {repoUrl}
+                Open repository on GitHub: {repoUrl}
               </text>
             </box>
           </box>
@@ -420,7 +420,7 @@ export function DialogOmniUpdate() {
               {lastCommitMsg()}
             </text>
             <text fg={RGBA.fromHex("#F59E0B")} attributes={TextAttributes.BOLD}>
-              ⚡ Restart OnethyCode to activate all new features in the terminal.
+              Restart OnethyCode to activate all new features in the terminal.
             </text>
           </box>
         </Match>

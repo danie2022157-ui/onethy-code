@@ -287,7 +287,7 @@ export function entrySplashLayout(input: { width: number; version: string; detai
     .filter((path) => stringWidth(path) < stringWidth(detail))
   let layout = { label: Locale.takeWidth("oc mini", input.width), version: "", path: "", metadata: "" }
   const stages = [
-    { label: `${input.mono ? "[O]" : "▪"} oc mini` },
+    { label: `${input.mono ? "[O]" : ">"} oc mini` },
     ...(leaf ? [{ path: leaf }] : []),
     ...(input.version ? [{ version: input.version }] : []),
     ...paths.concat(detail ? [detail] : []).map((path) => ({ path })),
