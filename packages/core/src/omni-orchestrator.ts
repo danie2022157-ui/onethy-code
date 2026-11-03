@@ -11,6 +11,7 @@ import { ModelSelectionPolicy } from "./model-selection-policy.js"
 import { Location } from "./location.js"
 import { OmniBus } from "./omni-bus.js"
 import { OmniConfig } from "./omni-config.js"
+import { OmniSession } from "./omni-session.js"
 
 function getAutoModelFilePath(): string {
   const stateDir =
@@ -241,6 +242,7 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* OmniBus.Service
+    const store = yield* OmniSession.Service
     const cooldowns = new Map<string, number>()
     const markModelCooldown = Effect.fn("OmniOrchestrator.markModelCooldown")(function* (
       providerID: string,
@@ -265,6 +267,15 @@ const layer = Layer.effect(
       return false
     })
     const missions = new Map<string, TaskItem[]>()
+    const missionTasks = Effect.fn("OmniOrchestrator.missionTasks")(function* (missionID: string) {
+      const existing = missions.get(missionID)
+      if (existing) return existing
+      const persisted = yield* store.loadMissionTasks(missionID)
+      if (!persisted) return undefined
+      const restored = persisted.map((task) => ({ ...task }))
+      missions.set(missionID, restored)
+      return restored
+    })
 
     const getAgents = Effect.fn("OmniOrchestrator.getAgents")(function* () {
       return [...DEFAULT_AGENTS]
@@ -298,6 +309,7 @@ const layer = Layer.effect(
       ]
 
       missions.set(missionID, subtasks)
+      yield* store.saveMissionTasks(missionID, subtasks)
 
       yield* bus.publish({
         sender: "supervisor",
@@ -359,6 +371,7 @@ const layer = Layer.effect(
       ]
 
       missions.set(missionID, subtasks)
+      yield* store.saveMissionTasks(missionID, subtasks)
 
       yield* bus.publish({
         sender: "supervisor",
@@ -398,6 +411,7 @@ const layer = Layer.effect(
       }))
 
       missions.set(missionID, subtasks)
+      yield* store.saveMissionTasks(missionID, subtasks)
 
       yield* bus.publish({
         sender: "supervisor",
@@ -461,6 +475,7 @@ const layer = Layer.effect(
       ]
 
       missions.set(missionID, subtasks)
+      yield* store.saveMissionTasks(missionID, subtasks)
 
       yield* bus.publish({
         sender: "supervisor",
@@ -554,13 +569,15 @@ const layer = Layer.effect(
     })
 
     const executeTask = Effect.fn("OmniOrchestrator.executeTask")(function* (missionID: string, taskId: string, resultSummary: string) {
-      const task = missions.get(missionID)?.find((t) => t.id === taskId)
+      const tasks = yield* missionTasks(missionID)
+      const task = tasks?.find((t) => t.id === taskId)
       if (!task) {
         throw new Error(`Tarefa '${taskId}' não pertence à missão '${missionID}'.`)
       }
 
       task.status = "completed"
       task.result = resultSummary
+      yield* store.saveMissionTasks(missionID, tasks!)
 
       yield* bus.publish({
         sender: task.assignedAgent,
@@ -574,7 +591,7 @@ const layer = Layer.effect(
 
     /** Claim one sequential task or a contiguous batch of parallel tasks; never skip an unfinished stage. */
     const claimReadyTasks = Effect.fn("OmniOrchestrator.claimReadyTasks")(function* (missionID: string, maxParallel = 3) {
-      const tasks = missions.get(missionID)
+      const tasks = yield* missionTasks(missionID)
       if (!tasks || !Number.isInteger(maxParallel) || maxParallel < 1 || maxParallel > 8) return []
       const running = tasks.filter((task) => task.status === "running")
       if (running.some((task) => !task.parallel)) return []
@@ -601,14 +618,17 @@ const layer = Layer.effect(
           payload: { missionID, status: "running" },
         })
       }
+      yield* store.saveMissionTasks(missionID, tasks)
       return claimable.map((task) => ({ ...task }))
     })
 
     const failTask = Effect.fn("OmniOrchestrator.failTask")(function* (missionID: string, taskId: string, reason: string) {
-      const task = missions.get(missionID)?.find((entry) => entry.id === taskId)
+      const tasks = yield* missionTasks(missionID)
+      const task = tasks?.find((entry) => entry.id === taskId)
       if (!task) throw new Error(`Task '${taskId}' does not belong to mission '${missionID}'.`)
       task.status = "failed"
       task.result = reason
+      yield* store.saveMissionTasks(missionID, tasks!)
       yield* bus.publish({
         sender: task.assignedAgent,
         taskId,
@@ -619,15 +639,18 @@ const layer = Layer.effect(
     })
 
     const retryTask = Effect.fn("OmniOrchestrator.retryTask")(function* (missionID: string, taskId: string) {
-      const task = missions.get(missionID)?.find((entry) => entry.id === taskId)
+      const tasks = yield* missionTasks(missionID)
+      const task = tasks?.find((entry) => entry.id === taskId)
       if (!task || task.status !== "failed") throw new Error("Only failed tasks can be retried")
       task.status = "pending"
       task.result = undefined
+      yield* store.saveMissionTasks(missionID, tasks!)
       return { ...task }
     })
 
     const getActiveTasks = Effect.fn("OmniOrchestrator.getActiveTasks")(function* (missionID?: string) {
-      return missionID ? (missions.get(missionID) ?? []).map((task) => ({ ...task })) : []
+      const tasks = missionID ? yield* missionTasks(missionID) : undefined
+      return tasks?.map((task) => ({ ...task })) ?? []
     })
 
     return Service.of({
@@ -656,5 +679,5 @@ const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Location.node, OmniBus.node, OmniConfig.node],
+  deps: [Location.node, OmniBus.node, OmniConfig.node, OmniSession.node],
 })
