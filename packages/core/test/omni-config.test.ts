@@ -1,10 +1,10 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { testEffect } from "./lib/effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Location } from "@opencode/core/location"
-import { OmniConfig } from "@opencode/core/omni-config"
+import { OmniConfig, parseOmniConfig } from "@opencode/core/omni-config"
 import { AbsolutePath } from "@opencode/core/schema"
 import { location } from "./fixture/location"
 
@@ -49,3 +49,27 @@ describe("OmniCode Config Management", () => {
   )
 })
 
+
+describe("OmniCode JSONC settings", () => {
+  test("preserves provider URLs and comments", () => {
+    const value = parseOmniConfig(`{
+      // URLs must survive JSONC comments
+      "mode": "approve",
+      "providers": {
+        "ollama": { "endpoint": "http://127.0.0.1:11434" },
+        "openai": { "endpoint": "https://api.openai.com/v1" },
+      },
+    }`)
+    expect(value.providers?.ollama?.endpoint).toBe("http://127.0.0.1:11434")
+    expect(value.providers?.openai?.endpoint).toBe("https://api.openai.com/v1")
+  })
+
+  test("rejects malformed JSONC instead of silently ignoring configuration", () => {
+    expect(() => parseOmniConfig('{ "mode": "approve", "providers": {')).toThrow("Invalid OmniCode JSONC")
+    expect(() => parseOmniConfig('{ "mode": "unrestricted" }')).toThrow("Invalid OmniCode autonomy mode")
+  })
+
+  test("rejects invalid MCP commands", () => {
+    expect(() => parseOmniConfig('{ "mcpServers": { "example": { "command": 5 } } }')).toThrow("Invalid OmniCode MCP")
+  })
+})
