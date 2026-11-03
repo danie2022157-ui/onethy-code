@@ -255,3 +255,28 @@ test("failed server plugins expose investigate, copy and scroll controls in the 
     fixture.app.renderer.destroy()
   }
 })
+
+test("Space opens error details for failed Server plugins", async () => {
+  await using tmp = await tmpdir()
+  const failure: PluginInfo = {
+    id: "broken.server",
+    source: { type: "local", path: path.join(tmp.path, "broken.ts") },
+    features: { server: true },
+    state: { status: "failed", error: "Plugin import failed: missing dependency", ref: "err_server" },
+  }
+  const fixture = await renderPlugins(tmp.path, { list: [failure], check: [] })
+  try {
+    await fixture.app.waitForFrame((frame) => frame.includes("broken.server") && frame.includes("failed"))
+    fixture.app.mockInput.pressKey(" ")
+    await fixture.app.waitForFrame((frame) =>
+      frame.includes("Server plugin error") &&
+      frame.includes("Plugin import failed: missing dependency") &&
+      frame.includes("investigate i"),
+    )
+    fixture.app.mockInput.pressKey("c")
+    await fixture.app.waitFor(() => fixture.copied.length === 1)
+    expect(fixture.copied[0]).toContain("Reference: err_server")
+  } finally {
+    fixture.app.renderer.destroy()
+  }
+})
