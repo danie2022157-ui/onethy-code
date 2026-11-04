@@ -1,10 +1,14 @@
 import { EOL } from "node:os"
-import { Effect } from "effect"
+import path from "node:path"
+import { readFile, mkdir, writeFile } from "node:fs/promises"
+import { applyEdits, modify } from "jsonc-parser"
+import { Effect, Option } from "effect"
 import { OpenCode, type McpServer } from "@opencode/client"
 import { Service } from "@opencode/client/effect/service"
 import { Commands } from "../../commands"
 import { Runtime } from "../../../framework/runtime"
 import { ServerConnection } from "../../../services/server-connection"
+import { resolveConfigPath } from "./add"
 
 // Read-only by default. --retry attempts only failed servers, never disabled servers or OAuth sign-ins.
 export default Runtime.handler(
@@ -15,13 +19,20 @@ export default Runtime.handler(
     const location = { directory: process.cwd() }
     const read = () => client.mcp.list({ location }).then((response) => response.data)
     let servers = yield* Effect.promise(read)
+    const enable = Option.getOrUndefined(input.enable)
+    if (enable && !servers.some((server) => server.name === enable))
+      return yield* Effect.fail(new Error(`MCP server not found: ${enable}. Configure or discover it first.`))
+    if (enable) {
+      const file = yield* Effect.promise(() => approveServer(process.cwd(), enable))
+      process.stdout.write(`Explicitly approved MCP "${enable}" in ${file}. Recheck status after the config reload.` + EOL)
+    }
     if (servers.length === 0) {
       process.stdout.write(
         [
           "No MCP servers were loaded for this workspace.",
           "Check onethy.json/onethy.jsonc or opencode.json/opencode.jsonc in the project or global config.",
           "Recognized formats: mcp.<name>, mcp.servers.<name>, .mcp.json, mcp.json and .cursor/.vscode MCP files.",
-          "Auto-discovered servers are intentionally disabled until explicitly approved in your configuration.",
+          "Auto-discovered servers stay disabled until explicitly approved: opencode mcp doctor --enable <name>.",
         ].join(EOL) + EOL,
       )
       return
@@ -57,6 +68,21 @@ export default Runtime.handler(
   }),
 )
 
+// Only invoked by an explicit --enable action. The normal read-only diagnostic never edits config.
+export async function approveServer(directory: string, name: string) {
+  const filepath = await resolveConfigPath(directory)
+  const current = await readFile(filepath, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return "{}"
+    throw error
+  })
+  const edits = modify(current, ["mcp", "overrides", name], true, {
+    formattingOptions: { insertSpaces: true, tabSize: 2 },
+  })
+  await mkdir(path.dirname(filepath), { recursive: true })
+  await writeFile(filepath, applyEdits(current, edits), "utf8")
+  return filepath
+}
+
 export function safeError(message: string): string {
   return message
     .replace(/(Bearer\s+)[^\s]+/gi, "$1[redacted]")
@@ -73,7 +99,7 @@ export function advice(server: McpServer): string {
     case "needs_auth":
       return `sign in with 'opencode mcp auth ${server.name}' (${safeError(server.status.error)})`
     case "disabled":
-      return "disabled by configuration or discovery; explicitly enable this server in trusted project/global config"
+      return "disabled by configuration or discovery; run opencode mcp doctor --enable <name> to approve"
     case "failed":
       return safeError(server.status.error) + " (check command, PATH, dependencies, URL and authentication)"
   }
