@@ -419,7 +419,9 @@ function UpdateNotification(props: { width: number }) {
                   ? "atualização do servidor remoto disponível"
                   : state.type === "installed"
                     ? ` reinicie para usar v${state.version}`
-                    : ` para instalar v${state.version}`}
+                    : state.source === "onethy"
+                      ? ` nova atualização disponível (${state.version})`
+                      : ` para instalar v${state.version}`}
               </FadeInText>
             </box>
           </Show>
