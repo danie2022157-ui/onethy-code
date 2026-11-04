@@ -108,6 +108,7 @@ import { COMMAND_PALETTE_COMMAND, Keymap, type KeymapCommand } from "./context/k
 import { DialogVariant } from "./component/dialog-variant"
 import { DialogFusionModels } from "./component/dialog-fusion-models"
 import { DialogOmniUpdate } from "./component/dialog-omni-update"
+import { DialogProjects } from "./component/dialog-projects"
 import { DialogMemoryBank } from "./component/dialog-memory-bank"
 import { ReviewBarSignals } from "./component/prompt/review-bar"
 import { destroyRenderer, setTerminalTitle } from "./util/renderer"
@@ -830,11 +831,21 @@ function App() {
           dialog.clear()
         },
       },
+      ...((process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1")
+        ? [{
+            name: "onethy.projects",
+            title: "Gerenciar projetos — criar, abrir, renomear e remover da lista",
+            description: "Crie ou adicione pastas e organize projetos sem apagar arquivos.",
+            category: "OmniCode",
+            slash: { name: "projects", aliases: ["project", "projetos"] },
+            run: () => dialog.replace(() => <DialogProjects />),
+          }]
+        : []),
       {
         name: "open.menu",
         title: "Open session or project",
         category: "Session",
-        slash: { name: "open", aliases: ["projects", "project"] },
+        slash: { name: "open" },
         run: () => {
           if (dialog.key === DialogOpenKey) return
           dialog.replace(() => <DialogOpen sessions={openSessions()} onLoad={setOpenSessions} />, undefined, {
