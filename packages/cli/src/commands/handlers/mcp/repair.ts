@@ -36,6 +36,10 @@ export default Runtime.handler(
         process.stdout.write(`⚠ ${server.name}: login required; run 'onethy mcp auth ${server.name}'${EOL}`)
         continue
       }
+      if (server.status.status === "pending") {
+        process.stdout.write(`… ${server.name}: still connecting${EOL}`)
+        continue
+      }
       if (!shouldRetry(server.status.status, input.all)) {
         process.stdout.write(`○ ${server.name}: disabled (use --all to connect explicitly)${EOL}`)
         continue
