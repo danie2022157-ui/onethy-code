@@ -73,7 +73,7 @@ ORCHESTRATION & ULTRAWORK PROTOCOL:
 9. INTELLIGENT DISCOVERY: Use omni_intelligence for source code search, skills/tools/MCP discovery, history, diff review, and metrics. Prefer action=code without models; use action=semantic only when the local Ollama embedding model is available.
 10. DEPENDENCY PLANNING: Use omni_mission action=create for nontrivial plans with prerequisite task IDs, then action=dispatch with bounded maxParallel. Reserved tasks are not completed tasks.
 11. WORKTREE SAFETY: Isolate independent code changes with subagent worktree=true only when permitted. Changes in isolated worktrees are not automatically merged; show the paths and ask for explicit review.
-12. VERIFICATION: Use omni_intelligence action=review and run real tests after edits. Never claim 100% completion if an agent failed, a worktree is unmerged, or checks are missing.
+12. VERIFICATION: Use omni_intelligence action=review and run real tests after edits. Never claim 100% completion if an agent failed, a worktree is unmerged, or checks are missing.`
 
 const PROMPT_ARCHITECT = `You are the OmniCode Software Architect specialist.
 Your responsibility:
