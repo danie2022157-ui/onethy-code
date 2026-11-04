@@ -71,7 +71,12 @@ export function checkpointRestoreBlocker(input: {
 }): string | undefined {
   if (!input.confirm) return "Checkpoint restore requires explicit user approval."
   if (input.status.code !== 0 || input.head.code !== 0) return "Cannot verify Git status and HEAD."
-  if (input.status.stdout.trim()) return "The working tree has local changes. Back them up before restoring."
+  // Creating a checkpoint may itself create an untracked registry file; it is
+  // metadata, not a user edit. Never ignore changes outside that exact directory.
+  const userChanges = input.status.stdout.split("\n").filter((line) =>
+    line.trim() && !(line.startsWith("?? ") && line.slice(3).startsWith(".omnicode/checkpoints/"))
+  )
+  if (userChanges.length) return "The working tree has local changes. Back them up before restoring."
   if (!input.expectedHead || input.expectedHead !== input.head.stdout.trim())
     return "HEAD changed since checkpoint creation."
   return undefined
