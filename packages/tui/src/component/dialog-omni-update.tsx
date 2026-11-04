@@ -132,7 +132,7 @@ export function DialogOmniUpdate(props: { git?: typeof runGit; bunBin?: string }
       const bun = props.bunBin ?? findBunBin()
       if (!bun) throw new Error("Bun not found. Update cancelled before changing files.")
       setStatusMessage("Checking status of local files...")
-      const statusRes = await git("git status --porcelain", root)
+      const statusRes = await git("git status --porcelain -uno", root)
       if (statusRes.code !== 0) throw new Error(statusRes.stderr || "Could not inspect local changes.")
       if (statusRes.stdout.length > 0) {
         throw new Error("Update refused: local edits exist. Commit or back them up first; no files were changed.")
