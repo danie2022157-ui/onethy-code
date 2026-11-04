@@ -7,6 +7,63 @@ import fs from "node:fs"
 import crypto from "node:crypto"
 import path from "node:path"
 
+export const PROJECT_TEMPLATES: Record<string, string> = {
+  "project-brief.md": [
+    "# Project Brief",
+    "",
+    "## 1. Visão Geral e Objetivos",
+    "- Propósito central do projeto.",
+    "- Problemas que resolve e valor para os usuários.",
+    "",
+    "## 2. Requisitos e Escopo",
+    "- Funcionalidades essenciais.",
+    "- O que está explicitamente FORA de escopo.",
+    "",
+    "## 3. Critérios de Sucesso",
+    "- Estabilidade, cobertura de testes e aderência aos requisitos.",
+  ].join("\n"),
+  "system-patterns.md": [
+    "# System Patterns & Arquitetura",
+    "",
+    "## 1. Arquitetura Geral",
+    "- Camadas do sistema e separação de responsabilidades.",
+    "- Direção de dependências e regras de importação.",
+    "",
+    "## 2. Padrões de Código e Convenções",
+    "- Nomenclatura, tratamento de erros e convenções de estilo.",
+    "- Regras de schema e tipagem.",
+    "",
+    "## 3. Decisões Arquiteturais Chave (ADRs)",
+    "- Decisões importantes e suas justificativas técnicas.",
+  ].join("\n"),
+  "tech-context.md": [
+    "# Tech Context",
+    "",
+    "## 1. Stack Tecnológica",
+    "- Runtime / Linguagens principais.",
+    "- Frameworks, bibliotecas e bancos de dados.",
+    "",
+    "## 2. Comandos e Scripts de Desenvolvimento",
+    "- Testes: comando para rodar testes.",
+    "- Build / Lint / Typecheck: scripts de validação.",
+    "",
+    "## 3. Restrições do Ambiente",
+    "- Compatibilidade de SO, variáveis de ambiente e requisitos de segurança.",
+  ].join("\n"),
+  "active-context.md": [
+    "# Active Context",
+    "",
+    "## 1. Foco Atual",
+    "- Funcionalidade ou refatoração sendo desenvolvida no momento.",
+    "",
+    "## 2. Tarefas e Próximos Passos",
+    "- [ ] Próxima tarefa imediata.",
+    "",
+    "## 3. Descobertas e Decisões Recentes",
+    "- Notas para os próximos subagentes e sessões futuras.",
+  ].join("\n"),
+}
+
 export const GLOBAL_TEMPLATES: Record<string, string> = {
   "preferences.md": [
     "# Preferências globais de desenvolvimento",
