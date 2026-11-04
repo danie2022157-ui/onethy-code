@@ -2,13 +2,12 @@ export * as InstructionBuiltIns from "./builtins.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import fs from "node:fs"
-import path from "node:path"
 import { Context, DateTime, Effect, Layer, Schema } from "effect"
 import { Global } from "@opencode/util/global"
 import { Location } from "../location.js"
 import { Instructions } from "./index.js"
 import { OmniOrchestrator } from "../omni-orchestrator.js"
-import { renderGlobalMemory } from "../omni-memory-bank.js"
+import { projectMemoryDirectory, readMemoryFile, renderGlobalMemory } from "../omni-memory-bank.js"
 
 export interface Interface {
   readonly load: () => Effect.Effect<Instructions.List>
@@ -16,7 +15,7 @@ export interface Interface {
 
 
 function readMemoryBank(directory: string): string {
-  const memDir = path.join(directory, ".omnicode", "memory-bank")
+  const memDir = projectMemoryDirectory(directory)
   if (!fs.existsSync(memDir)) {
     return [
       "<auto_memory_bank>",
@@ -30,14 +29,12 @@ function readMemoryBank(directory: string): string {
   const files = ["project-brief.md", "system-patterns.md", "tech-context.md", "active-context.md"]
   const sections: string[] = []
   for (const file of files) {
-    const full = path.join(memDir, file)
-    if (fs.existsSync(full)) {
-      try {
-        const content = fs.readFileSync(full, "utf8").trim()
-        if (content) {
-          sections.push(`### [Memory Bank: ${file}]\n${content}`)
-        }
-      } catch {}
+    // A corrupt or unreadable memory file must never prevent the entire app from starting.
+    try {
+      const content = readMemoryFile(memDir, file)?.trim()
+      if (content) sections.push(`### [Memory Bank: ${file}]\n${content.slice(0, 12000)}`)
+    } catch {
+      // Continue loading the remaining trusted local files.
     }
   }
 
