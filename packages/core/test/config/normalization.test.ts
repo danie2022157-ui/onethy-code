@@ -480,11 +480,22 @@ describe("ConfigNormalize", () => {
     })
 
     const enabledOnly = normalized({ mcp: { servers: { enabled: true }, timeout: { enabled: false } } })
-    expect(enabledOnly.encoded.mcp).toBeUndefined()
-    expect(enabledOnly.diagnostics.map((item) => [item.kind, item.path])).toEqual([
-      ["unsupported", ["mcp", "servers"]],
-      ["unsupported", ["mcp", "timeout"]],
-    ])
+    expect(enabledOnly.encoded.mcp).toEqual({ overrides: { servers: true, timeout: false } })
+    expect(enabledOnly.diagnostics).toEqual([])
+    expect(Schema.decodeUnknownSync(Info)(enabledOnly.encoded).mcp?.overrides).toEqual({
+      servers: true,
+      timeout: false,
+    })
+  })
+
+  test("preserves trusted enable-only MCP entries for earlier config layers", () => {
+    const result = normalized({ mcp: { github: { enabled: true }, internal: { enabled: false } } })
+    expect(result.diagnostics).toEqual([])
+    expect(result.encoded.mcp).toEqual({ overrides: { github: true, internal: false } })
+    expect(Schema.decodeUnknownSync(Info)(result.encoded).mcp?.overrides).toEqual({
+      github: true,
+      internal: false,
+    })
   })
 
   test("normalizes MCP timeout fields in schema order with per-leaf recovery", () => {
