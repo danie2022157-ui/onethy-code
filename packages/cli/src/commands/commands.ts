@@ -84,8 +84,13 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       },
     }),
     Spec.make("uninstall", {
-      description: "Desinstalar o OnethyCode, mantendo dados de sessão e configurações",
+      description: "Desinstalar o OnethyCode; use --purge para remover também os dados da aplicação",
+      aliases: ["unistall"],
       params: {
+        purge: Flag.Boolean("purge").pipe(
+          Flag.withDescription("Remover também sessões, credenciais, configurações e estado do OnethyCode"),
+          Flag.withDefault(false),
+        ),
         dryRun: Flag.Boolean("dry-run").pipe(
           Flag.withDescription("Show what would be removed without removing"),
           Flag.withDefault(false),
