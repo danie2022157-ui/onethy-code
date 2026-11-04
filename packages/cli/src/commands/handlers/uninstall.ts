@@ -3,6 +3,7 @@ import { Service } from "@opencode/client/effect/service"
 import { Global } from "@opencode/util/global"
 import { Effect, FileSystem, Schedule } from "effect"
 import path from "node:path"
+import { readFile as readNativeFile } from "node:fs/promises"
 import { Commands } from "../commands"
 import { Runtime } from "../../framework/runtime"
 import { ServerConnection } from "../../services/server-connection"
@@ -23,7 +24,9 @@ export default Runtime.handler(
       return yield* Effect.fail(new Error("Refusing purge: no safe Onethy-owned data directories were resolved."))
     const updater = yield* Updater.Service
     const method = yield* updater.method()
-    const removal = method ? updater.removal(method) : undefined
+    // A source-based Onethy launcher must never uninstall an unrelated OpenCode package.
+    const removal = input.purge ? undefined : method ? updater.removal(method) : undefined
+    const onethyLaunchers = input.purge ? yield* Effect.promise(() => ownedOnethyLaunchers()) : []
     // Data, config, and state hold sessions, credentials, settings, and prompt history; uninstall only removes the cache.
     // All channels share the cache. Stop background services before deleting it.
     // Read registrations directly: ServiceConfig.options() can migrate files even during a dry run.
@@ -33,7 +36,7 @@ export default Runtime.handler(
     const shell = method === "curl" ? yield* shellConfigs(global.home) : []
 
     log.info(`Installation method: ${method ?? "unknown"}`)
-    log.message("The following global files will be removed (shared by OpenCode versions and channels):")
+    log.message("The following OnethyCode application files will be removed:")
     if (yield* fs.exists(global.cache)) log.info(`  Cache: ${global.cache}`)
     services.forEach((name) =>
       log.info(`  Stop background service and persistent terminals: ${path.join(global.state, name)}`),
@@ -44,9 +47,11 @@ export default Runtime.handler(
     if (input.purge) {
       log.warn("PURGE: permanent removal of OnethyCode sessions, saved credentials, settings and service state.")
       for (const item of purgePaths(global)) log.info(`  Onethy data: ${item}`)
+      for (const item of onethyLaunchers) log.info(`  Onethy Windows launcher: ${item}`)
       log.warn("Source checkouts and customer project directories are NOT deleted.")
     }
-    if (!method) log.warn("Could not detect the installation method. Remove the installation manually after cleanup.")
+    if (!method && !onethyLaunchers.length)
+      log.warn("Could not verify the installed Onethy launcher. Review the installation manually after cleanup.")
 
     if (input.dryRun) {
       log.warn("Dry run - no changes made")
@@ -120,6 +125,17 @@ export default Runtime.handler(
     if (method === "curl") {
       log.message("To finish removing the binary, run:")
       log.info(`  rm '${process.execPath.replaceAll("'", "'\\''")}'`)
+    }
+    // Remove only Windows launcher files proven to belong to this checkout.
+    // No administrator privileges, registry changes, or cleanup of unrelated aliases.
+    if (input.purge) {
+      for (const file of onethyLaunchers) {
+        yield* fs.remove(file, { force: true }).pipe(
+          Effect.catch((error) =>
+            Effect.sync(() => errors.push(`Windows launcher ${file}: ${errorMessage(error)}`)),
+          ),
+        )
+      }
     }
     // The source checkout, other applications, and customer workspaces are never purge targets.
     // Only delete Onethy's own Global roots, after its services have stopped.
@@ -203,4 +219,43 @@ export function purgePaths(global: Pick<Global.Interface, "home" | "data" | "con
       return false
     return item.split(path.sep).some((segment) => segment.toLowerCase() === "omnicode")
   })
+}
+
+/**
+ * The Windows installer writes a small set of launchers under WindowsApps.
+ * Remove only files matching the installer's signatures AND this process's
+ * checkout marker, never arbitrary user-created .cmd/.ps1 files.
+ */
+export async function ownedOnethyLaunchers(
+  env: NodeJS.ProcessEnv = process.env,
+  platform = process.platform,
+): Promise<string[]> {
+  if (platform !== "win32" || !env.LOCALAPPDATA || !env.ONETHY_INSTALL_ROOT) return []
+  if (!path.isAbsolute(env.LOCALAPPDATA) || !path.isAbsolute(env.ONETHY_INSTALL_ROOT)) return []
+  const directory = path.join(env.LOCALAPPDATA, "Microsoft", "WindowsApps")
+  const configPath = path.join(directory, "onethy-config.json")
+  const scriptPath = path.join(directory, "onethy.ps1")
+  const read = (file: string) => readNativeFile(file, "utf8").catch(() => "")
+  const config = await read(configPath)
+  let checkout: unknown
+  try {
+    checkout = (JSON.parse(config) as { checkout?: unknown }).checkout
+  } catch {
+    return []
+  }
+  if (typeof checkout !== "string" || path.normalize(checkout).toLowerCase() !== path.normalize(env.ONETHY_INSTALL_ROOT).toLowerCase())
+    return []
+  const script = await read(scriptPath)
+  if (!script.includes("onethy-config.json") || !script.includes("bin\\onethy.js")) return []
+
+  const files: string[] = []
+  for (const name of ["onethy.cmd", "onethy-code.cmd", "omni.cmd", "omnicode.cmd"]) {
+    const file = path.join(directory, name)
+    const content = await read(file)
+    if (
+      /%SystemRoot%\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe/i.test(content) &&
+      /-File\s+"%~dp0onethy\.ps1"\s+%\*/i.test(content)
+    ) files.push(file)
+  }
+  return [...files, scriptPath, configPath]
 }
