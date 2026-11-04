@@ -58,12 +58,20 @@ jobs:
             $env:USERPROFILE = $testProfile
             $env:LOCALAPPDATA = Join-Path $testProfile "AppData/Local"
             $env:APPDATA = Join-Path $testProfile "AppData/Roaming"
+            $apps = Join-Path $env:LOCALAPPDATA "Microsoft/WindowsApps"
+            New-Item -ItemType Directory -Force -Path $apps | Out-Null
+            @{ checkout = $root; nodePath = "node.exe" } | ConvertTo-Json -Compress | Set-Content (Join-Path $apps "onethy-config.json")
+            Set-Content (Join-Path $apps "onethy.ps1") '$config = Get-Content "onethy-config.json"; Join-Path $config.checkout "bin\onethy.js"'
+            Set-Content (Join-Path $apps "onethy.cmd") '@echo off & WindowsPowerShell -File "%~dp0onethy.ps1" %*'
             & ./uninstall.ps1 -Checkout $root -Preview
             if (-not (Test-Path -LiteralPath $root)) { throw "Preview removed the installation!" }
             & ./uninstall.ps1 -Checkout $root -Yes
             if (Test-Path -LiteralPath $root) { throw "Onethy source was not removed" }
             if (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA "omnicode")) { throw "Onethy data was not removed" }
             if (Test-Path -LiteralPath (Join-Path $env:APPDATA "omnicode")) { throw "Onethy config was not removed" }
+            if (Test-Path -LiteralPath (Join-Path $apps "onethy.cmd")) { throw "Onethy command was not removed" }
+            if (Test-Path -LiteralPath (Join-Path $apps "onethy.ps1")) { throw "Onethy PowerShell launcher was not removed" }
+            if (Test-Path -LiteralPath (Join-Path $apps "onethy-config.json")) { throw "Onethy launcher config was not removed" }
           } finally {
             $env:USERPROFILE = $oldUserProfile
             $env:LOCALAPPDATA = $oldLocalApp
