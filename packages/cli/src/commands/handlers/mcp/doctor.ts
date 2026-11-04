@@ -59,8 +59,8 @@ export default Runtime.handler(
 
 export function safeError(message: string): string {
   return message
-    .replace(/(Bearer\\s+)[^\\s]+/gi, "$1[redacted]")
-    .replace(/((?:token|api[_-]?key|secret|password)=)[^&\\s]+/gi, "$1[redacted]")
+    .replace(/(Bearer\s+)[^\s]+/gi, "$1[redacted]")
+    .replace(/((?:token|api[_-]?key|secret|password)=)[^&\s]+/gi, "$1[redacted]")
     .slice(0, 500)
 }
 
