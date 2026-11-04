@@ -28,11 +28,11 @@ function SafeRoot([string]$name, [string]$candidate, [string]$home) {
     return $null
   }
   if ([IO.Path]::GetFileName($resolved) -ine 'omnicode') {
-    $warnings.Add("Ignorando $name: o diretorio nao termina em omnicode: $resolved")
+    $warnings.Add("Ignorando ${name}: o diretorio nao termina em omnicode: $resolved")
     return $null
   }
   if ((Test-Path -LiteralPath $resolved) -and ((Get-Item -LiteralPath $resolved -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-    $warnings.Add("Ignorando $name: link/reparse point: $resolved")
+    $warnings.Add("Ignorando ${name}: link/reparse point: $resolved")
     return $null
   }
   return $resolved
