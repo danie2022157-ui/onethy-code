@@ -14,7 +14,9 @@ import { errorMessage } from "../../util/error"
 export default Runtime.handler(
   Commands.commands.uninstall,
   Effect.fn("cli.uninstall")(function* (input) {
-    intro("Uninstall OpenCode")
+    intro("Uninstall OnethyCode")
+    if (input.purge && process.env.ONETHY_ACTIVE !== "1" && process.env.OMNICODE_ACTIVE !== "1")
+      return yield* Effect.fail(new Error("Purge is available only in the OnethyCode runtime."))
     const fs = yield* FileSystem.FileSystem
     const global = yield* Global.Service
     const updater = yield* Updater.Service
@@ -37,6 +39,11 @@ export default Runtime.handler(
     shell.forEach((file) => log.info(`  Shell PATH: ${file}`))
     if (removal) log.info(`  Package: ${removal.command.join(" ")}`)
     if (method === "curl") log.info(`  Binary (manual removal): ${process.execPath}`)
+    if (input.purge) {
+      log.warn("PURGE: permanent removal of OnethyCode sessions, saved credentials, settings and service state.")
+      for (const item of purgePaths(global)) log.info(`  Onethy data: ${item}`)
+      log.warn("Source checkouts and customer project directories are NOT deleted.")
+    }
     if (!method) log.warn("Could not detect the installation method. Remove the installation manually after cleanup.")
 
     if (input.dryRun) {
@@ -47,7 +54,7 @@ export default Runtime.handler(
     if (!input.force) {
       yield* requireInteractive("Use --force to uninstall without an interactive terminal, or --dry-run to preview.")
       const accepted = yield* prompt(() =>
-        confirm({ message: "Are you sure you want to uninstall?", initialValue: false }),
+        confirm({ message: input.purge ? "Permanently delete all OnethyCode application data and uninstall? This cannot be undone." : "Are you sure you want to uninstall?", initialValue: false }),
       )
       if (!accepted) {
         outro("Cancelled")
@@ -112,8 +119,28 @@ export default Runtime.handler(
       log.message("To finish removing the binary, run:")
       log.info(`  rm '${process.execPath.replaceAll("'", "'\\''")}'`)
     }
+    // The source checkout, other applications, and customer workspaces are never purge targets.
+    // Only delete Onethy's own Global roots, after its services have stopped.
+    if (input.purge) {
+      for (const directory of purgePaths(global)) {
+        progress.start(`Removing Onethy data: ${directory}`)
+        yield* fs.remove(directory, { recursive: true, force: true }).pipe(
+          Effect.retry({
+            while: (error) => process.platform === "win32" && error.reason._tag === "Busy",
+            schedule: Schedule.max([Schedule.spaced("250 millis"), Schedule.recurs(40)]),
+          }),
+          Effect.tap(() => Effect.sync(() => progress.stop("Removed"))),
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              progress.stop("Removal failed", 1)
+              errors.push(`${directory}: ${errorMessage(error)}`)
+            }),
+          ),
+        )
+      }
+    }
     if (errors.length) yield* Effect.fail(new Error(errors.join("\n")))
-    outro("Done")
+    outro(input.purge ? "OnethyCode application data removed. Remove the source checkout separately if desired." : "Done")
   }, handlePromptErrors),
 )
 
@@ -158,4 +185,20 @@ function cleanShellConfig(content: string) {
   return lines
     .filter((line, index) => !entry(line) && !(line.trim() === "# opencode" && entry(lines[index + 1] ?? "")))
     .join("\n")
+}
+
+/**
+ * Never follow arbitrary paths supplied by workspace configuration. Purge is
+ * limited to the runtime's Onethy-specific global roots; guard against a
+ * misconfigured path that points at the home directory or a filesystem root.
+ */
+export function purgePaths(global: Pick<Global.Interface, "home" | "data" | "config" | "state" | "cache">) {
+  const directories = [global.data, global.config, global.state, global.cache]
+  const home = path.resolve(global.home)
+  return [...new Set(directories.map((item) => path.resolve(item)))].filter((item) => {
+    const relative = path.relative(home, item)
+    if (!relative || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative))
+      return false
+    return item.split(path.sep).some((segment) => segment.toLowerCase() === "omnicode")
+  })
 }
