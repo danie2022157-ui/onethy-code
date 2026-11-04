@@ -26,7 +26,7 @@ export default Runtime.handler(
     const method = yield* updater.method()
     // A source-based Onethy launcher must never uninstall an unrelated OpenCode package.
     const removal = input.purge ? undefined : method ? updater.removal(method) : undefined
-    const onethyLaunchers = input.purge ? yield* Effect.promise(() => ownedOnethyLaunchers()) : []
+    const onethyLaunchers = input.purge && !input.deferLaunchers ? yield* Effect.promise(() => ownedOnethyLaunchers()) : []
     // Data, config, and state hold sessions, credentials, settings, and prompt history; uninstall only removes the cache.
     // All channels share the cache. Stop background services before deleting it.
     // Read registrations directly: ServiceConfig.options() can migrate files even during a dry run.
@@ -48,6 +48,7 @@ export default Runtime.handler(
       log.warn("PURGE: permanent removal of OnethyCode sessions, saved credentials, settings and service state.")
       for (const item of purgePaths(global)) log.info(`  Onethy data: ${item}`)
       for (const item of onethyLaunchers) log.info(`  Onethy Windows launcher: ${item}`)
+      if (input.deferLaunchers) log.info("  Windows launcher cleanup deferred to the separate uninstall worker")
       log.warn("Source checkouts and customer project directories are NOT deleted.")
     }
     if (!method && !onethyLaunchers.length)
