@@ -387,6 +387,25 @@ describe("ConfigNormalize", () => {
     expect(normalized({ formatter: {}, lsp: {} }).encoded).toMatchObject({ formatter: {}, lsp: {} })
   })
 
+  test("respects enabled flags inside mcp.servers (including false) without dropping tools", () => {
+    const cfg = decoded({
+      mcp: {
+        servers: {
+          github: { type: "remote", url: "https://example.com/mcp", enabled: true },
+          playwright: { type: "local", command: ["npx", "-y", "example-mcp"], enabled: false },
+          explicit: { type: "local", command: ["bun", "x", "example"], disabled: true, enabled: true },
+        },
+      },
+    })
+    expect(cfg.mcp?.servers?.github?.disabled).toBe(false)
+    expect(cfg.mcp?.servers?.playwright?.disabled).toBe(true)
+    expect(cfg.mcp?.servers?.explicit?.disabled).toBe(true)
+    const status = normalized({
+      mcp: { servers: { github: { type: "remote", url: "https://example.com/mcp", enabled: true } } },
+    })
+    expect(status.diagnostics).toEqual([])
+  })
+
   test("combines legacy and native MCP servers and merges timeout leaves", () => {
     const result = normalized({
       experimental: { mcp_timeout: 5000 },
