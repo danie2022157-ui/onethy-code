@@ -406,6 +406,16 @@ describe("ConfigNormalize", () => {
     expect(status.diagnostics).toEqual([])
   })
 
+  test("retains opt-in-only entries for discovered MCP servers", () => {
+    const v1 = normalized({ mcp: { vscode: { enabled: true } } })
+    expect(v1.encoded.mcp).toEqual({ enabled: { vscode: true } })
+    const nested = normalized({ mcp: { servers: { cursor: { enabled: true } } } })
+    expect(nested.encoded.mcp).toEqual({ enabled: { cursor: true } })
+    const native = normalized({ mcp: { enabled: { github: true, database: false } } })
+    expect(native.encoded.mcp).toEqual({ enabled: { github: true, database: false } })
+    expect(decoded({ mcp: { enabled: { github: true } } }).mcp?.enabled?.github).toBe(true)
+  })
+
   test("combines legacy and native MCP servers and merges timeout leaves", () => {
     const result = normalized({
       experimental: { mcp_timeout: 5000 },
@@ -499,11 +509,8 @@ describe("ConfigNormalize", () => {
     })
 
     const enabledOnly = normalized({ mcp: { servers: { enabled: true }, timeout: { enabled: false } } })
-    expect(enabledOnly.encoded.mcp).toBeUndefined()
-    expect(enabledOnly.diagnostics.map((item) => [item.kind, item.path])).toEqual([
-      ["unsupported", ["mcp", "servers"]],
-      ["unsupported", ["mcp", "timeout"]],
-    ])
+    expect(enabledOnly.encoded.mcp).toEqual({ enabled: { servers: true, timeout: false } })
+    expect(enabledOnly.diagnostics).toEqual([])
   })
 
   test("normalizes MCP timeout fields in schema order with per-leaf recovery", () => {
