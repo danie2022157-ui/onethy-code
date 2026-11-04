@@ -234,7 +234,6 @@ describe("SubagentTool", () => {
           yield* withSubagent(parent.location)
           const locations = yield* LocationServiceMap.Service
           const registry = yield* Tool.Service.pipe(Effect.provide(locations.get(parent.location)))
-          console.error('TRACE: registry')
           const jobs = yield* Job.Service
           const bus = yield* Bus.Service
           const admitted = yield* Deferred.make<Job.Background>()
@@ -250,7 +249,6 @@ describe("SubagentTool", () => {
             }),
           )
 
-          console.error('TRACE: before background spawn')
           const result = yield* executeTool(registry, {
             sessionID: parent.id,
             ...toolIdentity,
@@ -261,18 +259,9 @@ describe("SubagentTool", () => {
               input: { agent: "reviewer", description: "background review", prompt: "review", background: true },
             },
           })
-          console.error('TRACE: spawned',result.metadata)
-          yield* Effect.sleep("500 millis")
-          const bg = yield* jobs.get(outputSessionID(result.metadata))
-          const pending = yield* jobs.pendingBackground
-          const childMessages = yield* sessions.messages({ sessionID: outputSessionID(result.metadata), limit: 10 })
-          console.error('TRACE: child state', { bg, pending: pending.length, msgs: childMessages.map((m) => m.type) })
           const marker = yield* Deferred.await(admitted)
-          console.error('TRACE: notification emitted')
           yield* jobs.pendingBackground.pipe(Effect.repeat({ until: (pending) => pending.length === 0 }))
-          console.error('TRACE: pending drained')
           yield* sessions.wait(parent.id)
-          console.error('TRACE: parent idle')
           const messages = (yield* sessions.context(parent.id)).filter((message) => message.type === "synthetic")
           expect(messages).toEqual([
             expect.objectContaining({
@@ -292,9 +281,7 @@ describe("SubagentTool", () => {
           const kv = yield* KV.Service
           yield* kv.set(`job.background/${marker.notificationID}`, marker)
           const restart = yield* SessionRestart.Service
-          console.error('TRACE: before restart')
           yield* restart.resumeSuspendedSessions
-          console.error('TRACE: after restart')
           yield* sessions.wait(parent.id)
           expect(notifications).toEqual([marker.notificationID])
           expect((yield* sessions.context(parent.id)).filter((message) => message.type === "synthetic")).toEqual(
