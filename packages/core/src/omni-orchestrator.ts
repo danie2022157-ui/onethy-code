@@ -126,6 +126,16 @@ export interface TaskItem {
   result?: string
 }
 
+export type TaskTransition = "complete" | "fail" | "retry"
+
+/** State changes are explicit; planning a task is not proof that an agent ran it. */
+export function assertTaskTransition(task: Pick<TaskItem, "id" | "status">, transition: TaskTransition) {
+  const required: TaskItem["status"] = transition === "retry" ? "failed" : "running"
+  if (task.status !== required) {
+    throw new Error(`Cannot ${transition} task '${task.id}': expected ${required}, got ${task.status}.`)
+  }
+}
+
 export interface MissionResult {
   readonly missionId: string
   readonly goal: string
@@ -285,7 +295,13 @@ const layer = Layer.effect(
       return [...DEFAULT_AGENTS]
     })
 
+    const assertNewMission = Effect.fn("OmniOrchestrator.assertNewMission")(function* (missionID: string, goal: string) {
+      if (!goal.trim()) throw new Error("Mission goal cannot be empty")
+      if (yield* missionTasks(missionID)) throw new Error(`Mission '${missionID}' already exists. Reuse its tasks instead of overwriting history.`)
+    })
+
     const planMission = Effect.fn("OmniOrchestrator.planMission")(function* (goal: string, missionID = `mission-${crypto.randomUUID()}`) {
+      yield* assertNewMission(missionID, goal)
 
       // Supervisor gera as subtarefas especializadas para a missão
       const subtasks: TaskItem[] = [
@@ -325,6 +341,7 @@ const layer = Layer.effect(
     })
 
     const planUltrawork = Effect.fn("OmniOrchestrator.planUltrawork")(function* (goal: string, missionID = `mission-${crypto.randomUUID()}`) {
+      yield* assertNewMission(missionID, goal)
 
       const subtasks: TaskItem[] = [
         {
@@ -402,6 +419,8 @@ const layer = Layer.effect(
       models: ReadonlyArray<string>,
       missionID = `mission-${crypto.randomUUID()}`,
     ) {
+      yield* assertNewMission(missionID, problem)
+      if (models.length === 0) throw new Error("Arena requires at least one candidate model")
       const candidateAgents = ["architect", "reviewer", "coder"]
       const subtasks: TaskItem[] = models.slice(0, 3).map((modelRef, idx) => ({
         id: `arena-${crypto.randomBytes(3).toString("hex")}`,
@@ -438,6 +457,7 @@ const layer = Layer.effect(
     })
 
     const planTeamPipeline = Effect.fn("OmniOrchestrator.planTeamPipeline")(function* (goal: string, missionID = `mission-${crypto.randomUUID()}`) {
+      yield* assertNewMission(missionID, goal)
 
       const subtasks: TaskItem[] = [
         {
@@ -579,18 +599,23 @@ const layer = Layer.effect(
         throw new Error(`Tarefa '${taskId}' não pertence à missão '${missionID}'.`)
       }
 
-      task.status = "completed"
-      task.result = resultSummary
-      yield* store.saveMissionTasks(missionID, tasks!)
+      assertTaskTransition(task, "complete")
+      if (!resultSummary.trim()) throw new Error("Completed tasks must include a result summary.")
+      const next = tasks!.map((entry) => entry.id === taskId
+        ? { ...entry, status: "completed" as const, result: resultSummary.slice(0, 8000) }
+        : { ...entry })
+      yield* store.saveMissionTasks(missionID, next)
+      missions.set(missionID, next)
+      const completed = next.find((entry) => entry.id === taskId)!
 
       yield* bus.publish({
         sender: task.assignedAgent,
         taskId: task.id,
         type: "status",
-        payload: { missionID, status: "completed", result: resultSummary },
+        payload: { missionID, status: "completed", result: completed.result },
       })
 
-      return { ...task }
+      return { ...completed }
     })
 
     /** Claim one sequential task or a contiguous batch of parallel tasks; never skip an unfinished stage. */
@@ -630,26 +655,33 @@ const layer = Layer.effect(
       const tasks = yield* missionTasks(missionID)
       const task = tasks?.find((entry) => entry.id === taskId)
       if (!task) throw new Error(`Task '${taskId}' does not belong to mission '${missionID}'.`)
-      task.status = "failed"
-      task.result = reason
-      yield* store.saveMissionTasks(missionID, tasks!)
+      assertTaskTransition(task, "fail")
+      const next = tasks!.map((entry) => entry.id === taskId
+        ? { ...entry, status: "failed" as const, result: reason.slice(0, 8000) }
+        : { ...entry })
+      yield* store.saveMissionTasks(missionID, next)
+      missions.set(missionID, next)
+      const failed = next.find((entry) => entry.id === taskId)!
       yield* bus.publish({
         sender: task.assignedAgent,
         taskId,
         type: "status",
-        payload: { missionID, status: "failed", reason },
+        payload: { missionID, status: "failed", reason: failed.result },
       })
-      return { ...task }
+      return { ...failed }
     })
 
     const retryTask = Effect.fn("OmniOrchestrator.retryTask")(function* (missionID: string, taskId: string) {
       const tasks = yield* missionTasks(missionID)
       const task = tasks?.find((entry) => entry.id === taskId)
-      if (!task || task.status !== "failed") throw new Error("Only failed tasks can be retried")
-      task.status = "pending"
-      task.result = undefined
-      yield* store.saveMissionTasks(missionID, tasks!)
-      return { ...task }
+      if (!task) throw new Error("Unknown task or mission")
+      assertTaskTransition(task, "retry")
+      const next = tasks!.map((entry) => entry.id === taskId
+        ? { ...entry, status: "pending" as const, result: undefined }
+        : { ...entry })
+      yield* store.saveMissionTasks(missionID, next)
+      missions.set(missionID, next)
+      return { ...next.find((entry) => entry.id === taskId)! }
     })
 
     const getActiveTasks = Effect.fn("OmniOrchestrator.getActiveTasks")(function* (missionID?: string) {
