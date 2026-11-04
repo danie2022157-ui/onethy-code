@@ -276,8 +276,8 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
           else {
             hasOverrideSection = true
             for (const [serverName, enabled] of Object.entries(value)) {
-            if (typeof enabled !== "boolean") invalid([...path, serverName], diagnostics)
-            else setOwn(enabledOverrides, serverName, enabled)
+              if (typeof enabled !== "boolean") invalid([...path, serverName], diagnostics)
+              else setOwn(enabledOverrides, serverName, enabled)
             }
           }
           return
@@ -308,7 +308,12 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
     }
   }
   const servers = mergeMaps(legacyServers, nativeServers, ["mcp", "servers"], diagnostics)
-  if (!Object.keys(servers).length && !Object.keys(timeout).length && !Object.keys(enabledOverrides).length && !hasOverrideSection) {
+  if (
+    !Object.keys(servers).length &&
+    !Object.keys(timeout).length &&
+    !Object.keys(enabledOverrides).length &&
+    !hasOverrideSection
+  ) {
     if (isRecord(input.mcp) && !Object.keys(input.mcp).length) encoded.mcp = {}
     return
   }
