@@ -11,12 +11,13 @@ import { OmniBus } from "../../omni-bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { Session } from "../../session.js"
 import { rankCatalog, reviewDiff, searchProjectHistory, searchWorkspace, type CatalogEntry } from "../../omni-intelligence.js"
+import { OmniEmbeddings } from "../../omni-embeddings.js"
 
 export const name = "omni_intelligence"
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["code", "tools", "history", "review", "metrics"]).annotate({
-    description: "code: relevance-ranked source search; tools: discover tools/skills/MCP; history: previous project sessions and memory; review: read-only git diff; metrics: agent event counts.",
+  action: Schema.Literals(["code", "semantic", "tools", "history", "review", "metrics"]).annotate({
+    description: "code: lexical source search; semantic: on-device Ollama vector search; tools: discover tools/skills/MCP; history: project sessions and memory; review: read-only git diff; metrics: agent usage and events.",
   }),
   query: Schema.optionalKey(Schema.String).annotate({
     description: "Search intent. Required for code and history; optional for tools.",
@@ -32,7 +33,7 @@ export const Output = Schema.Struct({
 
 export const description = [
   "OnethyCode local intelligence hub for terminal agents; no VS Code dependency.",
-  "code: bounded and intent-aware lexical source retrieval, with paths and line numbers (not vector embeddings).",
+  "code: bounded intent-aware lexical retrieval; semantic: local Ollama embeddings (requires Ollama and nomic-embed-text).",
   "tools: rank registered tool, skill and connected MCP capabilities by meaning.",
   "history: search persisted project missions, plans, sessions and memory notes.",
   "review: inspect staged and unstaged Git changes without editing or approving.",
@@ -79,7 +80,7 @@ export const Plugin = {
           if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
             return yield* new ToolFailure({ message: "limit must be an integer between 1 and 20." })
           }
-          if ((action === "code" || action === "history") && !query) {
+          if ((action === "code" || action === "semantic" || action === "history") && !query) {
             return yield* new ToolFailure({ message: "A query is required for code and history search." })
           }
           const root = location.project.directory
@@ -92,6 +93,19 @@ export const Plugin = {
             summary = results.length
               ? results.map((item) => item.file + ":" + item.line + " [score " + item.score + "] " + item.excerpt).join("\n")
               : "No matching readable source files in the bounded project scan."
+          } else if (action === "semantic") {
+            const results = yield* Effect.tryPromise({
+              try: () => OmniEmbeddings.semanticSearch(root, query, limit),
+              catch: (error) => new ToolFailure({
+                message: "Local semantic search unavailable. Start Ollama, install nomic-embed-text, and use a Git project. No remote service is used.",
+                error,
+              }),
+            })
+            summary = results.length
+              ? results.map((item) =>
+                item.file + ":" + item.line + " [cosine " + item.score.toFixed(3) + "] " + item.excerpt,
+              ).join("\n")
+              : "No eligible source files found in the bounded local embedding index."
           } else if (action === "history") {
             const results = yield* Effect.tryPromise({
               try: () => searchProjectHistory(root, query, limit),
