@@ -1,6 +1,7 @@
 export * as OmniHealTool from "./omni-heal.js"
 
 import child_process from "node:child_process"
+import crypto from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -9,6 +10,7 @@ import type { Context } from "@opencode/plugin/effect/plugin"
 import { Effect, Schema } from "effect"
 import { Location } from "../../location.js"
 import { Permission } from "../../permission.js"
+import { Tool } from "../../tool.js"
 
 export const name = "omni_heal"
 
@@ -21,7 +23,10 @@ export const Input = Schema.Struct({
     description: "Custom test or typecheck command to execute. If omitted, detects project runner automatically.",
   }),
   maxAttempts: Schema.optionalKey(Schema.Number).annotate({
-    description: "Maximum healing iterations to attempt (default: 3).",
+    description: "Maximum test passes, including repairs (1 to 5; default: 3).",
+  }),
+  autoFix: Schema.optionalKey(Schema.Boolean).annotate({
+    description: "Set true to delegate a failing test to @coder, then rerun tests within maxAttempts. Requires existing subagent permissions.",
   }),
   errorLog: Schema.optionalKey(Schema.String).annotate({
     description: "Raw error log text to diagnose when action is 'diagnose'.",
@@ -38,7 +43,8 @@ export const Output = Schema.Struct({
 
 export const description = [
   "Permission-gated test and build diagnosis for coding agents.",
-  "Runs one test command with shell permission, captures errors and returns repair instructions; coding agents perform edits and reruns.",
+  "Runs tests with shell permission, captures errors and returns repair instructions.",
+  "With autoFix=true delegates failed tests to the existing @coder subagent, then reruns to verify; bounded by maxAttempts.",
   "- 'run_and_heal': Runs test suite, verifies results, and if failing, returns actionable healing instructions.",
   "- 'diagnose': Parses compiler or runtime tracebacks into targeted bugfix action items.",
 ].join("\n")
@@ -182,6 +188,7 @@ export const Plugin = {
   effect: Effect.fn("OmniHealTool.Plugin")(function* (ctx: Context) {
     const location = yield* Location.Service
     const permission = yield* Permission.Service
+    const tools = yield* Tool.Service
 
     yield* ctx.tool
       .transform((editor) => {
@@ -228,45 +235,83 @@ export const Plugin = {
                   source: { type: "tool", messageID: context.messageID, id: context.id },
                 }).pipe(Effect.mapError((error) =>
                   new ToolFailure({ message: "Test execution denied by session permissions.", error })))
-                const { stdout, stderr, exitCode } = yield* runCommandAsync(commandToRun, rootDir, 120_000)
-                const combinedOutput = `${stdout}\n${stderr}`.trim()
+                const attemptLimit = params.autoFix ? (params.maxAttempts ?? 3) : 1
+                let combinedOutput = ""
+                let exitCode = 1
+                let attempts = 0
+                const repairs: string[] = []
+                for (let attempt = 1; attempt <= attemptLimit; attempt++) {
+                  attempts = attempt
+                  const result = yield* runCommandAsync(commandToRun, rootDir, 120_000)
+                  exitCode = result.exitCode
+                  combinedOutput = (result.stdout + "\n" + result.stderr).trim()
+                  if (exitCode === 0) break
+                  if (!params.autoFix || attempt === attemptLimit) break
+                  const diagnostics = extractFailureDetails(combinedOutput).slice(0, 5000)
+                  const snapshot = yield* tools.snapshot()
+                  const repairResult = yield* snapshot.execute({
+                    sessionID: context.sessionID,
+                    agent: context.agent,
+                    messageID: context.messageID,
+                    call: {
+                      type: "tool-call",
+                      id: "call_heal_" + crypto.randomUUID(),
+                      name: "subagent",
+                      input: {
+                        agent: "coder",
+                        description: "Repair failing test suite",
+                        prompt: [
+                          "Tests are failing in the current project. Diagnose and fix ONLY the root cause.",
+                          "Respect existing project conventions, user permissions and review gates.",
+                          "Do not claim success. The parent will rerun the test command.",
+                          "Command: " + commandToRun,
+                          "Failure output:",
+                          diagnostics,
+                        ].join("\n"),
+                        background: false,
+                      },
+                    },
+                  }).pipe(
+                    Effect.catchAll((error) =>
+                      Effect.fail(new ToolFailure({
+                        message: "Auto-repair subagent could not run. Tests remain failed; review permissions and agent availability.",
+                        error,
+                      })),
+                  )
+                  const workerStatus = repairResult.metadata?.status
+                  if (workerStatus !== "completed")
+                    return yield* new ToolFailure({
+                      message: "Auto-repair worker did not finish; do not mark verification as passed.",
+                    })
+                  repairs.push("coder completed repair attempt " + attempt)
+                }
 
                 if (exitCode === 0) {
-                  const summary = `✅ SUCESSO: Todos os testes e validações passaram limpos!\nComando: ${commandToRun}\n\nSaída:\n${combinedOutput.slice(-500) || "OK"}`
+                  const summary = "Tests passed after " + attempts + " verification pass(es).\nCommand: " +
+                    commandToRun + "\n" + repairs.join("\n") + "\n" + (combinedOutput.slice(-500) || "OK")
                   return {
                     output: {
-                      action: "run_and_heal",
-                      passed: true,
-                      command: commandToRun,
-                      summary,
+                      action: "run_and_heal", passed: true, command: commandToRun, summary,
                     },
                     content: summary,
-                    metadata: { action: "run_and_heal", passed: true, command: commandToRun },
+                    metadata: { action: "run_and_heal", passed: true, command: commandToRun, attempts, repairs: repairs.length },
                   }
                 }
 
-                const diag = extractFailureDetails(combinedOutput)
-                const summary = `❌ FALHA DETECTADA (Exit code ${exitCode}):\nComando: ${commandToRun}\n\nIniciando ciclo de autocura (Self-Healing Loop)...`
                 const diagnostics = [
-                  "=== TRACEBACK DE FALHA ===",
-                  diag,
+                  "=== FAILING TEST OUTPUT ===",
+                  extractFailureDetails(combinedOutput),
                   "",
-                  "=== PLANO DE AUTOCURA PARA @CODER ===",
-                  "1. Identifique a causa raiz nos arquivos apontados pelo traceback acima.",
-                  "2. Aplique a correção nos arquivos afetados.",
-                  "3. Re-execute 'omni_heal' para testar novamente até atingir 100% verde.",
+                  "Test verification failed after " + attempts + " pass(es).",
+                  "Cause and edit must be reviewed before marking the task complete.",
+                  "Apply a fix then run omni_heal again (or set autoFix=true with permissions).",
                 ].join("\n")
-
+                const summary = "Tests failed (exit code " + exitCode + ") after " + attempts +
+                  " verification pass(es).\nCommand: " + commandToRun
                 return {
-                  output: {
-                    action: "run_and_heal",
-                    passed: false,
-                    command: commandToRun,
-                    summary,
-                    diagnostics,
-                  },
-                  content: `${summary}\n\n${diagnostics}`,
-                  metadata: { action: "run_and_heal", passed: false, command: commandToRun },
+                  output: { action: "run_and_heal", passed: false, command: commandToRun, summary, diagnostics },
+                  content: summary + "\n\n" + diagnostics,
+                  metadata: { action: "run_and_heal", passed: false, command: commandToRun, attempts, repairs: repairs.length },
                 }
               }
 
