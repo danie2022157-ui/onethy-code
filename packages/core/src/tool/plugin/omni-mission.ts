@@ -8,10 +8,17 @@ import { OmniOrchestrator } from "../../omni-orchestrator.js"
 export const name = "omni_mission"
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["status", "claim", "complete", "fail", "retry"]).annotate({
-    description: "status: inspect tasks; claim: reserve ready tasks; complete/fail: finish running task; retry: requeue a failed task.",
+  action: Schema.Literals(["create", "status", "claim", "complete", "fail", "retry"]).annotate({
+    description: "create: save dependency graph; status: inspect; claim: reserve runnable tasks; complete/fail/retry: transition task.",
   }),
-  missionID: Schema.String.annotate({ description: "Existing mission ID returned by /team, /omni or /ultrawork." }),
+  missionID: Schema.String.annotate({ description: "Mission ID; existing for all actions except create." }),
+  goal: Schema.optionalKey(Schema.String).annotate({ description: "Required to create a mission." }),
+  tasks: Schema.optionalKey(Schema.Array(Schema.Struct({
+    id: Schema.String,
+    title: Schema.String,
+    assignedAgent: Schema.String,
+    dependsOn: Schema.optionalKey(Schema.Array(Schema.String)),
+  }))).annotate({ description: "New mission tasks and their prerequisite IDs." }),
   taskId: Schema.optionalKey(Schema.String).annotate({ description: "Required for complete, fail and retry." }),
   result: Schema.optionalKey(Schema.String).annotate({ description: "Required non-empty evidence/summary for complete or fail." }),
   maxParallel: Schema.optionalKey(Schema.Number).annotate({
@@ -26,6 +33,7 @@ export const Output = Schema.Struct({
 
 export const description = [
   "Persistent mission task control for Onethy Code agents.",
+  "Create plans with an acyclic dependency graph, then claim runnable tasks.",
   "Call status before coordinating work. Claim runnable stages before executing them.",
   "A claim is a reservation, not work completion. Invoke the assigned agent or tools, then complete only with an actual result.",
   "If a worker cannot run or fails, call fail; report the blocker rather than inventing success.",
@@ -58,6 +66,20 @@ export const Plugin = {
           }
           if (["complete", "fail"].includes(params.action) && !params.result?.trim()) {
             return yield* new ToolFailure({ message: "An actual non-empty work result or failure reason is required." })
+          }
+
+          if (params.action === "create") {
+            if (!params.goal?.trim() || !params.tasks?.length)
+              return yield* new ToolFailure({ message: "A goal and at least one task are required for create." })
+            const created = yield* orchestrator.createMission(params.goal, missionID, params.tasks).pipe(
+              Effect.mapError((error) => new ToolFailure({ message: "Cannot create mission; check dependencies and IDs.", error })),
+            )
+            const summary = "Mission " + missionID + " created with dependency graph:\n" +
+              created.map((task) =>
+                "[" + task.status + "] " + task.id + " @" + task.assignedAgent +
+                " dependsOn=" + JSON.stringify(task.dependsOn ?? []) + " — " + task.title,
+              ).join("\n")
+            return { output: { action: "create", summary }, content: summary, metadata: { missionID, count: created.length } }
           }
 
           const describe = (tasks: ReadonlyArray<{ id: string; title: string; assignedAgent: string; status: string; result?: string }>) =>
