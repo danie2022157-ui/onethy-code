@@ -20,10 +20,10 @@ function FullPath([string]$value) {
 function Inside([string]$parent, [string]$child) {
   return $child.StartsWith(($parent.TrimEnd('\') + '\'), [StringComparison]::OrdinalIgnoreCase)
 }
-function SafeRoot([string]$name, [string]$candidate, [string]$home) {
+function SafeRoot([string]$name, [string]$candidate, [string]$profileRoot) {
   if ([string]::IsNullOrWhiteSpace($candidate)) { return $null }
   $resolved = FullPath $candidate
-  if (-not (Inside $home $resolved)) {
+  if (-not (Inside $profileRoot $resolved)) {
     $warnings.Add("Ignorando $name fora da pasta do usuario: $resolved")
     return $null
   }
@@ -42,9 +42,9 @@ try {
   if (-not $env:USERPROFILE -or -not $env:LOCALAPPDATA -or -not $env:APPDATA) {
     throw 'Variaveis de perfil Windows ausentes. Nenhum arquivo sera apagado.'
   }
-  $home = FullPath $env:USERPROFILE
+  $profileRoot = FullPath $env:USERPROFILE
   $root = FullPath $Checkout
-  if (-not (Inside $home $root)) { throw 'A pasta do OnethyCode deve estar dentro da pasta do usuario.' }
+  if (-not (Inside $profileRoot $root)) { throw 'A pasta do OnethyCode deve estar dentro da pasta do usuario.' }
   if ([IO.Path]::GetFileName($root) -notmatch '^onethy[-_]?code(?:[-_].*)?$') {
     throw 'Pasta de instalacao nao reconhecida como OnethyCode.'
   }
@@ -58,8 +58,8 @@ try {
       -not (Test-Path -LiteralPath (Join-Path $root 'bin\onethy.js') -PathType Leaf)) {
     throw 'O diretorio nao contem os marcadores do projeto OnethyCode. Nenhum arquivo sera apagado.'
   }
-  $localData = SafeRoot 'dados locais' (Join-Path $env:LOCALAPPDATA 'omnicode') $home
-  $roamingData = SafeRoot 'configuracao' (Join-Path $env:APPDATA 'omnicode') $home
+  $localData = SafeRoot 'dados locais' (Join-Path $env:LOCALAPPDATA 'omnicode') $profileRoot
+  $roamingData = SafeRoot 'configuracao' (Join-Path $env:APPDATA 'omnicode') $profileRoot
 
   # Verify launchers that this checkout actually installed (never delete a
   # different program's command, even if it has the same filename).
@@ -125,7 +125,7 @@ try {
       Start-Sleep -Milliseconds 250
     }
   }
-  Set-Location -LiteralPath $home
+  Set-Location -LiteralPath $profileRoot
 
   # Delete app-specific data before the source tree; unrelated global tools stay.
   foreach ($target in $targets) {
