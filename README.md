@@ -176,7 +176,7 @@ Back up local changes before updating. Git-based `/update` is available only for
 .\uninstall.ps1 -Checkout (Get-Location).Path -Preview
 ```
 
-This **lists proposed removals without deleting files**. The actual script removes the verified OnethyCode checkout and app-owned local data after an explicit confirmation. Check the target paths carefully; it does not remove other applications, separate customer projects, or the remote GitHub repository.
+This **lists proposed removals without deleting files**. The script is designed to remove the verified OnethyCode checkout and app-owned local data after an explicit confirmation; check its report to confirm that cleanup actually completed. Check the target paths carefully; it does not remove other applications, separate customer projects, or the remote GitHub repository.
 
 ## Testing and contributing
 
