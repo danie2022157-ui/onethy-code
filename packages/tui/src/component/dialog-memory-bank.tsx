@@ -1,418 +1,293 @@
 import { createMemo, createSignal } from "solid-js"
-import fs from "fs"
-import path from "path"
+import fs from "node:fs"
+import path from "node:path"
+import { useRenderer } from "@opentui/solid"
+import { Global } from "@opencode/util/global"
+import {
+  GLOBAL_TEMPLATES,
+  deleteMemoryFile,
+  globalMemoryDirectory,
+  globalMemoryFilename,
+  initializeMemoryBank,
+  memoryFilename,
+  projectMemoryDirectory,
+  readMemoryFile,
+  writeMemoryFile,
+} from "@opencode/core/omni-memory-bank"
 import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
 import { useDialog } from "../ui/dialog"
 import { useTuiPaths } from "../context/runtime"
+import { useLocation } from "../context/location"
 import { useToast } from "../ui/toast"
-import { useTheme } from "../context/theme"
 import { openEditor } from "../editor"
 
-interface MemoryBankFile {
-  name: string
-  label: string
-  description: string
-  exists: boolean
-  size: number
-  path: string
+type Scope = "project" | "global"
+
+interface MemoryEntry {
+  readonly id: string
+  readonly name: string
+  readonly label: string
+  readonly description: string
+  readonly directory: string
+  readonly content: string
+  readonly exists: boolean
+  readonly size: number
+  readonly safe: boolean
 }
 
-const STANDARD_FILES = [
-  {
-    names: ["active-context.md", "activeContext.md"],
-    label: "Active Context (active-context.md)",
-    description: "Current sprint focus, recent discoveries, and immediate next steps",
-    template: [
-      "# Active Context",
-      "",
-      "## 1. Current Focus",
-      "- Feature or refactoring currently under development.",
-      "",
-      "## 2. Immediate Next Steps",
-      "- [ ] Next concrete task.",
-      "",
-      "## 3. Recent Discoveries & Decisions",
-      "- Guidance and notes for subagents and future sessions.",
-    ].join("\n"),
-  },
-  {
-    names: ["project-brief.md", "projectbrief.md"],
-    label: "Project Brief (project-brief.md)",
-    description: "High-level overview, core goals, and project scope",
-    template: [
-      "# Project Brief",
-      "",
-      "## 1. Overview & Goals",
-      "- Core purpose of this project.",
-      "- Problems it solves and value delivered.",
-      "",
-      "## 2. Requirements & Scope",
-      "- Essential capabilities.",
-      "- What is explicitly out of scope.",
-      "",
-      "## 3. Success Criteria",
-      "- Stability, test coverage, and specification adherence.",
-    ].join("\n"),
-  },
-  {
-    names: ["system-patterns.md", "systemPatterns.md"],
-    label: "System Patterns (system-patterns.md)",
-    description: "Architecture, code conventions, and structural patterns",
-    template: [
-      "# System Patterns & Architecture",
-      "",
-      "## 1. System Architecture",
-      "- Layers and separation of concerns.",
-      "- Dependency direction and import conventions.",
-      "",
-      "## 2. Coding Patterns & Conventions",
-      "- Naming conventions, error handling, and style rules.",
-      "- Schema rules and typing.",
-      "",
-      "## 3. Key Architectural Decisions (ADRs)",
-      "- Critical decisions and technical rationale.",
-    ].join("\n"),
-  },
-  {
-    names: ["tech-context.md", "techContext.md"],
-    label: "Technology Context (tech-context.md)",
-    description: "Languages, frameworks, versions, and build constraints",
-    template: [
-      "# Tech Context",
-      "",
-      "## 1. Technology Stack",
-      "- Runtime / Core languages.",
-      "- Frameworks, libraries, and databases.",
-      "",
-      "## 2. Development Commands & Scripts",
-      "- Tests: test suite execution command.",
-      "- Build / Lint / Typecheck: validation scripts.",
-      "",
-      "## 3. Environment Constraints",
-      "- OS compatibility, environment variables, and security constraints.",
-    ].join("\n"),
-  },
-  {
-    names: ["memory.md"],
-    label: "Global Memory Notes (memory.md)",
-    description: "Persistent repository of project preferences in .omnicode/memory.md",
-    isRoot: true,
-    template: [
-      "# OmniCode Global Memory Notes",
-      "",
-      "Durable architectural decisions and long-term project knowledge.",
-    ].join("\n"),
-  },
-]
+const PROJECT_TEMPLATES: Record<string, string> = {
+  "active-context.md": "# Active Context\n\n## Foco atual\n\n## Próximas tarefas\n",
+  "project-brief.md": "# Project Brief\n\n## Objetivos\n\n## Escopo\n",
+  "system-patterns.md": "# System Patterns\n\n## Arquitetura\n\n## Convenções\n",
+  "tech-context.md": "# Tech Context\n\n## Stack\n\n## Comandos de desenvolvimento\n",
+}
 
-export function DialogMemoryBank() {
+const PROJECT_NOTES = "# Memória durável do projeto\n\nDecisões técnicas importantes e conhecimento de longo prazo.\n"
+const MAX_FILE_BYTES = 96 * 1024
+
+/** This dialog manages local project memory and local user-wide memory separately. */
+export function DialogMemoryBank(props: { projectDir?: string; configDir?: string } = {}) {
   const dialog = useDialog()
   const paths = useTuiPaths()
+  const location = useLocation()
   const toast = useToast()
-  const theme = useTheme()
+  const renderer = useRenderer()
+  const [scope, setScope] = createSignal<Scope>("project")
   const [version, setVersion] = createSignal(0)
-  const [toDelete, setToDelete] = createSignal<string | undefined>()
 
-  const dir = () => {
-    const root = paths.cwd ?? process.cwd()
-    return path.join(root, ".omnicode", "memory-bank")
+  const projectRoot = () => props.projectDir ?? location.current?.project.directory ?? paths.cwd
+  const configRoot = () => props.configDir ?? Global.Path.config
+  const bankDir = () => scope() === "global"
+    ? globalMemoryDirectory(configRoot())
+    : projectMemoryDirectory(projectRoot())
+
+  const names = () => scope() === "global" ? GLOBAL_TEMPLATES : PROJECT_TEMPLATES
+  const scopeText = () => scope() === "global" ? "Global — todos os projetos" : "Projeto atual"
+
+  function notify(variant: "success" | "error" | "info", title: string, message: string) {
+    toast.show({ variant, title, message })
   }
 
-  const rootMemoryPath = () => {
-    const root = paths.cwd ?? process.cwd()
-    return path.join(root, ".omnicode", "memory.md")
-  }
-
-  const files = createMemo<MemoryBankFile[]>(() => {
-    version()
-    const folder = dir()
-    const memoryRoot = rootMemoryPath()
-
-    const result: MemoryBankFile[] = []
-    const seenFiles = new Set<string>()
-
-    for (const def of STANDARD_FILES) {
-      let resolvedPath: string | undefined
-      let exists = false
-      let size = 0
-      let chosenName = def.names[0]
-
-      if (def.isRoot) {
-        resolvedPath = memoryRoot
-        if (fs.existsSync(resolvedPath)) {
-          exists = true
-          size = fs.statSync(resolvedPath).size
-        }
-      } else {
-        for (const candidate of def.names) {
-          const p = path.join(folder, candidate)
-          if (fs.existsSync(p)) {
-            resolvedPath = p
-            exists = true
-            size = fs.statSync(p).size
-            chosenName = candidate
-            seenFiles.add(candidate.toLowerCase())
-            break
-          }
-        }
-        if (!resolvedPath) {
-          resolvedPath = path.join(folder, def.names[0])
-        }
+  function inspect(directory: string, name: string, description: string, content: string): MemoryEntry {
+    const full = path.join(directory, name)
+    let exists = false
+    let size = 0
+    let safe = true
+    try {
+      const stat = fs.lstatSync(full)
+      exists = true
+      size = stat.size
+      safe = stat.isFile() && !stat.isSymbolicLink() && size <= MAX_FILE_BYTES
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        exists = true
+        safe = false
       }
-
-      result.push({
-        name: chosenName,
-        label: def.label,
-        description: def.description,
-        exists,
-        size,
-        path: resolvedPath,
-      })
     }
+    return { id: full, name, label: name, description, directory, content, exists, size, safe }
+  }
 
-    if (fs.existsSync(folder)) {
+  const entries = createMemo(() => {
+    version()
+    const directory = bankDir()
+    const templates = names()
+    const items = Object.entries(templates).map(([name, content]) =>
+      inspect(directory, name, scopeText(), content),
+    )
+
+    if (scope() === "project") {
+      const notesDirectory = path.join(projectRoot(), ".omnicode")
+      items.push(inspect(notesDirectory, "memory.md", "Notas do projeto (não globais)", PROJECT_NOTES))
       try {
-        const customFiles = fs.readdirSync(folder).filter((f) => f.endsWith(".md"))
-        for (const file of customFiles) {
-          if (!seenFiles.has(file.toLowerCase())) {
-            const p = path.join(folder, file)
-            const stat = fs.statSync(p)
-            result.push({
-              name: file,
-              label: `Custom Memory (${file})`,
-              description: `Additional memory file in .omnicode/memory-bank/${file}`,
-              exists: true,
-              size: stat.size,
-              path: p,
-            })
+        if (fs.existsSync(directory)) {
+          const standard = new Set(Object.keys(templates))
+          for (const name of fs.readdirSync(directory)) {
+            if (standard.has(name)) continue
+            try {
+              memoryFilename(name)
+            } catch {
+              continue
+            }
+            items.push(inspect(directory, name, "Arquivo adicional deste projeto", "# Memória do projeto\n"))
           }
         }
-      } catch {}
+      } catch (error) {
+        notify("error", "Erro de leitura", String(error))
+      }
     }
-
-    return result
+    return items
   })
 
-  function deleteFile(filePath: string) {
+  function refresh() {
+    setVersion((value) => value + 1)
+  }
+
+  function initBank() {
     try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath)
-        setToDelete(undefined)
-        setVersion((v) => v + 1)
-        toast.show({
-          variant: "success",
-          title: "Memory Deleted",
-          message: `File '${path.basename(filePath)}' deleted successfully.`,
-        })
+      const created = initializeMemoryBank(bankDir(), names())
+      if (scope() === "project") {
+        const notesDir = path.join(projectRoot(), ".omnicode")
+        created.push(...initializeMemoryBank(notesDir, { "memory.md": PROJECT_NOTES }))
       }
-    } catch (err) {
-      toast.show({
-        variant: "error",
-        title: "Delete Error",
-        message: `Unable to delete file: ${err}`,
-      })
+      refresh()
+      notify("success", "Memória inicializada", created.length
+        ? "Criados: " + created.join(", ")
+        : "Os arquivos desta memória já existem.")
+    } catch (error) {
+      notify("error", "Falha ao inicializar", String(error))
     }
   }
 
-  function clearAll() {
-    try {
-      const folder = dir()
-      let count = 0
-      if (fs.existsSync(folder)) {
-        for (const f of fs.readdirSync(folder)) {
-          if (f.endsWith(".md")) {
-            try {
-              fs.unlinkSync(path.join(folder, f))
-              count++
-            } catch {}
-          }
-        }
-      }
-      const memRoot = rootMemoryPath()
-      if (fs.existsSync(memRoot)) {
-        try {
-          fs.unlinkSync(memRoot)
-          count++
-        } catch {}
-      }
-      setToDelete(undefined)
-      setVersion((v) => v + 1)
-      toast.show({
-        variant: "success",
-        title: "Memory Bank Cleared",
-        message: `${count} memory file(s) deleted successfully.`,
-      })
-    } catch (err) {
-      toast.show({
-        variant: "error",
-        title: "Clear Error",
-        message: `Error clearing memory: ${err}`,
-      })
+  async function edit(entry: MemoryEntry) {
+    if (!entry.safe) {
+      notify("error", "Arquivo indisponível", "Arquivo inválido, simbólico ou maior que 96 KiB.")
+      return
     }
+    try {
+      if (!entry.exists) {
+        initializeMemoryBank(entry.directory, { [entry.name]: entry.content })
+        refresh()
+        notify("success", "Memória criada", entry.name)
+        return
+      }
+      const before = readMemoryFile(entry.directory, entry.name)
+      if (before === undefined) throw new Error("Unable to read the selected memory file")
+      // openEditor edits the supplied CONTENT in a temporary file and returns the edited text.
+      // Passing the file path or a null renderer previously made editing impossible.
+      const after = await openEditor({ value: before, renderer, cwd: projectRoot() })
+      if (after === undefined || after === before) return
+      const current = readMemoryFile(entry.directory, entry.name)
+      if (current !== before) throw new Error("Memory changed while editing. Reopen it to avoid losing changes.")
+      writeMemoryFile(entry.directory, entry.name, after)
+      refresh()
+      notify("success", "Memória atualizada", entry.name)
+    } catch (error) {
+      notify("error", "Erro ao editar", String(error))
+    }
+  }
+
+  function confirm(title: string, description: string, action: () => void) {
+    dialog.push(() => (
+      <DialogSelect
+        title={title}
+        description={description}
+        skipFilter
+        options={[
+          { value: "cancel", title: "Cancelar", onSelect: () => dialog.pop() },
+          {
+            value: "confirm",
+            title: "Confirmar exclusão",
+            onSelect: () => {
+              dialog.pop()
+              action()
+            },
+          },
+        ]}
+        footerHints={[{ title: "select", label: "enter" }, { title: "cancel", label: "esc" }]}
+      />
+    ))
+  }
+
+  function remove(entry: MemoryEntry) {
+    try {
+      if (scope() === "global") globalMemoryFilename(entry.name)
+      if (deleteMemoryFile(entry.directory, entry.name)) {
+        refresh()
+        notify("success", "Memória excluída", entry.name)
+      } else notify("info", "Arquivo ausente", entry.name)
+    } catch (error) {
+      notify("error", "Erro ao excluir", String(error))
+    }
+  }
+
+  function clearBank() {
+    const existing = entries().filter((entry) => entry.exists)
+    let count = 0
+    const errors: string[] = []
+    for (const entry of existing) {
+      try {
+        if (scope() === "global") globalMemoryFilename(entry.name)
+        if (deleteMemoryFile(entry.directory, entry.name)) count++
+      } catch (error) {
+        errors.push(entry.name + ": " + String(error))
+      }
+    }
+    refresh()
+    if (errors.length) {
+      notify("error", "Limpeza incompleta", "Excluídos: " + count + ". Falhas: " + errors.join("; "))
+    } else notify("success", "Memória limpa", count + " arquivo(s) excluído(s) somente deste escopo.")
   }
 
   const options = createMemo<DialogSelectOption<string>[]>(() => {
-    const list: DialogSelectOption<string>[] = []
-    const bank = files()
-    const existingFiles = bank.filter((f) => f.exists)
-    const totalExists = existingFiles.length
-
-    list.push({
-      value: "__init__",
-      title: `⚡ Initialize All Standard Files (${totalExists}/${STANDARD_FILES.length} active)`,
-      description: "Ensures .omnicode/memory-bank/ and memory.md are scaffolded with templates",
-      category: "Management Actions",
-      footer: "[Initialize]",
-      onSelect: () => {
-        try {
-          const folder = dir()
-          if (!fs.existsSync(folder)) {
-            fs.mkdirSync(folder, { recursive: true })
-          }
-          for (const item of STANDARD_FILES) {
-            const target = item.isRoot ? rootMemoryPath() : path.join(folder, item.names[0])
-            if (!fs.existsSync(target)) {
-              fs.writeFileSync(target, item.template, "utf8")
-            }
-          }
-          setVersion((v) => v + 1)
-          toast.show({
-            variant: "info",
-            title: "🧠 Memory Bank Initialized",
-            message: "Persistent memory bank files created successfully.",
-          })
-        } catch {
-          toast.show({
-            variant: "warning",
-            title: "Init Error",
-            message: "Unable to create Memory Bank files.",
-          })
-        }
+    const active = scope()
+    const items = entries()
+    const result: DialogSelectOption<string>[] = [
+      {
+        value: "__switch",
+        title: active === "project" ? "🌐 Alternar para memória GLOBAL" : "📁 Alternar para memória do PROJETO",
+        description: active === "project"
+          ? "Preferências compartilhadas entre todos os projetos locais"
+          : "Decisões e notas específicas da pasta de trabalho atual",
+        category: "Gerenciamento",
+        onSelect: () => setScope((current) => current === "project" ? "global" : "project"),
       },
-    })
+      {
+        value: "__init",
+        title: "Inicializar arquivos padrão",
+        description: "Cria somente arquivos que ainda não existem; não sobrescreve os atuais",
+        category: "Gerenciamento",
+        onSelect: initBank,
+      },
+    ]
 
-    for (const f of bank) {
-      const isPendingDelete = toDelete() === f.path
-      const statusIcon = f.exists ? (f.size > 0 ? "●" : "○") : "×"
-      const statusLabel = f.exists
-        ? f.size > 0
-          ? `${(f.size / 1024).toFixed(1)} KB`
-          : "Empty (0 KB)"
-        : "Not created"
-
-      list.push({
-        value: f.path,
-        title: isPendingDelete
-          ? `⚠️ DELETE: ${f.label}`
-          : `${statusIcon} ${f.label} [${statusLabel}]`,
-        description: isPendingDelete
-          ? "Press Enter or Ctrl+D again to confirm deletion of this memory file"
-          : f.description,
-        category: f.exists ? "Active Memory Files" : "Available Memory Files",
-        footer: isPendingDelete
-          ? "Press Ctrl+D again to confirm deletion"
-          : f.exists
-            ? "[Enter: Open · Ctrl+D: Delete]"
-            : "[Enter: Create]",
-        footerColor: isPendingDelete ? theme.text.feedback.warning.base : undefined,
-        onSelect: () => {
-          if (isPendingDelete) {
-            deleteFile(f.path)
-            return
-          }
-          if (!f.exists) {
-            try {
-              const folder = path.dirname(f.path)
-              if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true })
-              const match = STANDARD_FILES.find((s) => s.names.includes(f.name))
-              const template = match?.template ?? `# ${f.label}\n\n*Persistent memory file.*\n`
-              fs.writeFileSync(f.path, template, "utf8")
-              setVersion((v) => v + 1)
-              toast.show({
-                variant: "info",
-                title: "File Created",
-                message: `${f.name} created successfully.`,
-              })
-            } catch (err) {
-              toast.show({
-                variant: "error",
-                title: "Create Error",
-                message: `Failed to create file: ${err}`,
-              })
-            }
-          } else {
-            dialog.clear()
-            void openEditor({ value: f.path, renderer: null as any, cwd: paths.cwd })
-          }
-        },
+    for (const entry of items) {
+      const status = !entry.exists ? "não criado" : !entry.safe ? "indisponível" : (entry.size / 1024).toFixed(1) + " KB"
+      result.push({
+        value: entry.id,
+        title: (entry.exists ? entry.safe ? "● " : "⚠ " : "○ ") + entry.label + " [" + status + "]",
+        description: entry.description,
+        category: entry.exists ? "Arquivos disponíveis" : "Arquivos para criar",
+        footer: entry.safe ? (entry.exists ? "Enter: editar" : "Enter: criar") : "Arquivo não editável",
+        onSelect: () => void edit(entry),
       })
     }
 
-    if (totalExists > 0) {
-      const isPendingClearAll = toDelete() === "__clear_all__"
-      list.push({
-        value: "__clear_all__",
-        title: isPendingClearAll
-          ? "⚠️ CONFIRM: Clear Entire Memory Bank (.omnicode/memory-bank/)"
-          : `🗑️ Clear Entire Memory Bank (${totalExists} file${totalExists > 1 ? "s" : ""})`,
-        description: isPendingClearAll
-          ? "Warning: All memory files will be permanently erased. Press Enter or Ctrl+D to confirm."
-          : "Permanently deletes all persistent memory files in this workspace",
-        category: "Management Actions",
-        footer: isPendingClearAll
-          ? "Press Enter or Ctrl+D to confirm"
-          : "[Clear All]",
-        footerColor: isPendingClearAll ? theme.text.feedback.error.base : undefined,
-        onSelect: () => {
-          if (isPendingClearAll) {
-            clearAll()
-            return
-          }
-          setToDelete("__clear_all__")
-        },
+    if (items.some((entry) => entry.exists)) {
+      result.push({
+        value: "__clear",
+        title: "🗑 Limpar memória " + (active === "global" ? "GLOBAL" : "do PROJETO"),
+        description: "Solicita confirmação; não afeta o outro escopo",
+        category: "Gerenciamento",
+        onSelect: () => confirm(
+          "Excluir memória " + scopeText() + "?",
+          "Esta ação exclui os arquivos deste escopo. Não é possível desfazer.",
+          clearBank,
+        ),
       })
     }
-
-    return list
+    return result
   })
+
+  function requestDelete(selected: string) {
+    const entry = entries().find((file) => file.id === selected)
+    if (!entry?.exists) return
+    confirm("Excluir " + entry.name + "?", "Exclui somente este arquivo da memória " + scopeText() + ".", () => remove(entry))
+  }
 
   return (
     <DialogSelect
-      title="🧠 OmniCode — Persistent Memory Bank"
-      placeholder="Search memory files..."
+      title={"🧠 Memória Onethy — " + scopeText()}
+      placeholder="Buscar memórias..."
       options={options()}
-      onMove={() => setToDelete(undefined)}
       actions={[
         {
           command: "session.delete",
-          title: (option) => {
-            if (!option?.value) return "delete"
-            if (option.value === "__clear_all__") return "clear all (Ctrl+D)"
-            if (option.value === "__init__") return ""
-            return toDelete() === option.value ? "confirm delete" : "delete (Ctrl+D)"
-          },
-          onTrigger: (option) => {
-            if (!option.value || option.value === "__init__") return
-            if (option.value === "__clear_all__") {
-              if (toDelete() !== "__clear_all__") {
-                setToDelete("__clear_all__")
-                return
-              }
-              clearAll()
-              return
-            }
-            if (toDelete() !== option.value) {
-              setToDelete(option.value)
-              return
-            }
-            deleteFile(option.value)
-          },
+          title: "excluir memória",
+          disabled: (option) => !entries().some((entry) => entry.id === option?.value && entry.exists),
+          onTrigger: (option) => requestDelete(option.value),
         },
       ]}
-      footerHints={[
-        { title: "open / create", label: "enter" },
-        { title: "delete memory", label: "ctrl+d", side: "right" },
-      ]}
+      footerHints={[{ title: "abrir / criar", label: "enter" }, { title: "excluir", label: "ctrl+d", side: "right" }]}
     />
   )
 }
