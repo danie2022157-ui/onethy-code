@@ -41,7 +41,15 @@ EOF
 chmod +x "${TARGET_DIR}/omni"
 ln -sf "${TARGET_DIR}/omni" "${TARGET_DIR}/omnicode"
 
-echo "OmniCode development shortcut installed at: ${TARGET_DIR}/omni"
+cat <<EOF > "${TARGET_DIR}/onethy"
+#!/usr/bin/env bash
+exec "${NODE_BIN}" "${DIR}/bin/onethy.js" "\$@"
+EOF
+chmod +x "${TARGET_DIR}/onethy"
+ln -sf "${TARGET_DIR}/onethy" "${TARGET_DIR}/onethy-code"
+
+echo "OnethyCode shortcut installed at: ${TARGET_DIR}/onethy"
+echo "Legacy OmniCode shortcut installed at: ${TARGET_DIR}/omni"
 echo "This shortcut uses the current source checkout; keep it and its dependencies available."
 echo "There is no standalone OmniCode update channel yet; update this checkout manually."
 echo "Ensure ${TARGET_DIR} is in your PATH."
