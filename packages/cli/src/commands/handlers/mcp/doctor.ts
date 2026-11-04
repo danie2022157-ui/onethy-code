@@ -32,7 +32,7 @@ export default Runtime.handler(
           "No MCP servers were loaded for this workspace.",
           "Check onethy.json/onethy.jsonc or opencode.json/opencode.jsonc in the project or global config.",
           "Recognized formats: mcp.<name>, mcp.servers.<name>, .mcp.json, mcp.json and .cursor/.vscode MCP files.",
-          "Auto-discovered servers stay disabled until explicitly approved: opencode mcp doctor --enable <name>.",
+          "Auto-discovered servers stay disabled until explicitly approved: onethy mcp doctor --enable <name>.",
         ].join(EOL) + EOL,
       )
       return
@@ -64,7 +64,7 @@ export default Runtime.handler(
       `Total: ${servers.length} | connected: ${counts.connected} | failed: ${counts.failed} | auth: ${counts.needs_auth} | disabled: ${counts.disabled} | pending: ${counts.pending}` + EOL,
     )
     if (counts.failed && !input.retry)
-      process.stdout.write("Run 'opencode mcp doctor --retry' to retry failed connections." + EOL)
+      process.stdout.write("Run 'onethy mcp doctor --retry' to retry failed connections." + EOL)
   }),
 )
 
@@ -97,9 +97,9 @@ export function advice(server: McpServer): string {
     case "pending":
       return "initializing; run doctor again if startup does not finish"
     case "needs_auth":
-      return `sign in with 'opencode mcp auth ${server.name}' (${safeError(server.status.error)})`
+      return `sign in with 'onethy mcp auth ${server.name}' (${safeError(server.status.error)})`
     case "disabled":
-      return "disabled by configuration or discovery; run opencode mcp doctor --enable <name> to approve"
+      return "disabled by configuration or discovery; run onethy mcp doctor --enable <name> to approve"
     case "failed":
       return safeError(server.status.error) + " (check command, PATH, dependencies, URL and authentication)"
   }
