@@ -7,6 +7,7 @@ import { FSUtil } from "@opencode/util/fs-util"
 import { Effect, Stream } from "effect"
 import { Config } from "../../config.js"
 import { Mcp } from "../../mcp/index.js"
+import { Location } from "../../location.js"
 
 export const Plugin = define({
   id: "opencode.config.mcp",
@@ -21,6 +22,7 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
   const config = yield* Config.Service
   const mcp = yield* Mcp.Service
   const fsOpt = yield* Effect.serviceOption(FSUtil.Service)
+  const locationOpt = yield* Effect.serviceOption(Location.Service)
   const loaded = { entries: [] as Entry[], directoryServers: new Map<string, ServerConfig>() }
 
   const scanDirectoryMcps = Effect.fnUntraced(function* (entries: Entry[]) {
@@ -32,6 +34,7 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
       ...entries.flatMap((entry) => (entry.type === "directory" ? [entry.path] : [])),
       ...roots.claude,
       ...roots.agents,
+      ...(locationOpt._tag === "Some" ? [locationOpt.value.project.directory] : []),
     ]
     const files = new Set<string>()
     for (const directory of directories) {
@@ -39,6 +42,14 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
         .scan("{mcp,mcps}/**/*.json", { cwd: directory, absolute: true, dot: true, symlink: false })
         .pipe(Effect.orElseSucceed(() => [] as string[]))
       for (const file of scanned) files.add(file)
+      // Most IDE MCP installers write one of these conventional manifests rather
+      // than placing files in an mcp/ folder. They remain disabled until user approval.
+      const standard = yield* fs
+        .scan("{mcp.json,mcps.json,.mcp.json,.cursor/mcp.json,.vscode/mcp.json}", {
+          cwd: directory, absolute: true, dot: true, symlink: false,
+        })
+        .pipe(Effect.orElseSucceed(() => [] as string[]))
+      for (const file of standard) files.add(file)
     }
     for (const file of [...files].toSorted()) {
       const root = directories.find((directory) => isContained(directory, file))
