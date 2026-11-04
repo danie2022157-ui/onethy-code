@@ -180,7 +180,15 @@ export function discoveredName(name: string) {
 export function mergeServers(discovered: Map<string, ServerConfig>, documents: readonly Document[]) {
   const servers = new Map(discovered)
   for (const document of documents) {
-    for (const [name, server] of Object.entries(document.info.mcp?.servers ?? {})) servers.set(name, server)
+    const mcp = document.info.mcp
+    for (const [name, server] of Object.entries(mcp?.servers ?? {})) servers.set(name, server)
+    // An explicit canonical opt-in is the only way to enable an auto-discovered
+    // MCP without copying its executable/endpoint into a config file.
+    // Unknown server names are not created by an enable-only override.
+    for (const [name, enabled] of Object.entries(mcp?.enabled ?? {})) {
+      const server = servers.get(name)
+      if (server) servers.set(name, { ...server, disabled: !enabled })
+    }
   }
   return servers
 }
