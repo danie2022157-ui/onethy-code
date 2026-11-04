@@ -1,5 +1,5 @@
 import { EOL } from "node:os"
-import { Effect, Either } from "effect"
+import { Cause, Effect, Exit } from "effect"
 import { OpenCode, type McpServer } from "@opencode/client"
 import { Service } from "@opencode/client/effect/service"
 import { Commands } from "../../commands"
@@ -44,22 +44,22 @@ export default Runtime.handler(
       const connected = yield* Effect.tryPromise({
         try: () => client.experimental.mcp.connect({ server: server.name, location }),
         catch: (cause) => cause instanceof Error ? cause : new Error(String(cause)),
-      }).pipe(Effect.either)
-      if (Either.isLeft(connected)) {
+      }).pipe(Effect.exit)
+      if (Exit.isFailure(connected)) {
         failed += 1
-        process.stdout.write(`✗ ${server.name}: ${connected.left.message}${EOL}`)
+        process.stdout.write(`✗ ${server.name}: ${String(Cause.squash(connected.cause))}${EOL}`)
         continue
       }
       const checked = yield* Effect.tryPromise({
         try: () => client.mcp.list({ location }),
         catch: (cause) => cause instanceof Error ? cause : new Error(String(cause)),
-      }).pipe(Effect.either)
-      if (Either.isLeft(checked)) {
+      }).pipe(Effect.exit)
+      if (Exit.isFailure(checked)) {
         failed += 1
-        process.stdout.write(`✗ ${server.name}: couldn't verify status: ${checked.left.message}${EOL}`)
+        process.stdout.write(`✗ ${server.name}: couldn't verify status: ${String(Cause.squash(checked.cause))}${EOL}`)
         continue
       }
-      const fresh = checked.right.data.find((entry) => entry.name === server.name)
+      const fresh = checked.value.data.find((entry) => entry.name === server.name)
         if (fresh?.status.status === "connected") {
           recovered += 1
           process.stdout.write(`✓ ${server.name}: reconnected${EOL}`)
