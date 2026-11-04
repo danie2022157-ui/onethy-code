@@ -178,7 +178,7 @@ export const Plugin = {
   effect: Effect.fn("SubagentTool.Plugin")(function* (ctx: Context) {
     const sessions = yield* Session.Service
     const location = yield* Location.Service
-    const worktrees = yield* Worktree.Service
+    const worktreesOpt = yield* Effect.serviceOption(Worktree.Service)
     const jobs = yield* Job.Service
     const agents = yield* Agent.Service
     const config = yield* Config.Service
@@ -402,6 +402,7 @@ export const Plugin = {
                 (input.worktree ?? (process.env.ONETHY_AGENT_WORKTREES === "1" && agent.id === "coder"))
               let isolatedDirectory: string | undefined
               if (isolate) {
+                if (Option.isNone(worktreesOpt)) return yield* new ToolFailure({ message: "Native worktree service is unavailable." })
                 yield* permission.assert({
                   action: "worktree",
                   resources: ["create"],
@@ -410,7 +411,7 @@ export const Plugin = {
                   source: { type: "tool", messageID: context.messageID, id: context.id },
                 }).pipe(Effect.mapError((error) =>
                   new ToolFailure({ message: "Worktree creation denied by session permissions.", error })))
-                const created = yield* worktrees.create({
+                const created = yield* worktreesOpt.value.create({
                   projectID: location.project.id,
                   name: "agent-" + agent.id + "-" + crypto.randomBytes(4).toString("hex"),
                 }).pipe(Effect.mapError((error) =>
