@@ -47,7 +47,7 @@ jobs:
         run: bun --cwd packages/core test test/omni-config.test.ts test/omni-memory-bank.test.ts test/omni-session.test.ts test/omni-model-selection.test.ts test/omni-orchestrator.test.ts
 
       - name: TUI regression tests
-        run: bun --cwd packages/tui test test/cli/tui/plugins-dialog.test.tsx test/component/dialog-omni-update.test.tsx test/component/dialog-memory-bank.test.tsx
+        run: bun --cwd packages/tui test test/cli/tui/plugins-dialog.test.tsx test/component/dialog-omni-update.test.tsx test/component/dialog-memory-bank.test.tsx test/util/onethy-update.test.ts test/util/onethy-projects.test.ts test/component/dialog-projects.test.tsx
 
       - name: Core TypeScript check
         if: runner.os == 'Linux'

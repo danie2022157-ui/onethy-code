@@ -270,7 +270,14 @@ To manually lock a tier, use `/auto` or press `Ctrl+T` to choose:
 | `/commit` | `/autocommit` | Generate conventional commit messages from git diff |
 | `/personalizacoes` | `/customizations` | Open catalog of 430+ Agents, 1,000+ Skills, Mods, Hooks, and MCPs |
 | `/update` | `/atualizar` | Check for updates and sync directly with the GitHub repository |
+| `/projects` | `/project`, `/projetos` | Create, add, open, rename and remove project entries safely (without deleting files) |
 | `/connect` | `/integrations` | Connect or authenticate AI providers and MCP servers |
+
+### Automatic Update Alerts & Project Management
+
+**Update alerts:** When running OnethyCode from the official GitHub `main` checkout, the terminal checks for a newer commit at startup and approximately every 15 minutes. A notice on the home screen and a brief toast indicate when `/update` is available. The check is read-only; OnethyCode does **not** install updates automatically. Offline checks are silently skipped. For security, the check only runs against the official repository's Git origin.
+
+**Project manager:** Run `/projects` (or `/projetos`) to create a project folder, add an existing directory, open a project, edit its displayed name, or **remove it from the manager's list**. Removing a project does **not** delete its folder, code, git repository or session history. Use `Ctrl+R` to rename a selected entry and `Ctrl+D` to request removal with confirmation. You can always add an existing project back.
 
 ### Essential Keyboard Shortcuts
 * `Ctrl + P`: Open Command Palette (search all commands, agents, and tools).

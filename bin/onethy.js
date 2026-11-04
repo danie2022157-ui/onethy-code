@@ -39,6 +39,7 @@ const child = spawn(bunBin, ["run", "--cwd", cliDir, "src/index.ts", ...process.
   env: {
     ...makeOmniEnvironment(process.env, bunBin),
     ONETHY_ACTIVE: "1",
+    ONETHY_INSTALL_ROOT: rootDir,
     ...(activeCommit ? { ONETHY_COMMIT: activeCommit } : {}),
     OPENCODE_CLI_NAME: "onethy",
     OPENCODE_THEME: process.env.OPENCODE_THEME || "onethy",

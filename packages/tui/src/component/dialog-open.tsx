@@ -23,6 +23,8 @@ import { withTimestampedFallback } from "@opencode/util/session-title-fallback"
 import { sessionStatusGutter } from "./dialog-session-list"
 import { Spinner } from "./spinner"
 import { projectName } from "../util/project"
+import { useStorageOptional } from "../context/storage"
+import type { ProjectRegistry } from "../util/onethy-projects"
 
 const RECENT_LIMIT = 8
 export const DialogOpenKey = Symbol("DialogOpen")
@@ -47,6 +49,9 @@ export function DialogOpen(props: { sessions: SessionInfo[]; onLoad: (sessions: 
   const paths = useTuiPaths()
   const dimensions = useTerminalDimensions()
   const shortcuts = Keymap.useShortcuts()
+  const manager = useStorageOptional()?.store<ProjectRegistry>("onethy-projects", {
+    initial: { registered: [], hidden: [], names: {} },
+  })[0]
   const [filter, setFilter] = createSignal("")
   const [selectionMoved, setSelectionMoved] = createSignal(false)
   let closed = false
@@ -237,14 +242,14 @@ export function DialogOpen(props: { sessions: SessionInfo[]; onLoad: (sessions: 
     const current = location.ref ?? data.location.default()
     const projectOptions = data.project
       .list()
-      .filter((project) => project.canonical !== "/")
+      .filter((project) => project.canonical !== "/" && !manager?.hidden.includes(project.canonical))
       // Historical project identities can share a checkout. The list is newest-active first.
       .filter((project, index, projects) => projects.findIndex((item) => item.canonical === project.canonical) === index)
       .map((project) => ({ directory: project.canonical, project }))
       .map((item) => {
         const title =
           item.directory === item.project?.canonical
-            ? (projectName(item.project) ?? path.basename(item.directory))
+            ? (manager?.names[item.directory] ?? projectName(item.project) ?? path.basename(item.directory))
             : path.basename(item.directory)
         const footer = abbreviateHome(item.directory, paths.home)
         const git = item.project?.vcs === "git"
@@ -255,7 +260,7 @@ export function DialogOpen(props: { sessions: SessionInfo[]; onLoad: (sessions: 
         return {
           title,
           footer: `${truncateFilePath(footer, width)}${git ? " →" : ""}`,
-          searchText: `${footer} ${projectName(item.project) ?? ""}`,
+          searchText: `${footer} ${manager?.names[item.directory] ?? projectName(item.project) ?? ""}`,
           value: {
             type: "project",
             directory: item.directory,
