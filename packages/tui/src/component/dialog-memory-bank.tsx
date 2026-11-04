@@ -50,7 +50,7 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
   const [version, setVersion] = createSignal(0)
 
   const projectRoot = () => props.projectDir ?? location.current?.project.directory ?? paths.cwd
-  const configRoot = () => props.configDir ?? Global.Path.config
+  const configRoot = () => props.configDir ?? process.env.OPENCODE_CONFIG_DIR ?? Global.Path.config
   const bankDir = () => scope() === "global"
     ? globalMemoryDirectory(configRoot())
     : projectMemoryDirectory(projectRoot())
