@@ -498,6 +498,22 @@ describe("ConfigNormalize", () => {
     })
   })
 
+  test("respects enabled in modern mcp.servers config without overriding explicit disabled", () => {
+    const result = normalized({
+      mcp: {
+        servers: {
+          github: { type: "remote", url: "https://example.com/mcp", enabled: false },
+          local: { type: "local", command: ["node", "server.js"], enabled: true },
+          explicit: { type: "local", command: ["node", "other.js"], enabled: true, disabled: true },
+        },
+      },
+    })
+    const servers = Schema.decodeUnknownSync(Info)(result.encoded).mcp?.servers
+    expect(servers?.github?.disabled).toBe(true)
+    expect(servers?.local?.disabled).toBe(false)
+    expect(servers?.explicit?.disabled).toBe(true)
+  })
+
   test("supports explicit mcp.overrides for CLI connection approval", () => {
     const result = normalized({
       mcp: { overrides: { github: true, filesystem: false, invalid: "yes" } },
