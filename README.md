@@ -414,7 +414,7 @@ onethy debug paths
 onethy service status
 ```
 
-Outros grupos incluem `run`, `mini`, `serve`, `stats`, `pair`, `upgrade` e `uninstall`. Para opções e parâmetros, consulte sempre `onethy <subcomando> --help`.
+Outros grupos incluem `run`, `mini`, `serve`, `stats`, `pair` e `upgrade`. Para opções e parâmetros, consulte sempre `onethy <subcomando> --help`.
 
 ## Fluxos de uso
 
@@ -541,7 +541,6 @@ onethy-code/
 ├── .github/workflows/               # CI e testes automatizados
 ├── install.ps1                      # Instalação no Windows
 ├── install.sh                       # Instalação Linux/macOS
-├── uninstall.ps1                    # Desinstalador Windows com prévia
 ├── package.json                     # Workspace e scripts
 ├── bun.lock                         # Dependências fixadas
 ├── CONTRIBUTING.md
@@ -590,18 +589,6 @@ onethy debug paths data
 
 A memória global é **local à instalação**. Não há promessa de sincronização automática com GitHub, com outros dispositivos ou com contas externas.
 
-### Desinstalação no Windows
-
-O repositório inclui `uninstall.ps1`, um desinstalador PowerShell que pode funcionar independentemente da TUI. Antes de qualquer exclusão, é possível visualizar os caminhos propostos:
-
-```powershell
-.\uninstall.ps1 -Checkout (Get-Location).Path -Preview
-```
-
-**Cuidado:** a operação de desinstalação completa foi projetada para remover a pasta do checkout, os arquivos de configuração e dados locais do OnethyCode e atalhos reconhecidos da instalação. Isso pode incluir modificações locais ainda não enviadas ao GitHub. Leia a prévia, verifique o relatório final e guarde cópias de segurança quando necessário.
-
-A presença de um script ou comando `/unistall` não é garantia de sucesso em qualquer ambiente: falhas e itens preservados precisam ser examinados. A ferramenta não deve excluir outros projetos nem o repositório remoto no GitHub.
-
 ## Qualidade e testes
 
 O código contém testes unitários e de regressão para componentes de orquestração, memória, seleção de modelos, ferramentas, segurança de checkpoints, MCPs, CLI e TUI. O repositório também utiliza workflows do GitHub Actions com verificações em diferentes sistemas operacionais.
@@ -616,8 +603,7 @@ bun --cwd packages/core test test/omni-orchestrator.test.ts test/omni-mission-co
 bun --cwd packages/core test test/omni-memory-bank.test.ts
 bun --cwd packages/core test test/omni-intelligence.test.ts test/omni-embeddings.test.ts
 bun --cwd packages/core test test/omni-checkpoint-safety.test.ts
-bun --cwd packages/cli test test/mcp-config-path.test.ts test/uninstall-purge.test.ts
-bun --cwd packages/tui test test/uninstall-command.test.ts
+bun --cwd packages/cli test test/mcp-config-path.test.ts
 ```
 
 ### Verificações de tipos
