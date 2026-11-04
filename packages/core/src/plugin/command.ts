@@ -228,6 +228,31 @@ export const Plugin = define({
         })
 
         editor.add({
+          name: "memory-global",
+          description: "Global Memory Bank: consult or update preferences shared by all OnethyCode projects",
+          execute: (input) =>
+            ctx.session
+              .prompt({
+                ...input.prompt,
+                sessionID: input.sessionID,
+                text: [
+                  "🧠 [GLOBAL MEMORY — OnethyCode]",
+                  "Use the omni_memory tool with scope='global' (never scope='project') to handle this request.",
+                  "The shared files are preferences.md, rules.md and knowledge.md in the user configuration directory.",
+                  "Consult global memory before deciding whether to add or update an entry.",
+                  "Only modify global memory when the user explicitly requests it. Never store API keys, passwords, tokens, credentials or private client data.",
+                  "For delete or clear, ask the user for approval and pass confirm=true only after approval.",
+                  "Do not claim a change was saved until the tool confirms success.",
+                  "",
+                  "User request:",
+                  input.prompt.text.trim() || "Read and summarize global preferences; do not modify them.",
+                ].join("\n"),
+                delivery: input.delivery,
+              })
+              .pipe(Effect.asVoid),
+        })
+
+        editor.add({
           name: "memory",
           description: "Persistent Memory Bank (.omnicode/memory-bank/): reads or updates project memory bank files",
           execute: (input) =>
