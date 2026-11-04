@@ -228,10 +228,16 @@ export const Plugin = {
               }
 
               if (params.action === "update") {
+                if (scope === "global" && !params.content?.trim()) {
+                  return yield* new ToolFailure({
+                    message: "Global memory updates require nonempty content. Use delete with confirmation to remove entries.",
+                  })
+                }
                 ensureDir()
                 const fileName = selectFilename(params.file ?? (scope === "global" ? "preferences" : "active-context"))
                 const contentToWrite = params.content ?? ""
-                writeMemoryFile(memoryDir, fileName, contentToWrite, params.append ?? false)
+                // New global preferences append by default: never overwrite earlier memory by accident.
+                writeMemoryFile(memoryDir, fileName, contentToWrite, params.append ?? (scope === "global"))
 
                 const summary = `Arquivo '${fileName}' atualizado no Memory Bank ${scopeLabel}.`
                 return {
