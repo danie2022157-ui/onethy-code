@@ -72,7 +72,10 @@ export const Plugin = {
             if (!params.goal?.trim() || !params.tasks?.length)
               return yield* new ToolFailure({ message: "A goal and at least one task are required for create." })
             const created = yield* orchestrator.createMission(params.goal, missionID, params.tasks).pipe(
-              Effect.mapError((error) => new ToolFailure({ message: "Cannot create mission; check dependencies and IDs.", error })),
+              Effect.catchAllCause((cause) => new ToolFailure({
+                message: "Cannot create mission; check plan dependencies, uniqueness and IDs.",
+                error: cause,
+              })),
             )
             const summary = "Mission " + missionID + " created with dependency graph:\n" +
               created.map((task) =>
