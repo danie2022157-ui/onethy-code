@@ -20,11 +20,18 @@ export default Runtime.handler(
     const read = () => client.mcp.list({ location }).then((response) => response.data)
     let servers = yield* Effect.promise(read)
     const enable = Option.getOrUndefined(input.enable)
-    if (enable && !servers.some((server) => server.name === enable))
-      return yield* Effect.fail(new Error(`MCP server not found: ${enable}. Configure or discover it first.`))
-    if (enable) {
-      const file = yield* Effect.promise(() => approveServer(process.cwd(), enable))
-      process.stdout.write(`Explicitly approved MCP "${enable}" in ${file}. Recheck status after the config reload.` + EOL)
+    // A comma-separated list is an explicit opt-in for each server; never approve
+    // everything discovered on disk (those entries may be untrusted).
+    const requested = enable ? [...new Set(enable.split(",").map((name) => name.trim()).filter(Boolean))] : []
+    if (enable && requested.length === 0)
+      return yield* Effect.fail(new Error("Specify one or more MCP names with --enable name1,name2"))
+    const unknown = requested.filter((name) => !servers.some((server) => server.name === name))
+    if (unknown.length)
+      return yield* Effect.fail(new Error(`MCP servers not found: ${unknown.join(", ")}. Configure or discover them first.`))
+    if (requested.length) {
+      const file = yield* Effect.promise(() => approveServers(process.cwd(), requested))
+      process.stdout.write(`Approved MCP servers: ${requested.join(", ")} in ${file}.` + EOL)
+      process.stdout.write("Restart the Onethy service, then run 'onethy mcp doctor --retry' to reconnect and check status." + EOL)
     }
     if (servers.length === 0) {
       process.stdout.write(
@@ -70,16 +77,27 @@ export default Runtime.handler(
 
 // Only invoked by an explicit --enable action. The normal read-only diagnostic never edits config.
 export async function approveServer(directory: string, name: string) {
+  return approveServers(directory, [name])
+}
+
+export async function approveServers(directory: string, names: readonly string[]) {
+  if (!names.length || names.some((name) => !name.trim()))
+    throw new Error("At least one nonempty MCP server name is required")
   const filepath = await resolveConfigPath(directory)
-  const current = await readFile(filepath, "utf8").catch((error: NodeJS.ErrnoException) => {
+  let current = await readFile(filepath, "utf8").catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return "{}"
     throw error
   })
-  const edits = modify(current, ["mcp", "overrides", name], true, {
-    formattingOptions: { insertSpaces: true, tabSize: 2 },
-  })
+  // jsonc-parser offsets refer to the current text: apply each edit before
+  // creating the next to preserve comments and unrelated configuration.
+  for (const name of new Set(names)) {
+    const edits = modify(current, ["mcp", "overrides", name], true, {
+      formattingOptions: { insertSpaces: true, tabSize: 2 },
+    })
+    current = applyEdits(current, edits)
+  }
   await mkdir(path.dirname(filepath), { recursive: true })
-  await writeFile(filepath, applyEdits(current, edits), "utf8")
+  await writeFile(filepath, current, "utf8")
   return filepath
 }
 
