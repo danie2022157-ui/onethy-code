@@ -15,6 +15,20 @@ describe("checkpoint restore safety", () => {
       head, expectedHead: head.stdout,
     })).toContain("local changes")
   })
+  test("ignores only Onethy's own untracked checkpoint registry", () => {
+    expect(checkpointRestoreBlocker({
+      confirm: true,
+      status: { code: 0, stdout: "?? .omnicode/checkpoints/index.json" },
+      head,
+      expectedHead: head.stdout,
+    })).toBeUndefined()
+    expect(checkpointRestoreBlocker({
+      confirm: true,
+      status: { code: 0, stdout: "?? .omnicode/memory-bank/preferences.md" },
+      head,
+      expectedHead: head.stdout,
+    })).toContain("local changes")
+  })
   test("rejects changed history or failed Git checks", () => {
     expect(checkpointRestoreBlocker({
       confirm: true, status: clean, head, expectedHead: "b".repeat(40),
