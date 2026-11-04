@@ -2,12 +2,14 @@ export * as ConfigMcpPlugin from "./mcp.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
 import { Document, type Entry } from "@opencode/schema/config"
+import path from "node:path"
 import type { ServerConfig } from "@opencode/schema/mcp"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Effect, Stream } from "effect"
 import { parse as parseJsonc, type ParseError } from "jsonc-parser"
 import { Config } from "../../config.js"
 import { Mcp } from "../../mcp/index.js"
+import { Location } from "../../location.js"
 
 export const Plugin = define({
   id: "opencode.config.mcp",
@@ -21,6 +23,7 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
 ) {
   const config = yield* Config.Service
   const mcp = yield* Mcp.Service
+  const location = yield* Location.Service
   const fsOpt = yield* Effect.serviceOption(FSUtil.Service)
   const loaded = { entries: [] as Entry[], directoryServers: new Map<string, ServerConfig>() }
 
@@ -29,11 +32,13 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
     if (process.env.OMNICODE_ACTIVE !== "1" || fsOpt._tag === "None") return found
     const fs = fsOpt.value
     const roots = config.compatibility ? yield* config.compatibility() : { claude: [], agents: [] }
-    const directories = [
+    const directories = [...new Set([
+      location.project.directory,
+      location.directory,
       ...entries.flatMap((entry) => (entry.type === "directory" ? [entry.path] : [])),
       ...roots.claude,
       ...roots.agents,
-    ]
+    ])]
     const files = new Set<string>()
     for (const directory of directories) {
       const scanned = yield* fs
@@ -50,7 +55,7 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
         ".agents/mcp.json", ".agents/mcp.jsonc",
       ]
       for (const relative of explicit) {
-        const pathname = directory + "/" + relative
+        const pathname = path.join(directory, relative)
         if (yield* fs.isFile(pathname).pipe(Effect.orElseSucceed(() => false))) files.add(pathname)
       }
     }
