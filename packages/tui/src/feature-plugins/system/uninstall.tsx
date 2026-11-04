@@ -78,27 +78,27 @@ export function uninstallWorkerCommand(pid: number, checkout: string, launcher: 
     "  $deadline = (Get-Date).AddSeconds(60)",
     ...pids.map((value) => [
       "  while (Get-Process -Id " + value + " -ErrorAction SilentlyContinue) {",
-      "    if ((Get-Date) -gt $deadline) { throw 'Tempo limite aguardando encerramento do OnethyCode.' }",
+      "    if ((Get-Date) -gt $deadline) { throw 'Timeout waiting for OnethyCode to exit.' }",
       "    Start-Sleep -Milliseconds 250",
       "  }",
     ]).flat(),
     "  Start-Sleep -Milliseconds 500",
-    "  Write-Host 'Removendo a instalacao e os dados do OnethyCode...' -ForegroundColor Yellow",
+    "  Write-Host 'Removing OnethyCode installation and data...' -ForegroundColor Yellow",
     "  & " + powershellLiteral(launcher) + " unistall --purge --force --defer-launchers",
-    "  if ($LASTEXITCODE -ne 0) { throw ('Desinstalacao do aplicativo falhou com codigo ' + $LASTEXITCODE) }",
+    "  if ($LASTEXITCODE -ne 0) { throw ('Application uninstall failed with code ' + $LASTEXITCODE) }",
     "  $checkout = " + source,
-    "  if (-not (Test-Path -LiteralPath $checkout -PathType Container)) { throw 'Pasta do codigo-fonte nao encontrada.' }",
+    "  if (-not (Test-Path -LiteralPath $checkout -PathType Container)) { throw 'Source code folder not found.' }",
     "  $info = Get-Item -LiteralPath $checkout -Force",
-    "  if ($info.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { throw 'Recusado: pasta vinculada por symlink/junction.' }",
-    "  if (-not (Test-Path -LiteralPath (Join-Path $checkout 'bin\\onethy.js') -PathType Leaf) -or -not (Test-Path -LiteralPath (Join-Path $checkout 'install.ps1') -PathType Leaf)) { throw 'A pasta nao parece ser um checkout OnethyCode.' }",
+    "  if ($info.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { throw 'Declined: folder linked by symlink/junction.' }",
+    "  if (-not (Test-Path -LiteralPath (Join-Path $checkout 'bin\\onethy.js') -PathType Leaf) -or -not (Test-Path -LiteralPath (Join-Path $checkout 'install.ps1') -PathType Leaf)) { throw 'The folder does not appear to be an OnethyCode checkout.' }",
     // The CLI has exited; its .cmd/.ps1 launcher is no longer in use.
     "  $launcherDirectory = Split-Path -Parent " + powershellLiteral(launcher),
     "  $configFile = Join-Path $launcherDirectory 'onethy-config.json'",
     "  $scriptFile = Join-Path $launcherDirectory 'onethy.ps1'",
     "  $config = Get-Content -LiteralPath $configFile -Raw -ErrorAction Stop | ConvertFrom-Json",
-    "  if ([string]$config.checkout -ine $checkout) { throw 'O instalador registrado pertence a outra pasta.' }",
+    "  if ([string]$config.checkout -ine $checkout) { throw 'The registered installer belongs to another folder.' }",
     "  $script = Get-Content -LiteralPath $scriptFile -Raw -ErrorAction Stop",
-    "  if (-not $script.Contains('onethy-config.json') -or -not $script.Contains('bin\\onethy.js')) { throw 'Instalador do Windows nao reconhecido.' }",
+    "  if (-not $script.Contains('onethy-config.json') -or -not $script.Contains('bin\\onethy.js')) { throw 'Unrecognized Windows installer.' }",
     "  $unknownLaunchers = @()",
     "  foreach ($name in @('onethy.cmd', 'onethy-code.cmd', 'omni.cmd', 'omnicode.cmd')) {",
     "    $file = Join-Path $launcherDirectory $name",
@@ -110,20 +110,20 @@ export function uninstallWorkerCommand(pid: number, checkout: string, launcher: 
     "  }",
     "  Remove-Item -LiteralPath $scriptFile -Force -ErrorAction Stop",
     "  Remove-Item -LiteralPath $configFile -Force -ErrorAction Stop",
-    "  Write-Host ('Excluindo codigo-fonte: ' + $checkout) -ForegroundColor Yellow",
+    "  Write-Host ('Deleting source code: ' + $checkout) -ForegroundColor Yellow",
     "  $deleted = $false",
     "  foreach ($attempt in 1..20) {",
     "    try { Remove-Item -LiteralPath $checkout -Recurse -Force -ErrorAction Stop; $deleted = $true; break }",
     "    catch { if ($attempt -eq 20) { throw }; Start-Sleep -Milliseconds 300 }",
     "  }",
-    "  if (-not $deleted -or (Test-Path -LiteralPath $checkout)) { throw 'Nao foi possivel remover a pasta de codigo-fonte.' }",
-    "  if ($unknownLaunchers.Count -gt 0) { throw ('Alguns atalhos nao foram removidos por nao corresponderem ao OnethyCode: ' + ($unknownLaunchers -join ', ')) }",
+    "  if (-not $deleted -or (Test-Path -LiteralPath $checkout)) { throw 'Could not remove the source code folder.' }",
+    "  if ($unknownLaunchers.Count -gt 0) { throw ('Some shortcuts were not removed because they do not match OnethyCode: ' + ($unknownLaunchers -join ', ')) }",
     "  $status = 0",
-    "  Write-Host 'OnethyCode removido completamente deste computador.' -ForegroundColor Green",
+    "  Write-Host 'OnethyCode completely removed from this computer.' -ForegroundColor Green",
     "} catch {",
-    "  Write-Host ('Desinstalacao incompleta: ' + $_.Exception.Message) -ForegroundColor Red",
+    "  Write-Host ('Incomplete uninstall: ' + $_.Exception.Message) -ForegroundColor Red",
     "}",
-    "Read-Host 'Pressione Enter para fechar'",
+    "Read-Host 'Press Enter to close'",
   ].join("\n")
 }
 
@@ -139,20 +139,20 @@ export default Plugin.define({
           mode: "global",
           commands: [{
             id: "system.unistall",
-            title: "Desinstalar OnethyCode completamente",
-            description: "Executar a remocao da aplicacao e de seus dados apos confirmacao",
+            title: "Uninstall OnethyCode completely",
+            description: "Execute the removal of the application and its data after confirmation",
             group: "System",
             slash: { name: "unistall", aliases: ["uninstall"] },
             palette: true,
             async run() {
               if (process.env.ONETHY_ACTIVE !== "1" && process.env.OMNICODE_ACTIVE !== "1") {
-                toast.show({ message: "Disponivel somente no OnethyCode.", variant: "warning" })
+                toast.show({ message: "Available only in OnethyCode.", variant: "warning" })
                 return
               }
               if (process.platform !== "win32") {
                 await context.ui.dialog.alert({
-                  title: "Desinstalacao completa",
-                  message: "A execucao direta de /unistall ainda requer Windows. Use onethy unistall --purge em outro terminal.",
+                  title: "Complete uninstallation",
+                  message: "Direct execution of /uninstall still requires Windows. Use onethy uninstall --purge in another terminal.",
                 })
                 return
               }
@@ -160,20 +160,20 @@ export default Plugin.define({
               const launcher = checkout ? onethyInstalledLauncher(checkout) : undefined
               if (!checkout || !launcher) {
                 await context.ui.dialog.alert({
-                  title: "Desinstalacao nao iniciada",
-                  message: "Nao foi possivel verificar o codigo-fonte e o instalador global do OnethyCode. Nenhum arquivo foi removido. Reinstale com install.ps1 ou execute a limpeza manual com verificacao dos caminhos.",
+                  title: "Uninstallation not started",
+                  message: "Could not verify the source code and global installer of OnethyCode. No files were removed. Reinstall with install.ps1 or perform manual cleanup verifying paths.",
                 })
                 return
               }
               const confirmed = await context.ui.dialog.confirm({
-                title: "Excluir TODO o OnethyCode?",
+                title: "Delete ALL of OnethyCode?",
                 message: [
-                  "Essa acao remove permanentemente o programa, os comandos do Windows, configuracoes, sessoes, memórias locais, credenciais, cache e o codigo-fonte:",
+                  "This action permanently removes the program, Windows commands, settings, sessions, local memories, credentials, cache, and source code:",
                   checkout,
-                  "Arquivos e alteracoes locais nessa pasta serao perdidos. Projetos em outras pastas nao serao apagados.",
-                  "O OnethyCode sera encerrado para executar a limpeza em outra janela.",
+                  "Files and local changes in this folder will be lost. Projects in other folders will not be deleted.",
+                  "OnethyCode will be closed to execute the cleanup in another window.",
                 ].join("\n"),
-                label: { confirm: "Excluir tudo", cancel: "Cancelar" },
+                label: { confirm: "Delete everything", cancel: "Cancel" },
               })
               if (!confirmed) return
               try {
