@@ -265,6 +265,16 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
             ),
           },
         }),
+        Spec.make("repair", {
+          description: "Testar e reconectar MCPs com falha; use --all para tentar também os desativados",
+          globalFlags: ServerFlags,
+          params: {
+            all: Flag.Boolean("all").pipe(
+              Flag.withDescription("Tentar conectar também MCPs desativados (somente nesta sessão)"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
         Spec.make("auth", {
           description: "Authenticate with an OAuth-capable remote MCP server",
           globalFlags: ServerFlags,
