@@ -13,6 +13,18 @@ import { OmniSession } from "../omni-session.js"
 import PROMPT_INITIALIZE from "./command/initialize.txt"
 import PROMPT_REVIEW from "./command/review.txt"
 
+export function missionControlInstructions(missionID: string) {
+  return [
+    `Mission ID: ${missionID}`,
+    "Use the omni_mission tool to read 'status' then 'claim' the next runnable task/stage.",
+    "A claim means reserved, NOT completed. Actually delegate/run the assigned agent through available tools.",
+    "Only call 'complete' for a running task after genuine, verified work with a non-empty result.",
+    "Call 'fail' with the real blocker if an agent cannot run or the work fails; do not invent success.",
+    "On failure, report the blocker and ask whether to retry. Respect stage dependencies.",
+    "There is no autonomous persistent background worker; report unexecuted stages honestly.",
+  ].join("\\n")
+}
+
 export const Plugin = define({
   id: "opencode.command",
   effect: Effect.fn(function* (ctx) {
@@ -58,7 +70,7 @@ export const Plugin = define({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  `You are the OmniCode Multi-Agent Orchestrator (Mission Session: ${missionSessionId}).\nSubtasks registered on OmniBus:\n${taskSummary}\n\nCoordinate specialists (@planner, @architect, @coder, @reviewer, @explore) to achieve this goal:\n\n$ARGUMENTS`,
+                  `You are the OmniCode Multi-Agent Orchestrator (Mission Session: ${missionSessionId}).\n${missionControlInstructions(missionID)}\nSubtasks registered on OmniBus:\n${taskSummary}\n\nCoordinate specialists (@planner, @architect, @coder, @reviewer, @explore) to achieve this goal:\n\n$ARGUMENTS`,
                   goal,
                 ),
                 delivery: input.delivery,
@@ -71,6 +83,17 @@ export const Plugin = define({
           execute: executeOmni,
         })
         editor.add({ name: "orchestrate", description: "Deprecated alias for /omni", execute: executeOmni })
+        editor.add({
+          name: "mission",
+          description: "Inspect a saved Onethy mission and its agent task statuses",
+          execute: (input) => ctx.session.prompt({
+            ...input.prompt,
+            sessionID: input.sessionID,
+            text: `Use omni_mission action='status' for mission ID: ${input.prompt.text.trim()}. Show pending/running/completed/failed tasks. Do not mutate the mission unless explicitly asked.`,
+            delivery: input.delivery,
+          }).pipe(Effect.asVoid),
+        })
+
 
         editor.add({
           name: "memory-note",
@@ -115,7 +138,7 @@ export const Plugin = define({
               ...input.prompt,
               sessionID: input.sessionID,
               text: append(
-                `⚡ [ULTRAWORK MODE ACTIVE — Session: ${missionSessionId}]\nPlan persisted at: ${planPath}\n\nGenerated subtasks:\n${taskSummary}\n\nULTRAWORK DIRECTIVES:\n1. Launch @explore and @librarian in parallel (background=true) when applicable.\n2. Create and maintain the Todo checklist.\n3. Delegate implementation to @coder with concise Boomerang responses.\n4. Apply RALPH LOOP ENFORCER: run @reviewer + typecheck/tests and DO NOT stop until 100% of items are verified.\n\nGoal:\n$ARGUMENTS`,
+                `⚡ [ULTRAWORK MODE ACTIVE — Session: ${missionSessionId}]\n${missionControlInstructions(missionID)}\nPlan persisted at: ${planPath}\n\nGenerated subtasks:\n${taskSummary}\n\nULTRAWORK DIRECTIVES:\n1. Launch @explore and @librarian in parallel (background=true) when applicable.\n2. Create and maintain the Todo checklist.\n3. Delegate implementation to @coder with concise Boomerang responses.\n4. Apply RALPH LOOP ENFORCER: run @reviewer + typecheck/tests and DO NOT stop until 100% of items are verified.\n\nGoal:\n$ARGUMENTS`,
                 goal,
               ),
               delivery: input.delivery,
@@ -358,7 +381,7 @@ export const Plugin = define({
                 ...input.prompt,
                 sessionID: input.sessionID,
                 text: append(
-                  "🎯 [FULL TEAM PIPELINE — 4 AUTONOMOUS PHASES]\nStarting execution with multidisciplinary specialist team:\n1. @planner: Formal requirements specification, acceptance criteria, and scope.\n2. @architect: Interface design, schemas, type contracts, and module boundaries.\n3. @coder: Atomic implementation of modules and test suites.\n4. @reviewer: Security audit, git diff review, and 100% green tests verification (Ralph Loop).\n\nMission goal:\n$ARGUMENTS",
+                  `🎯 [TEAM PIPELINE — CONTROLLED EXECUTION]\n${missionControlInstructions(missionID)}\nStarting execution with multidisciplinary specialist team:\n1. @planner: Formal requirements specification, acceptance criteria, and scope.\n2. @architect: Interface design, schemas, type contracts, and module boundaries.\n3. @coder: Atomic implementation of modules and test suites.\n4. @reviewer: Security audit, git diff review, and report test results accurately.\n\nMission goal:\n$ARGUMENTS`,
                   input.prompt.text,
                 ),
                 delivery: input.delivery,
