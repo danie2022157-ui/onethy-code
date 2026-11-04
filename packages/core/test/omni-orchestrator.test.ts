@@ -102,16 +102,55 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       expect(yield* orchestrator.getActiveTasks()).toHaveLength(0)
       tasks[0].status = "failed"
       expect((yield* orchestrator.getActiveTasks("mission-auth"))[0].status).toBe("pending")
+      const claimed = yield* orchestrator.claimReadyTasks("mission-auth")
+      expect(claimed.map((item) => item.id)).toEqual([tasks[0].id])
       const completed = yield* orchestrator.executeTask("mission-auth", tasks[0].id, "Rotas identificadas com sucesso")
       expect(completed.status).toBe("completed")
       expect(completed.result).toBe("Rotas identificadas com sucesso")
-      const statusMessage = (yield* bus.list()).find((message) => message.type === "status")
+      const statusMessage = (yield* bus.list()).find((message) => message.type === "status" && message.payload.status === "completed")
       expect(statusMessage?.payload).toMatchObject({ missionID: "mission-auth", status: "completed" })
       const crossMission = yield* Effect.exit(orchestrator.executeTask("mission-other", tasks[1].id, "must not complete"))
       expect(crossMission._tag).toBe("Failure")
       expect((yield* orchestrator.getActiveTasks("mission-auth"))[1].status).toBe("pending")
       completed.status = "failed"
       expect((yield* orchestrator.getActiveTasks("mission-auth"))[0].status).toBe("completed")
+    }),
+  )
+
+  effect("supervisor refuses invalid transitions and protects mission history", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* OmniOrchestrator.Service
+      const tasks = yield* orchestrator.planTeamPipeline("Implement a safe checkout", "mission-state-integrity")
+      const neverStarted = yield* Effect.exit(orchestrator.executeTask(
+        "mission-state-integrity", tasks[0].id, "claimed done without running",
+      ))
+      expect(neverStarted._tag).toBe("Failure")
+      const prematureFail = yield* Effect.exit(orchestrator.failTask(
+        "mission-state-integrity", tasks[0].id, "not started",
+      ))
+      expect(prematureFail._tag).toBe("Failure")
+      expect((yield* orchestrator.getActiveTasks("mission-state-integrity"))[0].status).toBe("pending")
+
+      const claimed = yield* orchestrator.claimReadyTasks("mission-state-integrity")
+      expect(claimed.map((task) => task.id)).toEqual([tasks[0].id])
+      const emptyResult = yield* Effect.exit(orchestrator.executeTask("mission-state-integrity", tasks[0].id, "  "))
+      expect(emptyResult._tag).toBe("Failure")
+
+      const completed = yield* orchestrator.executeTask("mission-state-integrity", tasks[0].id, "Validated requirements")
+      expect(completed.status).toBe("completed")
+      expect((yield* Effect.exit(orchestrator.executeTask("mission-state-integrity", tasks[0].id, "mark twice")))._tag).toBe("Failure")
+      expect((yield* Effect.exit(orchestrator.failTask("mission-state-integrity", tasks[0].id, "rewrite history")))._tag).toBe("Failure")
+      expect((yield* Effect.exit(orchestrator.planTeamPipeline("new goal", "mission-state-integrity")))._tag).toBe("Failure")
+      expect((yield* orchestrator.getActiveTasks("mission-state-integrity"))[0].result).toBe("Validated requirements")
+      expect((yield* orchestrator.claimReadyTasks("mission-state-integrity")).map((task) => task.id)).toEqual([tasks[1].id])
+    }),
+  )
+
+  effect("rejects empty goals and empty model arenas", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* OmniOrchestrator.Service
+      expect((yield* Effect.exit(orchestrator.planMission("   ", "empty-goal")))._tag).toBe("Failure")
+      expect((yield* Effect.exit(orchestrator.planArena("problem", [], "empty-arena")))._tag).toBe("Failure")
     }),
   )
 
