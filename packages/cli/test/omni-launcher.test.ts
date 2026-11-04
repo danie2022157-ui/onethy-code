@@ -92,3 +92,25 @@ test("isolates inherited OpenCode settings and preserves provider credentials", 
   expect(env.OPENAI_API_KEY).toBe("test-key")
   expect(env.PATH?.split(path.delimiter)[0]).toBe("C:\\tools")
 })
+
+test("disables OpenTUI graphics queries on Windows consoles by default", () => {
+  const env = makeOmniEnvironment({ PATH: "C:\\tools" }, "C:\\tools\\bun.exe", "win32")
+  expect(env.OPENTUI_GRAPHICS).toBe("false")
+  expect(env.OPENTUI_IMAGE_PROTOCOL).toBe("blocks")
+})
+
+test("respects explicit OpenTUI graphics settings on Windows", () => {
+  const env = makeOmniEnvironment(
+    { PATH: "C:\\tools", OPENTUI_GRAPHICS: "1", OPENTUI_IMAGE_PROTOCOL: "kitty" },
+    "C:\\tools\\bun.exe",
+    "win32",
+  )
+  expect(env.OPENTUI_GRAPHICS).toBe("1")
+  expect(env.OPENTUI_IMAGE_PROTOCOL).toBe("kitty")
+})
+
+test("does not alter OpenTUI settings on non-Windows systems", () => {
+  const env = makeOmniEnvironment({ PATH: "/usr/bin" }, "/usr/bin/bun", "linux")
+  expect(env.OPENTUI_GRAPHICS).toBeUndefined()
+  expect(env.OPENTUI_IMAGE_PROTOCOL).toBeUndefined()
+})
