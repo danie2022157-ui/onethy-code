@@ -195,7 +195,7 @@ export interface DiffReview {
 /** Only executes read-only git subcommands with an argv array, never via a shell. */
 export async function reviewDiff(root: string): Promise<DiffReview> {
   const cwd = path.resolve(root)
-  const options = { cwd, windowsHide: true, timeout: 12000, maxBuffer: 2 * 1024 * 1024 }
+  const options = { cwd, encoding: "utf8" as const, windowsHide: true, timeout: 12000, maxBuffer: 2 * 1024 * 1024 }
   const [status, unstaged, staged] = await Promise.all([
     git("git", ["status", "--short", "--untracked-files=normal"], options),
     git("git", ["diff", "--no-ext-diff", "--no-color", "--"], options),
