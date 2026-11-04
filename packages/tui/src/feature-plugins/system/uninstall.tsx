@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process"
-import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs"
+import { copyFileSync, lstatSync, mkdtempSync, realpathSync, statSync } from "node:fs"
 import path from "node:path"
+import os from "node:os"
 import { Plugin } from "@opencode/plugin/tui"
 import { useExit } from "../../context/exit"
 import { useToast } from "../../ui/toast"
@@ -36,95 +37,20 @@ export function onethySourceCheckout(env: NodeJS.ProcessEnv = process.env, platf
   return root
 }
 
-/**
- * The Windows installer owns its launcher only when its config points at
- * this verified checkout. Never execute another application's onethy.cmd.
- */
-export function onethyInstalledLauncher(checkout: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
-  if (!env.LOCALAPPDATA || !path.isAbsolute(env.LOCALAPPDATA)) return
-  const directory = path.join(env.LOCALAPPDATA, "Microsoft", "WindowsApps")
-  const file = path.join(directory, "onethy.cmd")
-  try {
-    const info = JSON.parse(readFileSync(path.join(directory, "onethy-config.json"), "utf8"))
-    if (typeof info?.checkout !== "string") return
-    if (path.normalize(info.checkout).toLowerCase() !== path.normalize(checkout).toLowerCase()) return
-    const launcher = readFileSync(file, "utf8")
-    if (!launcher.includes('"%~dp0onethy.ps1" %*')) return
-    const script = readFileSync(path.join(directory, "onethy.ps1"), "utf8")
-    if (!script.includes("onethy-config.json") || !script.includes("bin\\onethy.js")) return
-    return file
-  } catch {
-    return
-  }
-}
-
-function powershellLiteral(value: string): string {
-  return "'" + value.replaceAll("'", "''") + "'"
-}
-
-/** A detached, UTF-16LE encoded PowerShell command, independent of checkout files.
- * The command requires the explicit, verified checkout path: a partial purge
- * must never be reported as a complete uninstall. */
-export function uninstallWorkerCommand(pid: number, checkout: string, launcher: string, parentPid?: number): string {
+/** Use a copy outside the source checkout, otherwise an uninstaller can
+ * delete the script it is still executing. The PowerShell script performs
+ * independent verification and does NOT depend on a working TUI/CLI. */
+export function uninstallWorkerArgs(script: string, checkout: string, pid: number, parentPid: number) {
+  if (!path.isAbsolute(script) || !path.isAbsolute(checkout)) throw new Error("Invalid OnethyCode paths")
   if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error("Invalid OnethyCode PID")
-  if (!checkout || !path.isAbsolute(checkout) || !launcher || !path.isAbsolute(launcher))
-    throw new Error("Verified OnethyCode source and launcher paths are required")
-  const pids = [...new Set([pid, parentPid].filter((value): value is number => typeof value === "number" && Number.isSafeInteger(value) && value > 0))]
-  const source = powershellLiteral(checkout)
   return [
-    "$ErrorActionPreference = 'Stop'",
-    "$status = 1",
-    "try {",
-    "  $deadline = (Get-Date).AddSeconds(60)",
-    ...pids.map((value) => [
-      "  while (Get-Process -Id " + value + " -ErrorAction SilentlyContinue) {",
-      "    if ((Get-Date) -gt $deadline) { throw 'Tempo limite aguardando encerramento do OnethyCode.' }",
-      "    Start-Sleep -Milliseconds 250",
-      "  }",
-    ]).flat(),
-    "  Start-Sleep -Milliseconds 500",
-    "  Write-Host 'Removendo a instalacao e os dados do OnethyCode...' -ForegroundColor Yellow",
-    "  & " + powershellLiteral(launcher) + " unistall --purge --force --defer-launchers",
-    "  if ($LASTEXITCODE -ne 0) { throw ('Desinstalacao do aplicativo falhou com codigo ' + $LASTEXITCODE) }",
-    "  $checkout = " + source,
-    "  if (-not (Test-Path -LiteralPath $checkout -PathType Container)) { throw 'Pasta do codigo-fonte nao encontrada.' }",
-    "  $info = Get-Item -LiteralPath $checkout -Force",
-    "  if ($info.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { throw 'Recusado: pasta vinculada por symlink/junction.' }",
-    "  if (-not (Test-Path -LiteralPath (Join-Path $checkout 'bin\\onethy.js') -PathType Leaf) -or -not (Test-Path -LiteralPath (Join-Path $checkout 'install.ps1') -PathType Leaf)) { throw 'A pasta nao parece ser um checkout OnethyCode.' }",
-    // The CLI has exited; its .cmd/.ps1 launcher is no longer in use.
-    "  $launcherDirectory = Split-Path -Parent " + powershellLiteral(launcher),
-    "  $configFile = Join-Path $launcherDirectory 'onethy-config.json'",
-    "  $scriptFile = Join-Path $launcherDirectory 'onethy.ps1'",
-    "  $config = Get-Content -LiteralPath $configFile -Raw -ErrorAction Stop | ConvertFrom-Json",
-    "  if ([string]$config.checkout -ine $checkout) { throw 'O instalador registrado pertence a outra pasta.' }",
-    "  $script = Get-Content -LiteralPath $scriptFile -Raw -ErrorAction Stop",
-    "  if (-not $script.Contains('onethy-config.json') -or -not $script.Contains('bin\\onethy.js')) { throw 'Instalador do Windows nao reconhecido.' }",
-    "  $unknownLaunchers = @()",
-    "  foreach ($name in @('onethy.cmd', 'onethy-code.cmd', 'omni.cmd', 'omnicode.cmd')) {",
-    "    $file = Join-Path $launcherDirectory $name",
-    "    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { continue }",
-    "    $body = Get-Content -LiteralPath $file -Raw -ErrorAction Stop",
-    "    if ($body.Contains('\"%~dp0onethy.ps1\" %*') -and $body.Contains('WindowsPowerShell')) {",
-    "      Remove-Item -LiteralPath $file -Force -ErrorAction Stop",
-    "    } else { $unknownLaunchers += $file }",
-    "  }",
-    "  Remove-Item -LiteralPath $scriptFile -Force -ErrorAction Stop",
-    "  Remove-Item -LiteralPath $configFile -Force -ErrorAction Stop",
-    "  Write-Host ('Excluindo codigo-fonte: ' + $checkout) -ForegroundColor Yellow",
-    "  $deleted = $false",
-    "  foreach ($attempt in 1..20) {",
-    "    try { Remove-Item -LiteralPath $checkout -Recurse -Force -ErrorAction Stop; $deleted = $true; break }",
-    "    catch { if ($attempt -eq 20) { throw }; Start-Sleep -Milliseconds 300 }",
-    "  }",
-    "  if (-not $deleted -or (Test-Path -LiteralPath $checkout)) { throw 'Nao foi possivel remover a pasta de codigo-fonte.' }",
-    "  if ($unknownLaunchers.Count -gt 0) { throw ('Alguns atalhos nao foram removidos por nao corresponderem ao OnethyCode: ' + ($unknownLaunchers -join ', ')) }",
-    "  $status = 0",
-    "  Write-Host 'OnethyCode removido completamente deste computador.' -ForegroundColor Green",
-    "} catch {",
-    "  Write-Host ('Desinstalacao incompleta: ' + $_.Exception.Message) -ForegroundColor Red",
-    "}",
-    "Read-Host 'Pressione Enter para fechar'",
-  ].join("\n")
+    "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+    "-File", script,
+    "-Checkout", checkout,
+    "-ChildPid", String(pid),
+    "-ParentPid", String(parentPid),
+    "-Yes", "-KeepWindow",
+  ]
 }
 
 export default Plugin.define({
@@ -157,11 +83,10 @@ export default Plugin.define({
                 return
               }
               const checkout = onethySourceCheckout()
-              const launcher = checkout ? onethyInstalledLauncher(checkout) : undefined
-              if (!checkout || !launcher) {
+              if (!checkout) {
                 await context.ui.dialog.alert({
                   title: "Desinstalacao nao iniciada",
-                  message: "Nao foi possivel verificar o codigo-fonte e o instalador global do OnethyCode. Nenhum arquivo foi removido. Reinstale com install.ps1 ou execute a limpeza manual com verificacao dos caminhos.",
+                  message: "Nao foi possivel identificar com seguranca a pasta OnethyCode. Nenhum arquivo foi apagado. Execute o script uninstall.ps1 em uma janela do PowerShell, informando a pasta de instalacao.",
                 })
                 return
               }
@@ -177,10 +102,14 @@ export default Plugin.define({
               })
               if (!confirmed) return
               try {
-                const script = uninstallWorkerCommand(process.pid, checkout, launcher, process.ppid)
-                const worker = spawn("powershell.exe", [
-                  "-NoProfile", "-NoLogo", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64"),
-                ], { detached: true, stdio: "inherit", windowsHide: false, cwd: process.env.USERPROFILE || process.cwd() })
+                const source = path.join(checkout, "uninstall.ps1")
+                if (!statSync(source).isFile()) throw new Error("uninstall.ps1 nao encontrado. Atualize o OnethyCode antes de desinstalar.")
+                const stage = mkdtempSync(path.join(os.tmpdir(), "onethy-uninstall-"))
+                const script = path.join(stage, "uninstall.ps1")
+                copyFileSync(source, script)
+                const worker = spawn("powershell.exe", uninstallWorkerArgs(script, checkout, process.pid, process.ppid), {
+                  detached: true, stdio: "inherit", windowsHide: false, cwd: process.env.USERPROFILE || os.homedir(),
+                })
                 // Detect synchronous errors before exiting and don't keep the UI
                 // process alive only to track the separate uninstall console.
                 await new Promise<void>((resolve, reject) => {
