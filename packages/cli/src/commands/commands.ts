@@ -83,31 +83,6 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         ),
       },
     }),
-    Spec.make("uninstall", {
-      description: "Desinstalar o OnethyCode; use --purge para remover também os dados da aplicação",
-      aliases: ["unistall"],
-      params: {
-        purge: Flag.Boolean("purge").pipe(
-          Flag.withDescription("Remover também sessões, credenciais, configurações e estado do OnethyCode"),
-          Flag.withDefault(false),
-        ),
-        // Only for the detached /unistall worker: the running Windows launcher
-        // cannot safely delete itself while its .cmd/.ps1 stack is still active.
-        deferLaunchers: Flag.Boolean("defer-launchers").pipe(
-          Flag.withDefault(false),
-          Flag.withHidden,
-        ),
-        dryRun: Flag.Boolean("dry-run").pipe(
-          Flag.withDescription("Show what would be removed without removing"),
-          Flag.withDefault(false),
-        ),
-        force: Flag.Boolean("force").pipe(
-          Flag.withAlias("f"),
-          Flag.withDescription("Skip confirmation prompts"),
-          Flag.withDefault(false),
-        ),
-      },
-    }),
     Spec.make("acp", {
       description: "Iniciar um servidor Agent Client Protocol",
       params: {
