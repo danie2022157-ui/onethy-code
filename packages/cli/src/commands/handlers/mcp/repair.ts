@@ -1,5 +1,5 @@
 import { EOL } from "node:os"
-import { Effect } from "effect"
+import { Effect, Either } from "effect"
 import { OpenCode, type McpServer } from "@opencode/client"
 import { Service } from "@opencode/client/effect/service"
 import { Commands } from "../../commands"
@@ -41,11 +41,25 @@ export default Runtime.handler(
         continue
       }
       // Run sequentially to avoid a burst of package installs and OAuth requests.
-      try {
-        yield* Effect.promise(() => client.experimental.mcp.connect({ server: server.name, location }))
-        const fresh = (yield* Effect.promise(() => client.mcp.list({ location }))).data.find(
-          (entry) => entry.name === server.name,
-        )
+      const connected = yield* Effect.tryPromise({
+        try: () => client.experimental.mcp.connect({ server: server.name, location }),
+        catch: (cause) => cause instanceof Error ? cause : new Error(String(cause)),
+      }).pipe(Effect.either)
+      if (Either.isLeft(connected)) {
+        failed += 1
+        process.stdout.write(`✗ ${server.name}: ${connected.left.message}${EOL}`)
+        continue
+      }
+      const checked = yield* Effect.tryPromise({
+        try: () => client.mcp.list({ location }),
+        catch: (cause) => cause instanceof Error ? cause : new Error(String(cause)),
+      }).pipe(Effect.either)
+      if (Either.isLeft(checked)) {
+        failed += 1
+        process.stdout.write(`✗ ${server.name}: couldn't verify status: ${checked.left.message}${EOL}`)
+        continue
+      }
+      const fresh = checked.right.data.find((entry) => entry.name === server.name)
         if (fresh?.status.status === "connected") {
           recovered += 1
           process.stdout.write(`✓ ${server.name}: reconnected${EOL}`)
@@ -56,10 +70,6 @@ export default Runtime.handler(
             ? status.error : status?.status ?? "unknown"
           process.stdout.write(`✗ ${server.name}: ${details}${EOL}`)
         }
-      } catch (error) {
-        failed += 1
-        process.stdout.write(`✗ ${server.name}: ${error instanceof Error ? error.message : String(error)}${EOL}`)
-      }
     }
     process.stdout.write(`MCP repair complete: ${recovered} reconnected, ${failed} failed.${EOL}`)
     if (failed > 0) process.exitCode = 1
