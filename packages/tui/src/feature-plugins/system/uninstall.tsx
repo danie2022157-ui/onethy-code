@@ -52,7 +52,7 @@ export function uninstallWorkerCommand(pid: number, removeSource?: string): stri
     "if ($status -ne 0) { Write-Host 'A desinstalacao nao foi concluida. Verifique as mensagens acima.' -ForegroundColor Red }",
     "else { Write-Host 'Desinstalacao finalizada.' -ForegroundColor Green }",
     "Read-Host 'Pressione Enter para fechar'",
-  ].join("; ")
+  ].join("\n")
 }
 
 export default Plugin.define({
@@ -101,7 +101,7 @@ export default Plugin.define({
                       "Esta pasta sera apagada permanentemente, incluindo alteracoes locais nao enviadas ao GitHub:",
                       checkout,
                       "Confirme somente se nao precisa mais de nenhum arquivo dessa pasta.",
-                    ].join("\\n"),
+                    ].join("\n"),
                     label: { confirm: "Apagar codigo-fonte", cancel: "Preservar pasta" },
                   })
                 : false
