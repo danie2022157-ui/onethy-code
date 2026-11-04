@@ -262,6 +262,11 @@ describe("SubagentTool", () => {
             },
           })
           console.error('TRACE: spawned',result.metadata)
+          yield* Effect.sleep("500 millis")
+          const bg = yield* jobs.get(outputSessionID(result.metadata))
+          const pending = yield* jobs.pendingBackground
+          const childMessages = yield* sessions.messages({ sessionID: outputSessionID(result.metadata), limit: 10 })
+          console.error('TRACE: child state', { bg, pending: pending.length, msgs: childMessages.map((m) => m.type) })
           const marker = yield* Deferred.await(admitted)
           console.error('TRACE: notification emitted')
           yield* jobs.pendingBackground.pipe(Effect.repeat({ until: (pending) => pending.length === 0 }))
