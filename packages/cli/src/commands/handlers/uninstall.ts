@@ -19,6 +19,8 @@ export default Runtime.handler(
       return yield* Effect.fail(new Error("Purge is available only in the OnethyCode runtime."))
     const fs = yield* FileSystem.FileSystem
     const global = yield* Global.Service
+    if (input.purge && purgePaths(global).length === 0)
+      return yield* Effect.fail(new Error("Refusing purge: no safe Onethy-owned data directories were resolved."))
     const updater = yield* Updater.Service
     const method = yield* updater.method()
     const removal = method ? updater.removal(method) : undefined
