@@ -287,7 +287,7 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
           onTrigger: (option) => requestDelete(option.value),
         },
       ]}
-      footerHints={[{ title: "abrir / criar", label: "enter" }, { title: "excluir", label: "ctrl+d", side: "right" }]}
+      footerHints={[{ title: "abrir / criar", label: "enter" }]}
     />
   )
 }
