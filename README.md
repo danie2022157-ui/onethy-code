@@ -2,7 +2,7 @@
 
 # ⚡ OnethyCode
 
-### *The Autonomous Multi-Agent AI Coding Platform with Omni Fusion & Self-Healing*
+### *Open-source AI coding CLI with multi-model routing, specialized agents, and persistent memory*
 
 [![GitHub Stars](https://img.shields.io/github/stars/danie2022157-ui/onethy-code?style=for-the-badge&logo=github&color=FFD700)](https://github.com/danie2022157-ui/onethy-code/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
@@ -17,8 +17,12 @@
 </p>
 
 <p align="center">
-  <b>OnethyCode</b> turns your terminal into a collaborative AI engineering squad.<br />
-  Featuring <b>Omni Fusion</b> (dynamic multi-model auto-routing), <b>Autonomous Memory Bank</b>, <b>Self-Healing Test Loops</b>, and <b>430+ preloaded specialized agents</b>.
+  <b>OnethyCode</b> is an open-source, terminal-first AI coding environment built on OpenCode.<br />
+  Connect supported AI providers, explore models with <b>Omni Fusion</b>, coordinate specialized coding agents, and carry project and global memory across sessions.
+</p>
+
+<p align="center">
+  <b>Code with more choice and control.</b> Use MCP integrations, interactive terminal tools, and agent workflows for planning, implementation, testing, and review.
 </p>
 
 <p align="center">
@@ -62,7 +66,7 @@
 
 ## 🌟 Why OnethyCode?
 
-Most AI coding tools lock you into a single provider, suffer from context amnesia across terminal sessions, or hallucinate silently when a build fails. **OnethyCode is built from the ground up as an autonomous multi-agent platform designed to address these core problems**:
+**OnethyCode extends OpenCode** with multi-model workflows, memory management, and specialized agents. Its goal is to make AI-assisted software development more flexible and easier to manage from the terminal. Key areas of the project include:
 
 1. **Eliminate Rate-Limit & Quota Halts**: Omni Fusion dynamically routes requests across Gemini 3.8 Flash, Claude 3.7 Sonnet/Opus, and GPT models based on complexity and remaining quota. If one account exhausts quota, OnethyCode fails over automatically.
 2. **Never Re-explain Your Architecture**: The 4-layer Autonomous Memory Bank automatically documents your requirements, coding conventions, tech stack, and sprint context in `.onethy-code/memory-bank/`.
