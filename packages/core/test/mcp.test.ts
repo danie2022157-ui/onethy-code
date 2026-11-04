@@ -579,6 +579,21 @@ describe("MCP errors", () => {
 })
 
 describe("discovered MCP configuration", () => {
+  test("discovers VS Code JSONC MCP manifests with comments and trailing commas", () => {
+    const discovered = decodeDiscovered(`{
+      // VS Code stores MCP definitions as JSON with comments
+      "servers": {
+        "My Service": {
+          "command": "npx",
+          "args": ["-y", "example-mcp"],
+        },
+      },
+    }`)
+    expect(discovered.get("my-service")).toMatchObject({
+      type: "local", command: ["npx", "-y", "example-mcp"], disabled: true,
+    })
+  })
+
   test("discovered servers cannot enable themselves and retain literal environment references", () => {
     const discovered = decodeDiscovered(
       JSON.stringify({
