@@ -9,6 +9,7 @@ import { Skill } from "../../skill.js"
 import { Mcp } from "../../mcp/index.js"
 import { OmniBus } from "../../omni-bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
+import { Session } from "../../session.js"
 import { rankCatalog, reviewDiff, searchProjectHistory, searchWorkspace, type CatalogEntry } from "../../omni-intelligence.js"
 
 export const name = "omni_intelligence"
@@ -48,6 +49,20 @@ export const Plugin = {
     const mcp = yield* Mcp.Service
     const bus = yield* OmniBus.Service
     const orchestrator = yield* OmniOrchestrator.Service
+    const sessions = yield* Session.Service
+
+
+    /** Bounded and project-scoped: do not index tool results or system instructions. */
+    const sampledSessionTexts = Effect.fn("OmniIntelligence.sessions")(function* (limit: number) {
+      const page = yield* sessions.list({ project: location.project.id, limit: 30 })
+      const selected = page.data.slice(0, 30)
+      const rows = yield* Effect.forEach(selected, (session) =>
+        sessions.messages({ sessionID: session.id, limit, order: "desc" }).pipe(
+          Effect.map((messages) => ({ session, messages })),
+          Effect.catchAll(() => Effect.succeed({ session, messages: [] })),
+        ), { concurrency: 4 })
+      return rows
+    })
 
     yield* ctx.tool.transform((editor) => {
       if (process.env.OMNICODE_ACTIVE !== "1") return
@@ -82,9 +97,21 @@ export const Plugin = {
               try: () => searchProjectHistory(root, query, limit),
               catch: (error) => new ToolFailure({ message: "Project history search failed.", error }),
             })
-            summary = results.length
-              ? results.map((item) => item.name + "\n" + item.description).join("\n---\n")
-              : "No saved project sessions, plans, missions or memory notes matched the query."
+            const stored = yield* sampledSessionTexts(30)
+            const chats: CatalogEntry[] = stored.flatMap(({ session, messages }) =>
+              messages.flatMap((message) => {
+                const text = message.type === "user" ? message.text
+                  : message.type === "assistant"
+                    ? message.content.filter((part) => part.type === "text").map((part) => part.text).join("\n")
+                    : ""
+                return text && text.length <= 12000
+                  ? [{ category: "conversation", name: "Session " + session.id + " (" + session.title + ")", description: text.slice(0, 2500) }]
+                  : []
+              }))
+            const combined = rankCatalog([...results, ...chats], query, limit)
+            summary = combined.length
+              ? combined.map((item) => item.name + "\n" + item.description.slice(0, 900)).join("\n---\n")
+              : "No project sessions, conversations, plans, missions or memory notes matched the query."
           } else if (action === "tools") {
             const [builtin, skills, mcpTools] = yield* Effect.all([tool.list(), skill.list(), mcp.tools()], {
               concurrency: 3,
@@ -124,6 +151,14 @@ export const Plugin = {
             const tasks = input.missionID
               ? yield* orchestrator.getActiveTasks(input.missionID)
               : []
+            const stored = yield* sampledSessionTexts(50)
+            const assistants = stored.flatMap(({ messages }) => messages.filter((message) => message.type === "assistant"))
+            const costs = assistants.reduce((total, message) => total + (message.cost ?? 0), 0)
+            const tokens = assistants.reduce((total, message) =>
+              total + (message.tokens
+                ? message.tokens.input + message.tokens.output + message.tokens.reasoning +
+                  message.tokens.cache.read + message.tokens.cache.write
+                : 0), 0)
             summary = [
               "Agent bus: " + events.length + " events total; last " + last.length + " sampled.",
               "Plans: " + count("plan"),
@@ -133,7 +168,8 @@ export const Plugin = {
               "Artifacts: " + count("artifact"),
               "Mission " + (input.missionID || "(not selected)") + ": " +
                 tasks.map((task) => task.id + "=" + task.status).join(", "),
-              "Token/cost counters are provided by the existing session usage telemetry, not this agent event view.",
+              "Session sample: " + stored.length + " latest project sessions, up to 50 recent messages each.",
+              "Recorded usage in sample: " + tokens + " tokens, USD " + costs.toFixed(4) + " (provider-reported, not live billing).",
             ].join("\n")
           }
           return { output: { action, summary }, content: summary, metadata: { action } }
