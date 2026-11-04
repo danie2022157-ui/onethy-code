@@ -5,6 +5,7 @@ import { useRenderer } from "@opentui/solid"
 import { Global } from "@opencode/util/global"
 import {
   GLOBAL_TEMPLATES,
+  PROJECT_TEMPLATES,
   deleteMemoryFile,
   globalMemoryDirectory,
   globalMemoryFilename,
@@ -33,13 +34,6 @@ interface MemoryEntry {
   readonly exists: boolean
   readonly size: number
   readonly safe: boolean
-}
-
-const PROJECT_TEMPLATES: Record<string, string> = {
-  "active-context.md": "# Active Context\n\n## Foco atual\n\n## Próximas tarefas\n",
-  "project-brief.md": "# Project Brief\n\n## Objetivos\n\n## Escopo\n",
-  "system-patterns.md": "# System Patterns\n\n## Arquitetura\n\n## Convenções\n",
-  "tech-context.md": "# Tech Context\n\n## Stack\n\n## Comandos de desenvolvimento\n",
 }
 
 const PROJECT_NOTES = "# Memória durável do projeto\n\nDecisões técnicas importantes e conhecimento de longo prazo.\n"
