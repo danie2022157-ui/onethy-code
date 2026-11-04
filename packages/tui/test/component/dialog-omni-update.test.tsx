@@ -17,6 +17,7 @@ for (const scenario of ["available", "up-to-date", "network-error", "pull-error"
       if (command === "git pull --ff-only origin main" && code === 0) pulled = true
       const outputs: Record<string, string> = {
         "git branch --show-current": "main",
+        "git remote get-url origin": "https://github.com/danie2022157-ui/onethy-code.git",
         "git rev-parse --short HEAD": pulled ? "def456" : "abc123",
         "git log HEAD..origin/main --oneline -n 6":
           scenario === "available" || scenario === "pull-error" ? "def456 fix(tui): prevent updater crash" : "",

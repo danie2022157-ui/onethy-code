@@ -68,48 +68,48 @@
 
 **OnethyCode extends OpenCode** with multi-model workflows, memory management, and specialized agents. Its goal is to make AI-assisted software development more flexible and easier to manage from the terminal. Key areas of the project include:
 
-1. **Eliminate Rate-Limit & Quota Halts**: Omni Fusion dynamically routes requests across Gemini 3.8 Flash, Claude 3.7 Sonnet/Opus, and GPT models based on complexity and remaining quota. If one account exhausts quota, OnethyCode fails over automatically.
-2. **Never Re-explain Your Architecture**: The 4-layer Autonomous Memory Bank automatically documents your requirements, coding conventions, tech stack, and sprint context in `.onethy-code/memory-bank/`.
-3. **Verified Working Code**: The `/heal` loop detects test/build errors, diagnoses root causes, modifies source code, and re-runs the compiler until tests pass.
-4. **Fearless AI Edits**: Instant Git snapshots are created before major edits. Execute `/undo` at any point to restore your workspace to its exact prior state.
-5. **Lightning Performance**: Written in TypeScript and powered by Bun 1.4+, launching in milliseconds with low memory overhead.
+1. **Choose available models**: Omni Fusion ranks compatible models from providers you have configured, using catalog metadata.
+2. **Keep project context**: Store architecture and implementation notes in `.omnicode/memory-bank/`, with separate local global preferences.
+3. **Diagnose failures**: `/heal` runs checks and gives the coding agent actionable diagnostics. Fixes must be applied and verified by the agent.
+4. **Protect tracked edits**: `/checkpoint` saves a Git snapshot of tracked changes; use careful, confirmed restoration only on a clean working tree.
+5. **Terminal-first workflow**: Build on the OpenCode codebase with Bun, TypeScript and a specialized agent interface.
 
 ---
 
-## 📊 Feature Matrix
+## 📊 Current Feature Status
 
-| Capability | Vanilla OpenCode | Claude Code | Cursor IDE | Aider | ⚡ OnethyCode |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Multi-Model Dynamic Routing (Omni Fusion)** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (44+ Models)** |
-| **Model Whitelisting & Selection UI** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (`/fusion-models`)** |
-| **Automatic Memory Bank (Zero Prompting)** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (4-layer sync)** |
-| **Self-Healing Test/Build Loop** | ❌ | ❌ | ❌ | Basic | **✅ Yes (`/heal`)** |
-| **Time-Travel Checkpoints & Instant Undo** | ❌ | ❌ | ❌ | Git only | **✅ Yes (`/checkpoint`, `/undo`)** |
-| **Multi-Agent 4-Phase Squad Pipeline** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (`/team`)** |
-| **Preloaded Agents, Skills & Mods** | 2 Agents | 1 Agent | N/A | N/A | **✅ 430+ Agents, 1,000+ Skills** |
-| **Automated Dual-Stack OAuth Loopback** | ❌ | ❌ | N/A | N/A | **✅ 1-Click Browser Sync** |
-| **1-Command Terminal Installer** | ❌ | ❌ | ❌ | ❌ | **✅ Yes (`install.ps1`, `install.sh`)** |
+| Capability | Implemented today | Important limitation |
+| :--- | :--- | :--- |
+| Multi-model routing | Catalog-based model selection and TUI controls | Depends on connected providers and real model availability |
+| Memory Bank | Project memory and local cross-project global preferences | No cloud sync, semantic retrieval, or automatic conversation archive |
+| Specialist agents | Planner, coder, reviewer and other agent prompts | Missions are planned/persisted, not autonomously dispatched by a durable worker queue |
+| Self-healing | Test execution and failure diagnosis via `/heal` | Code editing/retries require subsequent agent actions; no guaranteed repair |
+| Checkpoints | Snapshot tracked Git changes and inspect history | Untracked files are excluded; restore requires an explicit confirmation and clean tree |
+| Projects | `/projects`: create, register, open, rename label, hide | Removing from list never deletes source files |
+| Updates | Git-based checks and manual `/update` for official checkout | No independent signed release/update channel yet |
 
 ---
 
 ## 🚀 Quickstart
 
 ### 🪟 Windows (PowerShell)
-Open PowerShell (as normal user or Administrator) and run:
-```powershell
-irm https://raw.githubusercontent.com/danie2022157-ui/onethy-code/main/install.ps1 | iex
-```
-*Or clone and install locally:*
+Requires Git, Node.js 20+, and Bun. Clone the repository, install the pinned dependencies and run the installer **from the checkout**:
 ```powershell
 git clone https://github.com/danie2022157-ui/onethy-code.git
 cd onethy-code
+bun install --frozen-lockfile
 .\install.ps1
+onethy
 ```
 
 ### 🐧 Linux & 🍎 macOS (Bash)
-Open your terminal and run:
+Requires Git, Node.js 20+, and Bun:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/danie2022157-ui/onethy-code/main/install.sh | bash
+git clone https://github.com/danie2022157-ui/onethy-code.git
+cd onethy-code
+bun install --frozen-lockfile
+bash ./install.sh
+onethy
 ```
 
 ### 🔑 Connecting Models
@@ -146,8 +146,8 @@ You interact with OnethyCode using natural language in the terminal prompt. Omni
 
 * **What happens behind the scenes:**
   1. **Complexity Evaluator**: Classifies the prompt as **High Complexity** (multi-file implementation + security + tests).
-  2. **Memory Bank Injection**: Reads `.onethy-code/memory-bank/system-patterns.md` to match your existing JWT schema and error formatting.
-  3. **Tier Selection**: Routes to **🧠 Intelligence Tier** (`Claude 3.7 Sonnet Thinking` or `Claude Opus 4`).
+  2. **Memory Bank Injection**: Reads `.omnicode/memory-bank/system-patterns.md` to match your existing JWT schema and error formatting.
+  3. **Tier Selection**: Routes to **🧠 Intelligence Tier** (`available Claude models` or `available Anthropic models`).
   4. **Atomic Checkpoint**: Takes a snapshot of your repo before modifying files.
   5. **Execution**: Generates the token verification middleware, handler, and test suite.
 
@@ -161,9 +161,9 @@ Do you want OnethyCode to use only free models, or only Claude, or restrict spec
    ```
 2. An interactive checklist opens:
    - **`✓ [Usar Todos os Modelos Conectados]`**: Omni Fusion freely routes between all connected providers.
-   - **`[✓] Google Gemini 3.8 Flash`** (Tier: Eficiência)
+   - **`[✓] Google connected Gemini models`** (Tier: Eficiência)
    - **`[✓] Claude 3.5 Sonnet`** (Tier: Balanceado)
-   - **`[✓] Claude Opus 4 Thinking`** (Tier: Inteligência)
+   - **`[✓] available Anthropic models Thinking`** (Tier: Inteligência)
    - **`[○] GPT-4o Mini`** (Desmarcado)
 3. Press `Enter` to toggle any model on or off.
 4. The sidebar instantly updates in real time:
@@ -172,10 +172,10 @@ Do you want OnethyCode to use only free models, or only Claude, or restrict spec
 ---
 
 ### 4. Autonomous Project Memory Bank
-OnethyCode maintains a living memory of your codebase in `.onethy-code/memory-bank/`:
+OnethyCode maintains a living memory of your codebase in `.omnicode/memory-bank/`:
 
 ```text
-.onethy-code/memory-bank/
+.omnicode/memory-bank/
 ├── project-brief.md      # Core product vision, features, and non-negotiables
 ├── system-patterns.md    # Architecture blueprints, naming rules, design patterns
 ├── tech-context.md       # Frameworks, versions, database schemas, environments
@@ -196,7 +196,7 @@ Stop debugging compiler and test errors by hand:
    - Isolates the failing assertion or compilation error.
    - Edits the source code to resolve the defect.
    - Re-runs the test suite.
-   - Loops until 100% of tests pass.
+   - Loops until the chosen checks pass, or report the remaining failures.
 
 ---
 
@@ -235,7 +235,7 @@ Omni Fusion is the brain of OnethyCode. Rather than forcing you to guess which m
 ```mermaid
 graph LR
     P[Incoming Prompt] --> E{Complexity Engine}
-    E -->|Simple / Lookup| T1[🌱 Efficiency Tier<br/>Gemini 3.8 Flash / Haiku]
+    E -->|Simple / Lookup| T1[🌱 Efficiency Tier<br/>connected Gemini models / Haiku]
     E -->|Standard Coding| T2[⚖️ Balanced Tier<br/>Claude Sonnet / GPT-4o]
     E -->|Architecture / Refactor| T3[🧠 Intelligence Tier<br/>Claude Opus / Thinking / R1]
     
@@ -263,12 +263,12 @@ To manually lock a tier, use `/auto` or press `Ctrl+T` to choose:
 | `/auto` | `/fusion`, `/otimizar` | Cycle or pick Omni Fusion tier (`Modo Auto`, `Eficiência`, `Balanceado`, `Inteligente`) |
 | `/fusion-models` | `/modelos-fusion` | Open interactive checklist to mark allowed models or use all |
 | `/memory` | `/memory-bank` | View active persistent Memory Bank state |
-| `/checkpoint` | `/salvar-ponto` | Create an instant Git snapshot checkpoint |
-| `/undo` | `/desfazer` | Revert workspace to previous AI checkpoint |
-| `/heal` | `/autofix` | Start autonomous self-healing test and compiler fix loop |
+| `/checkpoint` | `/salvar-ponto` | Create an Git checkpoint for tracked changes |
+| `/undo` | `/desfazer` | Request a confirmed, safe restore of tracked changes (clean Git tree required) |
+| `/heal` | `/autofix` | Run tests and diagnose failures for a coding agent to fix and verify |
 | `/team` | `/squad` | Launch the 4-phase Planner → Architect → Coder → Reviewer pipeline |
 | `/commit` | `/autocommit` | Generate conventional commit messages from git diff |
-| `/personalizacoes` | `/customizations` | Open catalog of 430+ Agents, 1,000+ Skills, Mods, Hooks, and MCPs |
+| `/personalizacoes` | `/customizations` | Open catalog of specialized agents, skills, Mods, Hooks, and MCPs |
 | `/update` | `/atualizar` | Check for updates and sync directly with the GitHub repository |
 | `/projects` | `/project`, `/projetos` | Create, add, open, rename and remove project entries safely (without deleting files) |
 | `/connect` | `/integrations` | Connect or authenticate AI providers and MCP servers |
@@ -337,16 +337,19 @@ flowchart TD
 **A: Yes.** OnethyCode supports local endpoints via OpenAI-compatible APIs (Ollama, vLLM, LM Studio, LocalAI). Configure your base URL in `~/.config/opencode/opencode.json` and Omni Fusion will route to your local GPUs.
 
 #### Q: How do I update OnethyCode?
-**A: Run `/update` in chat** or run `git pull origin main` in the checkout directory. OnethyCode's built-in updater syncs with GitHub and preserves your local settings.
+**A: Run `/update` in chat** from the official checkout, on `main`. Make sure you have committed or backed up local edits first. The update uses fast-forward Git and locked dependencies.
 
 ---
 
 ## 🇧🇷 Guia em Português
 
-### Instalação Rápida no Windows:
-Abra o PowerShell e cole:
+### Instalação no Windows:
+Instale Git, Node.js 20+ e Bun. Clone o repositório e instale a partir da pasta local:
 ```powershell
-irm https://raw.githubusercontent.com/danie2022157-ui/onethy-code/main/install.ps1 | iex
+git clone https://github.com/danie2022157-ui/onethy-code.git
+cd onethy-code
+bun install --frozen-lockfile
+.\install.ps1
 ```
 
 ### Como Usar no Dia a Dia:
@@ -355,10 +358,10 @@ irm https://raw.githubusercontent.com/danie2022157-ui/onethy-code/main/install.p
    onethy
    ```
 2. **Conectar seus modelos**: Digite `/connect` e escolha Google Antigravity, Anthropic ou OpenAI.
-3. **Omni Fusion**: O OnethyCode escolhe automaticamente o melhor modelo para cada pergunta (Gemini 3.8 Flash para tarefas rápidas, Claude 3.7 Sonnet para código balanceado, Opus para arquitetura).
+3. **Omni Fusion**: O OnethyCode escolhe automaticamente o melhor modelo para cada pergunta (connected Gemini models para tarefas rápidas, connected Claude models para código balanceado, Opus para arquitetura).
 4. **Filtrar Modelos**: Digite `/fusion-models` para marcar apenas os modelos que você quer usar.
-5. **Autocura de Código**: Se seus testes ou build quebrarem, digite `/heal` e a IA conserta o código sozinha até passar em todos os testes.
-6. **Desfazer Alterações**: Digite `/undo` para voltar o código ao estado anterior a qualquer momento.
+5. **Autocura de Código**: Se os testes falharem, use `/heal` para diagnosticar, solicitar correções e verificar novamente.
+6. **Desfazer Alterações**: Use `/undo` para solicitar uma restauração de mudanças rastreadas, sujeita à confirmação e à verificação de segurança do Git.
 7. **Equipe Completa**: Digite `/team "sua funcionalidade"` para acionar o time de 4 agentes (Planejador, Arquiteto, Programador e Revisor).
 
 ---

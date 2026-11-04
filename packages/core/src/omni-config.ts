@@ -79,6 +79,21 @@ export function parseOmniConfig(content: string): Partial<ConfigData> {
   return data as Partial<ConfigData>
 }
 
+/** Update only the selected scope's on-disk overrides; never persist the merged runtime view. */
+export async function updateOmniConfigFile(
+  filePath: string,
+  update: (current: Partial<ConfigData>) => Partial<ConfigData>,
+) {
+  let current: Partial<ConfigData> = {}
+  try {
+    current = parseOmniConfig(await fs.readFile(filePath, "utf8"))
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+  }
+  await fs.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 })
+  await fs.writeFile(filePath, JSON.stringify(update(current), null, 2), { encoding: "utf8", mode: 0o600 })
+}
+
 export class Service extends Context.Service<Service, Interface>()("@opencode/OmniConfig") {}
 
 const DEFAULT_CONFIG: ConfigData = {
@@ -140,28 +155,25 @@ const layer = Layer.effect(
       return activeData
     })
 
+    // Persist only the requested override. Never copy merged project settings (including
+    // API keys and MCP environment secrets) to the user-wide configuration, or vice versa.
+    const saveOverride = (filePath: string, update: (current: Partial<ConfigData>) => Partial<ConfigData>) =>
+      Effect.promise(() => updateOmniConfigFile(filePath, update))
+
     const setMode = Effect.fn("OmniConfig.setMode")(function* (mode: AutonomyMode) {
-      activeData = { ...activeData, mode }
-      yield* Effect.promise(async () => {
-        const dir = path.dirname(projectConfigPath)
-        await fs.mkdir(dir, { recursive: true })
-        await fs.writeFile(projectConfigPath, JSON.stringify(activeData, null, 2), "utf-8")
-      })
+      yield* saveOverride(projectConfigPath, (current) => ({ ...current, mode }))
+      yield* refresh
     })
 
     const setProvider = Effect.fn("OmniConfig.setProvider")(function* (id: string, cfg: ProviderConfig) {
-      activeData = {
-        ...activeData,
+      yield* saveOverride(globalConfigPath, (current) => ({
+        ...current,
         providers: {
-          ...activeData.providers,
-          [id]: { ...activeData.providers[id], ...cfg },
+          ...current.providers,
+          [id]: { ...current.providers?.[id], ...cfg },
         },
-      }
-      yield* Effect.promise(async () => {
-        const dir = path.dirname(globalConfigPath)
-        await fs.mkdir(dir, { recursive: true })
-        await fs.writeFile(globalConfigPath, JSON.stringify(activeData, null, 2), "utf-8")
-      })
+      }))
+      yield* refresh
     })
 
     const getGlobalPath = () => globalConfigPath

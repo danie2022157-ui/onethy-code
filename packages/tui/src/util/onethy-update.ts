@@ -6,8 +6,17 @@ import { fileURLToPath } from "node:url"
 type GitResult = { stdout: string; stderr: string; code: number }
 export type GitRunner = (args: string[], cwd: string) => Promise<GitResult>
 
-const OFFICIAL_ORIGIN = /(?:^|[/:@])github\.com[:/]danie2022157-ui\/onethy-code(?:\.git)?\/?$/i
+const OFFICIAL_ORIGINS = new Set([
+  "https://github.com/danie2022157-ui/onethy-code",
+  "git@github.com:danie2022157-ui/onethy-code",
+  "ssh://git@github.com/danie2022157-ui/onethy-code",
+])
 
+export function isOfficialOnethyOrigin(value: string): boolean {
+  const trimmed = value.trim().replace(/\/$/, "")
+  const normalized = trimmed.endsWith(".git") ? trimmed.slice(0, -4) : trimmed
+  return OFFICIAL_ORIGINS.has(normalized)
+}
 const runGit: GitRunner = (args, cwd) =>
   new Promise((resolve) => {
     execFile("git", args, { cwd, encoding: "utf8", timeout: 12000, windowsHide: true }, (error, stdout, stderr) =>
@@ -50,7 +59,10 @@ export async function checkOnethyUpdate(input: {
   const branch = await git(["branch", "--show-current"], root)
   if (branch.code !== 0 || branch.stdout !== "main") return
   const origin = await git(["remote", "get-url", "origin"], root)
-  if (origin.code !== 0 || !OFFICIAL_ORIGIN.test(origin.stdout)) return
+  if (origin.code !== 0 || !isOfficialOnethyOrigin(origin.stdout)) return
+  // Do not mistake an ahead/diverged local checkout for an available update.
+  const ahead = await git(["rev-list", "--count", "origin/main..HEAD"], root)
+  if (ahead.code !== 0 || !/^\d+$/.test(ahead.stdout) || Number(ahead.stdout) > 0) return
   const local = await git(["rev-parse", "HEAD"], root)
   if (local.code !== 0 || !/^[a-f0-9]{40}$/i.test(local.stdout)) return
   const remote = await git(["ls-remote", "origin", "refs/heads/main"], root)

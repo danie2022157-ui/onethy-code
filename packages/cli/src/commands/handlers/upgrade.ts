@@ -14,20 +14,30 @@ export default Runtime.handler(
       intro("Upgrade")
       if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")) {
         const s = spinner()
-        s.start("Atualizando OnethyCode (git pull origin main)...")
+        s.start("Atualizando OnethyCode com Git fast-forward seguro...")
         const pullResult = yield* Effect.tryPromise(async () => {
-          const { execSync } = await import("node:child_process")
-          const { fileURLToPath } = await import("node:url")
+          const { execFileSync } = await import("node:child_process")
           const path = await import("node:path")
           const fs = await import("node:fs")
-          let curr = path.dirname(fileURLToPath(import.meta.url))
-          for (let i = 0; i < 8; i++) {
-            if (fs.existsSync(path.join(curr, ".git")) && fs.existsSync(path.join(curr, "package.json"))) break
-            const parent = path.dirname(curr)
-            if (parent === curr) break
-            curr = parent
+          const root = process.env.ONETHY_INSTALL_ROOT
+          if (!root || !fs.existsSync(path.join(root, ".git")) || !fs.existsSync(path.join(root, "packages", "tui"))) {
+            throw new Error("Could not identify the OnethyCode installation; update refused.")
           }
-          return execSync("git pull origin main", { cwd: curr, encoding: "utf8" })
+          const git = (...args: string[]) =>
+            execFileSync("git", args, { cwd: root, encoding: "utf8", timeout: 30000 }).trim()
+          const origin = git("remote", "get-url", "origin")
+          const normalized = origin.endsWith(".git") ? origin.slice(0, -4) : origin
+          const official = ["https://github.com/danie2022157-ui/onethy-code", "git@github.com:danie2022157-ui/onethy-code", "ssh://git@github.com/danie2022157-ui/onethy-code"]
+          if (!official.includes(normalized)) {
+            throw new Error("Not the official OnethyCode Git origin; update refused.")
+          }
+          if (git("branch", "--show-current") !== "main") throw new Error("Update only works on the main branch.")
+          if (git("status", "--porcelain").length > 0) throw new Error("Local edits exist; commit or back them up before updating.")
+          const bun = process.env.BUN_BIN
+          if (!bun || !fs.existsSync(bun)) throw new Error("Bun executable not found; update cancelled.")
+          const result = git("pull", "--ff-only", "origin", "main")
+          execFileSync(bun, ["install", "--frozen-lockfile"], { cwd: root, timeout: 180000, stdio: "pipe" })
+          return result
         }).pipe(Effect.option)
 
         if (Option.isSome(pullResult)) {
@@ -35,7 +45,7 @@ export default Runtime.handler(
           log.success(pullResult.value.trim())
         } else {
           s.stop("Falha ao atualizar via git.")
-          log.warn("Execute 'git pull origin main' no diretório do OnethyCode.")
+          log.warn("Atualização recusada ou falhou. Verifique a instalação oficial, alterações locais e conectividade.")
         }
         outro("Done")
         return

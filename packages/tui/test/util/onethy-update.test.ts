@@ -13,6 +13,7 @@ function fixture(input: { local?: string; remote?: string; origin?: string; bran
     const response: Record<string, string> = {
       "branch --show-current": input.branch ?? "main",
       "remote get-url origin": input.origin ?? URL,
+      "rev-list --count origin/main..HEAD": input.branch === "ahead" ? "2" : "0",
       "rev-parse HEAD": input.local ?? LOCAL,
       "ls-remote origin refs/heads/main": (input.remote ?? REMOTE) + "\trefs/heads/main",
     }
@@ -29,6 +30,7 @@ describe("OnethyCode automatic update detection", () => {
     expect(calls).toEqual([
       "branch --show-current",
       "remote get-url origin",
+      "rev-list --count origin/main..HEAD",
       "rev-parse HEAD",
       "ls-remote origin refs/heads/main",
     ])
@@ -43,9 +45,21 @@ describe("OnethyCode automatic update detection", () => {
     const foreign = fixture({ origin: "https://github.com/other/repo.git" })
     expect(await checkOnethyUpdate({ root: "/opt/onethy", git: foreign.git })).toBeUndefined()
     expect(foreign.calls).not.toContain("ls-remote origin refs/heads/main")
+    const forged = fixture({ origin: "https://evil.example/github.com/danie2022157-ui/onethy-code.git" })
+    expect(await checkOnethyUpdate({ root: "/opt/onethy", git: forged.git })).toBeUndefined()
+    expect(forged.calls).not.toContain("ls-remote origin refs/heads/main")
     const branch = fixture({ branch: "feature" })
     expect(await checkOnethyUpdate({ root: "/opt/onethy", git: branch.git })).toBeUndefined()
     expect(branch.calls).toEqual(["branch --show-current"])
+  })
+
+  test("does not flag local commits ahead of origin as updates", async () => {
+    const fixtureAhead = fixture()
+    const git: GitRunner = async (args, cwd) => args[0] === "rev-list"
+      ? { stdout: "2", stderr: "", code: 0 }
+      : fixtureAhead.git(args, cwd)
+    expect(await checkOnethyUpdate({ root: "/opt/onethy", git })).toBeUndefined()
+    expect(fixtureAhead.calls).not.toContain("ls-remote origin refs/heads/main")
   })
 
   test("treats GitHub errors or malformed refs as unknown, not an available update", async () => {

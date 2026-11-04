@@ -13,24 +13,7 @@ import { exec } from "node:child_process"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
-
-function findOnethyRoot(): string {
-  try {
-    let curr = path.dirname(fileURLToPath(import.meta.url))
-    for (let i = 0; i < 8; i++) {
-      if (fs.existsSync(path.join(curr, ".git")) && fs.existsSync(path.join(curr, "package.json"))) {
-        return curr
-      }
-      const parent = path.dirname(curr)
-      if (parent === curr) break
-      curr = parent
-    }
-  } catch {
-    // ignore
-  }
-  return process.cwd()
-}
+import { findOnethyRoot, isOfficialOnethyOrigin } from "../util/onethy-update"
 
 function findBunBin(): string | undefined {
   if (process.env.BUN_BIN && fs.existsSync(process.env.BUN_BIN)) return process.env.BUN_BIN
@@ -87,12 +70,22 @@ export function DialogOmniUpdate(props: { git?: typeof runGit; bunBin?: string }
     setStep("checking")
     setStatusMessage("Connecting to official repository...")
     const root = findOnethyRoot()
+    if (!root) {
+      setErrorMessage("OnethyCode installation directory not found. Open the official Git checkout and try again.")
+      setStep("error")
+      return
+    }
 
     try {
       // 1. Detect local commit & branch
       const curBranchRes = await git("git branch --show-current", root)
       if (curBranchRes.code !== 0) throw new Error(curBranchRes.stderr || "Could not determine Git branch.")
-      const curBranch = curBranchRes.stdout || "main"
+      const curBranch = curBranchRes.stdout
+      if (curBranch !== "main") throw new Error("Updates are only supported on the official main branch.")
+      const origin = await git("git remote get-url origin", root)
+      if (origin.code !== 0 || !isOfficialOnethyOrigin(origin.stdout)) {
+        throw new Error("Update refused: Git origin is not the official OnethyCode repository.")
+      }
       setBranch(curBranch)
 
       const localShaRes = await git("git rev-parse --short HEAD", root)
@@ -131,42 +124,26 @@ export function DialogOmniUpdate(props: { git?: typeof runGit; bunBin?: string }
     const curBranch = branch()
 
     try {
+      if (!root) throw new Error("OnethyCode installation directory not found.")
+      if (curBranch !== "main") throw new Error("Update refused: only the official main branch is supported.")
+      const origin = await git("git remote get-url origin", root)
+      if (origin.code !== 0 || !isOfficialOnethyOrigin(origin.stdout))
+        throw new Error("Update refused: Git origin is not the official OnethyCode repository.")
+      const bun = props.bunBin ?? findBunBin()
+      if (!bun) throw new Error("Bun not found. Update cancelled before changing files.")
       setStatusMessage("Checking status of local files...")
       const statusRes = await git("git status --porcelain", root)
       if (statusRes.code !== 0) throw new Error(statusRes.stderr || "Could not inspect local changes.")
-      const isDirty = statusRes.stdout.length > 0
-      let stashed = false
-
-      if (isDirty) {
-        setStatusMessage("Stashing local changes (safe stash)...")
-        const stashRes = await git('git stash push --include-untracked -m "onethy-auto-update"', root)
-        if (stashRes.code !== 0) throw new Error(stashRes.stderr || "Could not stash local changes.")
-        stashed = !stashRes.stdout.includes("No local changes")
+      if (statusRes.stdout.length > 0) {
+        throw new Error("Update refused: local edits exist. Commit or back them up first; no files were changed.")
       }
 
-      setStatusMessage(`Downloading updates (git pull origin ${curBranch})...`)
-      const pullRes = await git(`git pull --ff-only origin ${curBranch}`, root)
+      setStatusMessage("Applying a fast-forward update from the official GitHub main...")
+      const pullRes = await git("git pull --ff-only origin main", root)
+      if (pullRes.code !== 0) throw new Error(pullRes.stderr || pullRes.stdout || "Git pull failed.")
 
-      if (pullRes.code !== 0) {
-        // Keep the saved stash intact if the pull fails; do not claim a successful update.
-        throw new Error(
-          (pullRes.stderr || pullRes.stdout || "Git pull failed.") +
-            (stashed ? " Local changes are saved in git stash." : ""),
-        )
-      }
-
-      if (stashed) {
-        setStatusMessage("Restoring local files...")
-        const restoreRes = await git("git stash pop", root)
-        if (restoreRes.code !== 0)
-          throw new Error(restoreRes.stderr || "Could not restore local files. Check git stash list.")
-      }
-
-      // Check if Bun is available to sync dependencies
-      const bun = props.bunBin ?? findBunBin()
-      if (!bun) throw new Error("Bun not found. Dependencies were not synchronized; install Bun and retry.")
-      setStatusMessage("Syncing OnethyCode dependencies...")
-      const installRes = await git(`"${bun}" install`, root, 180000)
+      setStatusMessage("Syncing OnethyCode locked dependencies...")
+      const installRes = await git(`"${bun}" install --frozen-lockfile`, root, 180000)
       if (installRes.code !== 0)
         throw new Error(installRes.stderr || installRes.stdout || "Could not install dependencies.")
 
@@ -226,7 +203,6 @@ export function DialogOmniUpdate(props: { git?: typeof runGit; bunBin?: string }
         run: () => {
           const s = step()
           if (s === "available") void applyUpdate()
-          else if (s === "up-to-date") void applyUpdate()
           else if (s === "success") void restartApp()
           else if (s === "error") void checkUpdates()
         },

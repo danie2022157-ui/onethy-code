@@ -1,6 +1,10 @@
 # OnethyCode — Instalador Global para Windows
 $ErrorActionPreference = "Stop"
 
+if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+  Write-Error "Este instalador precisa ser executado do checkout local. Use git clone, bun install --frozen-lockfile e depois .\\install.ps1."
+  exit 1
+}
 $currentDir = $PSScriptRoot
 $targetDir = "$env:LOCALAPPDATA\Microsoft\WindowsApps"
 
