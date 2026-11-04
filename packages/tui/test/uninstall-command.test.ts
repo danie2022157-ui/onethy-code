@@ -41,7 +41,7 @@ describe("OnethyCode source checkout removal confirmation", () => {
     try {
       await mkdir(directory, { recursive: true })
       await writeFile(path.join(directory, "onethy-config.json"), JSON.stringify({ checkout }))
-      await writeFile(path.join(directory, "onethy.ps1"), 'Get-Content "onethy-config.json"; Join-Path $config.checkout "bin\\\\onethy.js"')
+      await writeFile(path.join(directory, "onethy.ps1"), 'Get-Content "onethy-config.json"; Join-Path $config.checkout "bin\\onethy.js"')
       await writeFile(path.join(directory, "onethy.cmd"), 'powershell.exe -File "%~dp0onethy.ps1" %*')
       expect(onethyInstalledLauncher(checkout, { LOCALAPPDATA: root })).toBe(path.join(directory, "onethy.cmd"))
       expect(onethyInstalledLauncher(path.join(root, "other"), { LOCALAPPDATA: root })).toBeUndefined()
