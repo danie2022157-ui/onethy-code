@@ -2,9 +2,9 @@
 import { expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
-import { renderLocal } from "../../fixture/local"
-import { tmpdir } from "../../fixture/fixture"
-import { DialogMemoryBank } from "../../../src/component/dialog-memory-bank"
+import { renderLocal } from "../fixture/local"
+import { tmpdir } from "../fixture/fixture"
+import { DialogMemoryBank } from "../../src/component/dialog-memory-bank"
 
 test("memory manager can switch to global scope and initialize its own documents", async () => {
   await using temp = await tmpdir()
