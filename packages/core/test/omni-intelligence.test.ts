@@ -34,7 +34,7 @@ describe("Onethy terminal intelligence", () => {
     fs.mkdirSync(path.join(root, "src"))
     fs.mkdirSync(path.join(root, "node_modules"))
     fs.writeFileSync(path.join(root, "src", "authentication.ts"), [
-      "export function validateCredentials(name: string) {",
+      "export function authenticate(name: string) {",
       "  return name.length > 3",
       "}",
     ].join("\n"))
