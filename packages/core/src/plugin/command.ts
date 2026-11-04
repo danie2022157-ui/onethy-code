@@ -246,7 +246,7 @@ export const Plugin = define({
                   "",
                   "User request:",
                   input.prompt.text.trim() || "Read and summarize global preferences; do not modify them.",
-                ].join("\\n"),
+                ].join("\n"),
                 delivery: input.delivery,
               })
               .pipe(Effect.asVoid),
