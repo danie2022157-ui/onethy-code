@@ -20,10 +20,18 @@ export function findBun(env = process.env) {
   return candidates.find((candidate) => candidate && path.isAbsolute(candidate) && isBun(candidate))
 }
 
-export function makeOmniEnvironment(env, bunBin) {
+export function makeOmniEnvironment(env, bunBin, platform = process.platform) {
   const pathKey = Object.keys(env).find((key) => key.toUpperCase() === "PATH") || "PATH"
   return {
     ...Object.fromEntries(Object.entries(env).filter(([key]) => !key.toUpperCase().startsWith("OPENCODE_"))),
+    // OpenTUI's Kitty graphics capability probe can leak as printable
+    // "Gi=31337,s=1,v=1,a=q,t=d,f=24;AAAA" in Windows console hosts.
+    // Default to character rendering on Windows without preventing a user
+    // from explicitly opting back into graphics-capable terminals.
+    ...(platform === "win32" ? {
+      OPENTUI_GRAPHICS: env.OPENTUI_GRAPHICS ?? "false",
+      OPENTUI_IMAGE_PROTOCOL: env.OPENTUI_IMAGE_PROTOCOL ?? "blocks",
+    } : {}),
     ONETHY_ACTIVE: "1",
     OMNICODE_ACTIVE: "1",
     OPENCODE_CLI_NAME: "onethy",
