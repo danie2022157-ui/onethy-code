@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url"
 type GitResult = { stdout: string; stderr: string; code: number }
 export type GitRunner = (args: string[], cwd: string) => Promise<GitResult>
 
-const OFFICIAL_ORIGIN = /(?:^|[/:])github\.com[:/]danie2022157-ui\/onethy-code(?:\.git)?\/?$/i
+const OFFICIAL_ORIGIN = /(?:^|[/:@])github\.com[:/]danie2022157-ui\/onethy-code(?:\.git)?\/?$/i
 
 const runGit: GitRunner = (args, cwd) =>
   new Promise((resolve) => {
