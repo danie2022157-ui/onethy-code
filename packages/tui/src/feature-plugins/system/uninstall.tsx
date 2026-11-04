@@ -178,7 +178,7 @@ export default Plugin.define({
                 const script = uninstallWorkerCommand(process.pid, checkout, launcher, process.ppid)
                 const worker = spawn("powershell.exe", [
                   "-NoProfile", "-NoLogo", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64"),
-                ], { detached: true, stdio: "ignore", windowsHide: false, cwd: process.env.USERPROFILE || process.cwd() })
+                ], { detached: true, stdio: "inherit", windowsHide: false, cwd: process.env.USERPROFILE || process.cwd() })
                 // Detect synchronous errors before exiting and don't keep the UI
                 // process alive only to track the separate uninstall console.
                 await new Promise<void>((resolve, reject) => {
