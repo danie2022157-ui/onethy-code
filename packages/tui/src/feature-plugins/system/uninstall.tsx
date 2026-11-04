@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process"
+import { lstatSync, statSync } from "node:fs"
+import path from "node:path"
 import { Plugin } from "@opencode/plugin/tui"
 import { useToast } from "../../ui/toast"
 
@@ -6,13 +8,48 @@ import { useToast } from "../../ui/toast"
  * The confirmed uninstall runs in a separate Windows console, after this TUI
  * process exits. That avoids deleting files still in use by the application.
  */
-export function uninstallWorkerCommand(pid: number): string {
+/** Source deletion is permitted only for a verified Onethy source checkout
+ * under the current Windows user's home. Never infer it from process.cwd(). */
+export function onethySourceCheckout(env: NodeJS.ProcessEnv = process.env, platform = process.platform): string | undefined {
+  const home = env.USERPROFILE
+  const installRoot = env.ONETHY_INSTALL_ROOT
+  if (platform !== "win32" || !home || !installRoot || !path.isAbsolute(home) || !path.isAbsolute(installRoot))
+    return
+  const root = path.resolve(installRoot)
+  const relative = path.relative(path.resolve(home), root)
+  if (!relative || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative))
+    return
+  if (!/^onethy[-_]?code(?:[-_].*)?$/i.test(path.basename(root))) return
+  try {
+    if (lstatSync(root).isSymbolicLink()) return
+    if (!statSync(path.join(root, "bin", "onethy.js")).isFile()) return
+    if (!statSync(path.join(root, "install.ps1")).isFile()) return
+  } catch {
+    return
+  }
+  return root
+}
+
+function powershellLiteral(value: string): string {
+  return "'" + value.replaceAll("'", "''") + "'"
+}
+
+export function uninstallWorkerCommand(pid: number, removeSource?: string): string {
   if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error("Invalid OnethyCode PID")
   return [
     `while (Get-Process -Id ${pid} -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 300 }`,
+    "Start-Sleep -Milliseconds 800",
     "Write-Host 'Desinstalando OnethyCode e removendo seus dados...' -ForegroundColor Yellow",
     "& onethy unistall --purge --force",
-    "if ($LASTEXITCODE -ne 0) { Write-Host 'Falha na desinstalacao. Verifique as mensagens acima.' -ForegroundColor Red }",
+    "$status = $LASTEXITCODE",
+    ...(removeSource ? [
+      "if ($status -eq 0) {",
+      `  Write-Host 'Removendo codigo-fonte: ' ${powershellLiteral(removeSource)} -ForegroundColor Yellow`,
+      `  try { Remove-Item -LiteralPath ${powershellLiteral(removeSource)} -Recurse -Force -ErrorAction Stop }`,
+      "  catch { Write-Host ('Falha ao remover o codigo-fonte: ' + $_.Exception.Message) -ForegroundColor Red; $status = 1 }",
+      "}",
+    ] : []),
+    "if ($status -ne 0) { Write-Host 'A desinstalacao nao foi concluida. Verifique as mensagens acima.' -ForegroundColor Red }",
     "else { Write-Host 'Desinstalacao finalizada.' -ForegroundColor Green }",
     "Read-Host 'Pressione Enter para fechar'",
   ].join("; ")
@@ -56,9 +93,21 @@ export default Plugin.define({
                 label: { confirm: "Desinstalar", cancel: "Cancelar" },
               })
               if (!confirmed) return
+              const checkout = onethySourceCheckout()
+              const removeSource = checkout
+                ? await context.ui.dialog.confirm({
+                    title: "Apagar tambem o codigo-fonte?",
+                    message: [
+                      "Esta pasta sera apagada permanentemente, incluindo alteracoes locais nao enviadas ao GitHub:",
+                      checkout,
+                      "Confirme somente se nao precisa mais de nenhum arquivo dessa pasta.",
+                    ].join("\\n"),
+                    label: { confirm: "Apagar codigo-fonte", cancel: "Preservar pasta" },
+                  })
+                : false
               try {
                 const worker = spawn("powershell.exe", [
-                  "-NoProfile", "-NoLogo", "-Command", uninstallWorkerCommand(process.pid),
+                  "-NoProfile", "-NoLogo", "-Command", uninstallWorkerCommand(process.pid, removeSource ? checkout : undefined),
                 ], { detached: true, stdio: "ignore", windowsHide: false, cwd: process.env.USERPROFILE || process.cwd() })
                 // Detect synchronous errors before exiting and don't keep the UI
                 // process alive only to track the separate uninstall console.
