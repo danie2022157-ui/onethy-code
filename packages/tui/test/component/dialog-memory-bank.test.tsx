@@ -16,7 +16,7 @@ test("memory manager can switch to global scope and initialize its own documents
 
   setup.dialog.replace(() => <DialogMemoryBank projectDir={project} configDir={config} />)
   await setup.waitForFrame((frame) => frame.includes("Memória Onethy") && frame.includes("Alternar para memória GLOBAL"))
-  expect(setup.captureCharFrame()).toContain("Notas do projeto")
+  expect(setup.captureCharFrame()).toContain("active-context.md")
 
   setup.mockInput.pressEnter()
   await setup.waitForFrame((frame) => frame.includes("Alternar para memória do PROJETO"))
@@ -38,7 +38,7 @@ test("memory manager initializes and labels project notes separately from global
   fs.mkdirSync(config)
 
   setup.dialog.replace(() => <DialogMemoryBank projectDir={project} configDir={config} />)
-  await setup.waitForFrame((frame) => frame.includes("Memória Onethy") && frame.includes("Notas do projeto"))
+  await setup.waitForFrame((frame) => frame.includes("Memória Onethy") && frame.includes("active-context.md"))
   setup.mockInput.pressArrow("down")
   setup.mockInput.pressEnter()
   await setup.waitFor(() => fs.existsSync(path.join(project, ".omnicode", "memory.md")))
