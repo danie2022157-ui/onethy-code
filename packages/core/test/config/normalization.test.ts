@@ -498,6 +498,20 @@ describe("ConfigNormalize", () => {
     })
   })
 
+  test("supports explicit mcp.overrides for CLI connection approval", () => {
+    const result = normalized({
+      mcp: { overrides: { github: true, filesystem: false, invalid: "yes" } },
+    })
+    expect(result.encoded.mcp).toEqual({ overrides: { github: true, filesystem: false } })
+    expect(result.diagnostics.map((item) => [item.kind, item.path])).toEqual([
+      ["invalid", ["mcp", "overrides", "invalid"]],
+    ])
+    expect(Schema.decodeUnknownSync(Info)(result.encoded).mcp?.overrides).toEqual({
+      github: true,
+      filesystem: false,
+    })
+  })
+
   test("normalizes MCP timeout fields in schema order with per-leaf recovery", () => {
     const result = normalized({ mcp: { timeout: { execution: 3000, startup: "invalid", catalog: 2000 } } })
 
