@@ -321,8 +321,16 @@ function expandServerTimeouts(value: unknown) {
   return Object.fromEntries(
     Object.entries(value).map(([name, server]) => [
       name,
-      isRecord(server) && typeof server.timeout === "number"
-        ? { ...server, timeout: ConfigMigrateV1.migrateMcpTimeout(server.timeout) }
+      isRecord(server)
+        ? {
+            ...server,
+            ...(typeof server.enabled === "boolean" && !own(server, "disabled")
+              ? { disabled: !server.enabled }
+              : {}),
+            ...(typeof server.timeout === "number"
+              ? { timeout: ConfigMigrateV1.migrateMcpTimeout(server.timeout) }
+              : {}),
+          }
         : server,
     ]),
   )
