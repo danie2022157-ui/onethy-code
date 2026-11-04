@@ -251,7 +251,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
               Flag.withDefault(false),
             ),
             enable: Flag.String("enable").pipe(
-              Flag.withDescription("Approve and persistently enable one named MCP server in project config"),
+              Flag.withDescription("Approve one or more named MCP servers (comma-separated) in project config"),
               Flag.optional,
             ),
           },
