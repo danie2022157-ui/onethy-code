@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs"
+import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs"
 import path from "node:path"
 import { Plugin } from "@opencode/plugin/tui"
 import { useToast } from "../../ui/toast"
@@ -83,13 +83,32 @@ export function uninstallWorkerCommand(pid: number, checkout: string, launcher: 
     ]).flat(),
     "  Start-Sleep -Milliseconds 500",
     "  Write-Host 'Removendo a instalacao e os dados do OnethyCode...' -ForegroundColor Yellow",
-    "  & " + powershellLiteral(launcher) + " unistall --purge --force",
+    "  & " + powershellLiteral(launcher) + " unistall --purge --force --defer-launchers",
     "  if ($LASTEXITCODE -ne 0) { throw ('Desinstalacao do aplicativo falhou com codigo ' + $LASTEXITCODE) }",
     "  $checkout = " + source,
     "  if (-not (Test-Path -LiteralPath $checkout -PathType Container)) { throw 'Pasta do codigo-fonte nao encontrada.' }",
     "  $info = Get-Item -LiteralPath $checkout -Force",
     "  if ($info.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { throw 'Recusado: pasta vinculada por symlink/junction.' }",
     "  if (-not (Test-Path -LiteralPath (Join-Path $checkout 'bin\\onethy.js') -PathType Leaf) -or -not (Test-Path -LiteralPath (Join-Path $checkout 'install.ps1') -PathType Leaf)) { throw 'A pasta nao parece ser um checkout OnethyCode.' }",
+    // The CLI has exited; its .cmd/.ps1 launcher is no longer in use.
+    "  $launcherDirectory = Split-Path -Parent " + powershellLiteral(launcher),
+    "  $configFile = Join-Path $launcherDirectory 'onethy-config.json'",
+    "  $scriptFile = Join-Path $launcherDirectory 'onethy.ps1'",
+    "  $config = Get-Content -LiteralPath $configFile -Raw -ErrorAction Stop | ConvertFrom-Json",
+    "  if ([string]$config.checkout -ine $checkout) { throw 'O instalador registrado pertence a outra pasta.' }",
+    "  $script = Get-Content -LiteralPath $scriptFile -Raw -ErrorAction Stop",
+    "  if (-not $script.Contains('onethy-config.json') -or -not $script.Contains('bin\onethy.js')) { throw 'Instalador do Windows nao reconhecido.' }",
+    "  $unknownLaunchers = @()",
+    "  foreach ($name in @('onethy.cmd', 'onethy-code.cmd', 'omni.cmd', 'omnicode.cmd')) {",
+    "    $file = Join-Path $launcherDirectory $name",
+    "    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { continue }",
+    "    $body = Get-Content -LiteralPath $file -Raw -ErrorAction Stop",
+    "    if ($body.Contains('\"%~dp0onethy.ps1\" %*') -and $body.Contains('WindowsPowerShell')) {",
+    "      Remove-Item -LiteralPath $file -Force -ErrorAction Stop",
+    "    } else { $unknownLaunchers += $file }",
+    "  }",
+    "  Remove-Item -LiteralPath $scriptFile -Force -ErrorAction Stop",
+    "  Remove-Item -LiteralPath $configFile -Force -ErrorAction Stop",
     "  Write-Host ('Excluindo codigo-fonte: ' + $checkout) -ForegroundColor Yellow",
     "  $deleted = $false",
     "  foreach ($attempt in 1..20) {",
@@ -97,6 +116,7 @@ export function uninstallWorkerCommand(pid: number, checkout: string, launcher: 
     "    catch { if ($attempt -eq 20) { throw }; Start-Sleep -Milliseconds 300 }",
     "  }",
     "  if (-not $deleted -or (Test-Path -LiteralPath $checkout)) { throw 'Nao foi possivel remover a pasta de codigo-fonte.' }",
+    "  if ($unknownLaunchers.Count -gt 0) { throw ('Alguns atalhos nao foram removidos por nao corresponderem ao OnethyCode: ' + ($unknownLaunchers -join ', ')) }",
     "  $status = 0",
     "  Write-Host 'OnethyCode removido completamente deste computador.' -ForegroundColor Green",
     "} catch {",
