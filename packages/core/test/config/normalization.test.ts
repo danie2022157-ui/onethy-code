@@ -526,6 +526,7 @@ describe("ConfigNormalize", () => {
       github: true,
       filesystem: false,
     })
+    expect(normalized({ mcp: { overrides: {} } }).encoded.mcp).toEqual({ overrides: {} })
   })
 
   test("normalizes MCP timeout fields in schema order with per-leaf recovery", () => {
