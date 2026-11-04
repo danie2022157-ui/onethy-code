@@ -8,6 +8,7 @@ import { ToolFailure } from "@opencode/ai/effect"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { Effect, Schema } from "effect"
 import { Location } from "../../location.js"
+import { Permission } from "../../permission.js"
 
 export const name = "omni_heal"
 
@@ -36,8 +37,8 @@ export const Output = Schema.Struct({
 })
 
 export const description = [
-  "Self-Healing Autonomous Test & Build Loop (Claude Code / Ralph loop pattern).",
-  "Executes test suites or typechecks, captures error outputs, isolates failing files and assertion traces, and formulates step-by-step healing plans for @coder.",
+  "Permission-gated test and build diagnosis for coding agents.",
+  "Runs one test command with shell permission, captures errors and returns repair instructions; coding agents perform edits and reruns.",
   "- 'run_and_heal': Runs test suite, verifies results, and if failing, returns actionable healing instructions.",
   "- 'diagnose': Parses compiler or runtime tracebacks into targeted bugfix action items.",
 ].join("\n")
@@ -180,6 +181,7 @@ export const Plugin = {
   id: "opencode.tool.omni_heal",
   effect: Effect.fn("OmniHealTool.Plugin")(function* (ctx: Context) {
     const location = yield* Location.Service
+    const permission = yield* Permission.Service
 
     yield* ctx.tool
       .transform((editor) => {
@@ -190,10 +192,14 @@ export const Plugin = {
           description,
           input: Input,
           output: Output,
-          execute: (params) =>
+          execute: (params, context) =>
             Effect.gen(function* () {
               const rootDir = location.project.directory
               const commandToRun = params.command || detectProjectTestCommand(rootDir)
+              if (params.maxAttempts !== undefined &&
+                (!Number.isInteger(params.maxAttempts) || params.maxAttempts < 1 || params.maxAttempts > 5)) {
+                return yield* new ToolFailure({ message: "maxAttempts must be an integer between 1 and 5." })
+              }
 
               if (params.action === "diagnose") {
                 const raw = params.errorLog || ""
@@ -214,6 +220,14 @@ export const Plugin = {
               }
 
               if (params.action === "run_and_heal") {
+                yield* permission.assert({
+                  action: "shell",
+                  resources: [commandToRun],
+                  sessionID: context.sessionID,
+                  agent: context.agent,
+                  source: { type: "tool", messageID: context.messageID, id: context.id },
+                }).pipe(Effect.mapError((error) =>
+                  new ToolFailure({ message: "Test execution denied by session permissions.", error })))
                 const { stdout, stderr, exitCode } = yield* runCommandAsync(commandToRun, rootDir, 120_000)
                 const combinedOutput = `${stdout}\n${stderr}`.trim()
 
