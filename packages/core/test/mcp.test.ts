@@ -616,6 +616,30 @@ describe("discovered MCP configuration", () => {
     expect(server.command).toEqual(["node", "trusted.js"])
   })
 
+  test("only explicitly approved discovered MCPs connect on startup", () => {
+    const discovered = decodeDiscovered(JSON.stringify({
+      mcpServers: {
+        github: { command: "npx", args: ["-y", "github-server"] },
+        unapproved: { url: "https://example.test/mcp" },
+      },
+    }))
+    expect(discovered.get("github")?.disabled).toBe(true)
+    const allowed = new Document({
+      type: "document",
+      info: new Info({ mcp: { enabled: { github: true, unknown: true } } }),
+    })
+    const configured = mergeServers(discovered, [allowed])
+    expect(configured.get("github")?.disabled).toBe(false)
+    expect(configured.get("unapproved")?.disabled).toBe(true)
+    expect(configured.has("unknown")).toBe(false)
+
+    const blocked = new Document({
+      type: "document",
+      info: new Info({ mcp: { enabled: { github: false } } }),
+    })
+    expect(mergeServers(configured, [blocked]).get("github")?.disabled).toBe(true)
+  })
+
   test("canonical containment rejects a symlink target outside the discovery root", async () => {
     const base = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-mcp-discovery-"))
     const root = path.join(base, ".claude")
