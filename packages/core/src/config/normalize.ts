@@ -249,6 +249,7 @@ function normalizeSkills(input: Record<string, unknown>, encoded: Record<string,
 
 function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, unknown>, diagnostics: Diagnostic[]) {
   const legacyServers: Record<string, unknown> = {}
+  const enabledOverrides: Record<string, boolean> = {}
   const nativeServers: Record<string, unknown> = {}
   const timeout: Record<string, unknown> = {}
   if (isRecord(input.experimental) && own(input.experimental, "mcp_timeout")) {
@@ -270,7 +271,7 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
       Object.entries(input.mcp).forEach(([name, value]) => {
         const path = ["mcp", name]
         if (isEnabledOnlyMcp(value)) {
-          diagnostics.push({ kind: "unsupported", path, message: "omitted enabled-only legacy MCP entry" })
+          setOwn(enabledOverrides, name, value.enabled as boolean)
           return
         }
         if (name === "servers" && !isDirectLegacyMcp(value)) {
@@ -295,13 +296,14 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
     }
   }
   const servers = mergeMaps(legacyServers, nativeServers, ["mcp", "servers"], diagnostics)
-  if (!Object.keys(servers).length && !Object.keys(timeout).length) {
+  if (!Object.keys(servers).length && !Object.keys(timeout).length && !Object.keys(enabledOverrides).length) {
     if (isRecord(input.mcp) && !Object.keys(input.mcp).length) encoded.mcp = {}
     return
   }
   encoded.mcp = {
     ...(Object.keys(timeout).length ? { timeout } : {}),
     ...(Object.keys(servers).length ? { servers } : {}),
+    ...(Object.keys(enabledOverrides).length ? { overrides: enabledOverrides } : {}),
   }
 }
 
