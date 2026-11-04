@@ -32,6 +32,13 @@ import { ConfigMCP } from "@opencode/schema/config/mcp"
 import type { Session } from "@opencode/schema/session"
 import { McpStdio } from "./stdio.js"
 
+export const windowsMcpCommand = (command: string, platform = process.platform): string => {
+  if (platform !== "win32") return command
+  // Preserve explicit extensions and paths; only bare package-manager commands
+  // need the Windows shim suffix.
+  return /^(?:npx|npm|pnpm|yarn)$/i.test(command) ? command + ".cmd" : command
+}
+
 const DEFAULT_STARTUP_TIMEOUT = 30_000
 const DEFAULT_CATALOG_TIMEOUT = 30_000
 const DEFAULT_EXECUTION_TIMEOUT = 12 * 60 * 60 * 1_000 // 12 hours
@@ -297,7 +304,10 @@ export const connect = Effect.fnUntraced(function* (
   const exit = yield* Effect.gen(function* () {
     if (config.type === "attached") return yield* initialize(config.transport)
     if (config.type === "local") {
-      const [command, ...args] = config.command
+      const [configuredCommand, ...args] = config.command
+      // npm-installed launchers are .cmd shims on Windows. Normalize canonical config
+      // as well as auto-discovered config so both paths start the same MCP server.
+      const command = windowsMcpCommand(configuredCommand)
       const transport = yield* McpStdio.make({
         server,
         command,
