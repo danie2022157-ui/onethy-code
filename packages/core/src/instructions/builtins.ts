@@ -29,9 +29,13 @@ function readMemoryBank(directory: string): string {
   const files = ["project-brief.md", "system-patterns.md", "tech-context.md", "active-context.md"]
   const sections: string[] = []
   for (const file of files) {
-    // Don't follow symlinks and never inject an unbounded local memory file into the model context.
-    const content = readMemoryFile(memDir, file)?.trim()
-    if (content) sections.push(`### [Memory Bank: ${file}]\n${content.slice(0, 12000)}`)
+    // A corrupt or unreadable memory file must never prevent the entire app from starting.
+    try {
+      const content = readMemoryFile(memDir, file)?.trim()
+      if (content) sections.push(`### [Memory Bank: ${file}]\n${content.slice(0, 12000)}`)
+    } catch {
+      // Continue loading the remaining trusted local files.
+    }
   }
 
   if (sections.length === 0) {
