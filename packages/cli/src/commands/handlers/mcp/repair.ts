@@ -42,9 +42,7 @@ export default Runtime.handler(
       }
       // Run sequentially to avoid a burst of package installs and OAuth requests.
       try {
-        await Effect.runPromise(Effect.promise(() => client.experimental.mcp.connect({
-          server: server.name, location,
-        })))
+        yield* Effect.promise(() => client.experimental.mcp.connect({ server: server.name, location }))
         const fresh = (yield* Effect.promise(() => client.mcp.list({ location }))).data.find(
           (entry) => entry.name === server.name,
         )
