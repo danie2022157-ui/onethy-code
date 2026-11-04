@@ -1,6 +1,6 @@
 import { EOL } from "node:os"
 import path from "node:path"
-import { readFile, stat, writeFile } from "node:fs/promises"
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises"
 import { Effect, Option } from "effect"
 import { applyEdits, modify } from "jsonc-parser"
 import { Global } from "@opencode/util/global"
@@ -38,11 +38,15 @@ export default Runtime.handler(
 )
 
 export async function resolveConfigPath(directory: string) {
+  // Reuse an existing Onethy or compatible config rather than silently creating
+  // a separate opencode.json that may shadow the user's MCP settings.
   const candidates = [
-    path.join(directory, "opencode.json"),
-    path.join(directory, "opencode.jsonc"),
-    path.join(directory, ".opencode", "opencode.json"),
-    path.join(directory, ".opencode", "opencode.jsonc"),
+    ...["onethy.json", "onethy.jsonc", "omnicode.json", "omnicode.jsonc", "opencode.json", "opencode.jsonc"]
+      .map((name) => path.join(directory, name)),
+    ...[".onethy", ".omnicode", ".opencode"].flatMap((folder) =>
+      ["onethy.json", "onethy.jsonc", "omnicode.json", "omnicode.jsonc", "opencode.json", "opencode.jsonc"]
+        .map((name) => path.join(directory, folder, name)),
+    ),
   ]
   for (const candidate of candidates) {
     if (
@@ -64,5 +68,6 @@ async function write(configPath: string, name: string, server: unknown) {
   const edits = modify(text, ["mcp", "servers", name], server, {
     formattingOptions: { tabSize: 2, insertSpaces: true },
   })
+  await mkdir(path.dirname(configPath), { recursive: true })
   await writeFile(configPath, applyEdits(text, edits))
 }
