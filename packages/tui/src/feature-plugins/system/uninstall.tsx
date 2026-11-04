@@ -87,7 +87,7 @@ export default Plugin.define({
                 title: "Desinstalar OnethyCode?",
                 message: [
                   "Isso apagara permanentemente configuracoes, sessoes, credenciais e cache do OnethyCode.",
-                  "O repositorio de codigo e os projetos de clientes nao serao apagados.",
+                  "Projetos de clientes serao preservados. A exclusao do codigo-fonte requer uma segunda confirmacao.",
                   "O OnethyCode sera encerrado e a desinstalacao continuara em uma nova janela.",
                 ].join("\n"),
                 label: { confirm: "Desinstalar", cancel: "Cancelar" },
