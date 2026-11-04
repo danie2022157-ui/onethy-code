@@ -1,3 +1,4 @@
+import crypto from "node:crypto"
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { TestClock } from "effect/testing"
@@ -267,5 +268,36 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       expect(ralphDone.passed).toBe(true)
     }),
   )
+  effect("persists a dependency graph and dispatches only verified prerequisites", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* OmniOrchestrator.Service
+      const sessions = yield* OmniSession.Service
+      const missionID = "mission-dag-" + crypto.randomUUID()
+      const planned = yield* orchestrator.createMission("Implement and review a feature", missionID, [
+        { id: "explore", title: "Inspect the project", assignedAgent: "researcher" },
+        { id: "api", title: "Implement API", assignedAgent: "coder", dependsOn: ["explore"] },
+        { id: "cli", title: "Implement CLI", assignedAgent: "coder", dependsOn: ["explore"] },
+        { id: "review", title: "Verify the changes", assignedAgent: "reviewer", dependsOn: ["api", "cli"] },
+      ])
+      expect(planned).toHaveLength(4)
+      expect(yield* sessions.loadMissionTasks(missionID)).toHaveLength(4)
+      expect((yield* orchestrator.claimReadyTasks(missionID, 2)).map((task) => task.id)).toEqual(["explore"])
+      expect(yield* orchestrator.claimReadyTasks(missionID, 2)).toHaveLength(0)
+      yield* orchestrator.executeTask(missionID, "explore", "Exploration completed")
+      expect((yield* orchestrator.claimReadyTasks(missionID, 2)).map((task) => task.id)).toEqual(["api", "cli"])
+      yield* orchestrator.executeTask(missionID, "api", "API implemented")
+      expect(yield* orchestrator.claimReadyTasks(missionID, 2)).toHaveLength(0)
+      yield* orchestrator.failTask(missionID, "cli", "Tests failed")
+      expect(yield* orchestrator.claimReadyTasks(missionID, 2)).toHaveLength(0)
+      yield* orchestrator.retryTask(missionID, "cli")
+      expect((yield* orchestrator.claimReadyTasks(missionID, 2)).map((task) => task.id)).toEqual(["cli"])
+      yield* orchestrator.executeTask(missionID, "cli", "CLI tests passed")
+      expect((yield* orchestrator.claimReadyTasks(missionID, 2)).map((task) => task.id)).toEqual(["review"])
+      yield* orchestrator.executeTask(missionID, "review", "Verified by reviewer")
+      expect((yield* orchestrator.getActiveTasks(missionID)).every((task) => task.status === "completed")).toBe(true)
+      expect((yield* sessions.loadMissionTasks(missionID))?.every((task) => task.status === "completed")).toBe(true)
+    }),
+  )
+
 })
 
