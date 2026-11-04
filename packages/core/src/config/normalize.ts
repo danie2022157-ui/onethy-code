@@ -270,6 +270,14 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
     if (isRecord(input.mcp)) {
       Object.entries(input.mcp).forEach(([name, value]) => {
         const path = ["mcp", name]
+        if (name === "overrides" && !isDirectLegacyMcp(value)) {
+          if (!isRecord(value)) invalid(path, diagnostics)
+          else for (const [serverName, enabled] of Object.entries(value)) {
+            if (typeof enabled !== "boolean") invalid([...path, serverName], diagnostics)
+            else setOwn(enabledOverrides, serverName, enabled)
+          }
+          return
+        }
         if (isEnabledOnlyMcp(value)) {
           setOwn(enabledOverrides, name, value.enabled as boolean)
           return
