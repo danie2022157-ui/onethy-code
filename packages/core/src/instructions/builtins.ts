@@ -178,7 +178,8 @@ const layer = Layer.effect(
               key: Instructions.Key.make("omnicode/auto-customizations"),
               codec: Schema.toCodecJson(Schema.String),
               read: Effect.sync(() => {
-                const directive = renderAutoCustomizationsDirective(location.directory)
+                const directive = process.env.OMNICODE_ACTIVE === "1"
+                  ? renderAutoCustomizationsDirective(location.directory) : ""
                 return directive.trim() ? directive : Instructions.removed
               }),
               render: {
