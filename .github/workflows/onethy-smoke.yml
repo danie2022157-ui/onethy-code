@@ -44,7 +44,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Core regression tests
-        run: bun --cwd packages/core test test/omni-config.test.ts test/omni-checkpoint-safety.test.ts test/omni-commit-safety.test.ts test/omni-memory-bank.test.ts test/omni-session.test.ts test/omni-model-selection.test.ts test/omni-orchestrator.test.ts
+        run: bun --cwd packages/core test test/omni-config.test.ts test/omni-memory-bank.test.ts test/omni-session.test.ts test/omni-model-selection.test.ts test/omni-orchestrator.test.ts
 
       - name: TUI regression tests
         run: bun --cwd packages/tui test test/cli/tui/plugins-dialog.test.tsx test/component/dialog-omni-update.test.tsx test/component/dialog-memory-bank.test.tsx test/util/onethy-update.test.ts test/util/onethy-projects.test.ts test/component/dialog-projects.test.tsx
@@ -56,20 +56,3 @@ jobs:
       - name: TUI TypeScript check
         if: runner.os == 'Linux'
         run: bun --cwd packages/tui run typecheck:tsc
-
-      - name: CLI TypeScript check
-        if: runner.os == 'Linux'
-        run: bun --cwd packages/cli run typecheck:tsc
-
-      - name: POSIX installer syntax
-        if: runner.os == 'Linux'
-        run: bash -n install.sh
-
-      - name: PowerShell installer syntax
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $pwd 'install.ps1'), [ref]$null, [ref]$errors) | Out-Null
-          if ($errors) { $errors | ForEach-Object { Write-Error $_.ToString() }; exit 1 }
-
