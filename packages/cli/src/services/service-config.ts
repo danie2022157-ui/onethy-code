@@ -134,10 +134,14 @@ const paths = Effect.gen(function* () {
 // Clients find the service at its registration under XDG_STATE_HOME. A saved value would move the
 // registration away from them, and children of the service (tool shells, a relaunched Desktop) would
 // look for it in the wrong place, so the service keeps the state directory it was launched with.
-export function processEnv(env: Info["env"]) {
-  if (env === undefined) return undefined
-  const { XDG_STATE_HOME: _state, ...rest } = env
-  return rest
+export function processEnv(env: Info["env"], host: NodeJS.ProcessEnv = process.env) {
+  const { XDG_STATE_HOME: _state, ...rest } = env ?? {}
+  // The managed server is a separate process. Keep Onethy identity even when
+  // the service manager starts it with a minimal environment: otherwise MCP
+  // discovery is skipped because it is gated on OMNICODE_ACTIVE.
+  if (host.ONETHY_ACTIVE === "1" || host.OMNICODE_ACTIVE === "1")
+    return { ...rest, ONETHY_ACTIVE: "1", OMNICODE_ACTIVE: "1", OPENCODE_CLI_NAME: "onethy" }
+  return env === undefined ? undefined : rest
 }
 
 export const options = Effect.fnUntraced(function* (input: { readonly checkVersion?: boolean } = {}) {
