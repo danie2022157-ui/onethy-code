@@ -97,7 +97,7 @@ export function uninstallWorkerCommand(pid: number, checkout: string, launcher: 
     "  $config = Get-Content -LiteralPath $configFile -Raw -ErrorAction Stop | ConvertFrom-Json",
     "  if ([string]$config.checkout -ine $checkout) { throw 'O instalador registrado pertence a outra pasta.' }",
     "  $script = Get-Content -LiteralPath $scriptFile -Raw -ErrorAction Stop",
-    "  if (-not $script.Contains('onethy-config.json') -or -not $script.Contains('bin\onethy.js')) { throw 'Instalador do Windows nao reconhecido.' }",
+    "  if (-not $script.Contains('onethy-config.json') -or -not $script.Contains('bin\\onethy.js')) { throw 'Instalador do Windows nao reconhecido.' }",
     "  $unknownLaunchers = @()",
     "  foreach ($name in @('onethy.cmd', 'onethy-code.cmd', 'omni.cmd', 'omnicode.cmd')) {",
     "    $file = Join-Path $launcherDirectory $name",
