@@ -275,7 +275,7 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
         }
         if (name === "servers" && !isDirectLegacyMcp(value)) {
           Object.entries(
-            decodeMap(expandServerTimeouts(value), ConfigMCP.Server, path, diagnostics, decodeEncoded),
+            decodeMap(expandServerTimeouts(value), ConfigMCP.Server, path, diagnostics, decodeMcpServer),
           ).forEach(([key, server]) => setOwn(nativeServers, key, server))
           return
         }
@@ -303,6 +303,28 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
     ...(Object.keys(timeout).length ? { timeout } : {}),
     ...(Object.keys(servers).length ? { servers } : {}),
   }
+}
+
+/** Native and V1 MCP configurations both document "enabled"; canonical storage uses "disabled".
+ * Accept it in the nested mcp.servers map too, instead of silently dropping the opt-out flag.
+ * This conversion is restricted to explicitly declared server configurations.
+ */
+function decodeMcpServer(
+  schema: typeof ConfigMCP.Server,
+  value: unknown,
+  path: string[],
+  diagnostics: Diagnostic[],
+) {
+  if (!isRecord(value) || !own(value, "enabled")) return decodeEncoded(schema, value, path, diagnostics)
+  if (typeof value.enabled !== "boolean") {
+    invalid([...path, "enabled"], diagnostics)
+    return undefined
+  }
+  if (own(value, "disabled") && value.disabled !== !value.enabled) {
+    diagnostics.push({ kind: "conflict", path: [...path, "enabled"], message: "disabled takes precedence over enabled" })
+  }
+  const { enabled, ...rest } = value
+  return decodeEncoded(schema, { ...rest, disabled: own(value, "disabled") ? value.disabled : !enabled }, path, diagnostics)
 }
 
 // Native servers accept the V1 bare-number timeout so one V1-shaped field does not drop the whole server.
