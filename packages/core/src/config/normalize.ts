@@ -250,6 +250,7 @@ function normalizeSkills(input: Record<string, unknown>, encoded: Record<string,
 function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, unknown>, diagnostics: Diagnostic[]) {
   const legacyServers: Record<string, unknown> = {}
   const nativeServers: Record<string, unknown> = {}
+  const enabled: Record<string, boolean> = {}
   const timeout: Record<string, unknown> = {}
   if (isRecord(input.experimental) && own(input.experimental, "mcp_timeout")) {
     const value = decodeEncoded(
@@ -270,12 +271,25 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
       Object.entries(input.mcp).forEach(([name, value]) => {
         const path = ["mcp", name]
         if (isEnabledOnlyMcp(value)) {
-          diagnostics.push({ kind: "unsupported", path, message: "omitted enabled-only legacy MCP entry" })
+          enabled[name] = value.enabled as boolean
+          return
+        }
+        if (name === "enabled" && !isDirectLegacyMcp(value)) {
+          const chosen = decodeMap(value, Schema.Boolean, path, diagnostics, decodeEncoded)
+          for (const [key, flag] of Object.entries(chosen)) enabled[key] = flag
           return
         }
         if (name === "servers" && !isDirectLegacyMcp(value)) {
+          const candidates = isRecord(value) ? value : {}
+          if (!isRecord(value)) invalid(path, diagnostics)
+          for (const [key, config] of Object.entries(candidates)) {
+            if (isEnabledOnlyMcp(config)) enabled[key] = config.enabled as boolean
+          }
+          const complete = Object.fromEntries(
+            Object.entries(candidates).filter(([, config]) => !isEnabledOnlyMcp(config)),
+          )
           Object.entries(
-            decodeMap(expandServerTimeouts(value), ConfigMCP.Server, path, diagnostics, decodeMcpServer),
+            decodeMap(expandServerTimeouts(complete), ConfigMCP.Server, path, diagnostics, decodeMcpServer),
           ).forEach(([key, server]) => setOwn(nativeServers, key, server))
           return
         }
@@ -295,13 +309,14 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
     }
   }
   const servers = mergeMaps(legacyServers, nativeServers, ["mcp", "servers"], diagnostics)
-  if (!Object.keys(servers).length && !Object.keys(timeout).length) {
+  if (!Object.keys(servers).length && !Object.keys(timeout).length && !Object.keys(enabled).length) {
     if (isRecord(input.mcp) && !Object.keys(input.mcp).length) encoded.mcp = {}
     return
   }
   encoded.mcp = {
     ...(Object.keys(timeout).length ? { timeout } : {}),
     ...(Object.keys(servers).length ? { servers } : {}),
+    ...(Object.keys(enabled).length ? { enabled } : {}),
   }
 }
 
