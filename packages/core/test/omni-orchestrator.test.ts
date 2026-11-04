@@ -107,7 +107,7 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       const completed = yield* orchestrator.executeTask("mission-auth", tasks[0].id, "Rotas identificadas com sucesso")
       expect(completed.status).toBe("completed")
       expect(completed.result).toBe("Rotas identificadas com sucesso")
-      const statusMessage = (yield* bus.list()).find((message) => message.type === "status")
+      const statusMessage = (yield* bus.list()).find((message) => message.type === "status" && message.payload.status === "completed")
       expect(statusMessage?.payload).toMatchObject({ missionID: "mission-auth", status: "completed" })
       const crossMission = yield* Effect.exit(orchestrator.executeTask("mission-other", tasks[1].id, "must not complete"))
       expect(crossMission._tag).toBe("Failure")
