@@ -83,6 +83,7 @@ import { GrepTool } from "../tool/plugin/grep.js"
 import { ImageGenerateTool } from "../tool/plugin/image-generate.js"
 import { McpResourceTools } from "../tool/plugin/mcp-resource.js"
 import { OmniBusTool } from "../tool/plugin/omni-bus.js"
+import { OmniMissionTool } from "../tool/plugin/omni-mission.js"
 import { OmniMemoryTool } from "../tool/plugin/omni-memory.js"
 import { OmniCheckpointTool } from "../tool/plugin/omni-checkpoint.js"
 import { OmniHealTool } from "../tool/plugin/omni-heal.js"
@@ -272,6 +273,7 @@ const pre = [
   GrepTool.Plugin,
   ImageGenerateTool.Plugin,
   OmniBusTool.Plugin,
+  OmniMissionTool.Plugin,
   OmniMemoryTool.Plugin,
   OmniCheckpointTool.Plugin,
   OmniHealTool.Plugin,
