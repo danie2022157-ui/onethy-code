@@ -9,6 +9,7 @@ import { Location } from "../../location.js"
 import { Global } from "@opencode/util/global"
 import {
   GLOBAL_TEMPLATES,
+  PROJECT_TEMPLATES,
   globalMemoryDirectory,
   projectMemoryDirectory,
   memoryFilename,
@@ -63,63 +64,6 @@ export const description = [
   "- 'status': Checks memory bank existence and last modified dates.",
 ].join("\n")
 
-const TEMPLATES: Record<string, string> = {
-  "project-brief.md": [
-    "# Project Brief",
-    "",
-    "## 1. Visão Geral e Objetivos",
-    "- Propósito central do projeto.",
-    "- Problemas que resolve e valor para os usuários.",
-    "",
-    "## 2. Requisitos e Escopo",
-    "- Funcionalidades essenciais.",
-    "- O que está explicitamente FORA de escopo.",
-    "",
-    "## 3. Critérios de Sucesso",
-    "- Estabilidade, cobertura de testes e aderência aos requisitos.",
-  ].join("\n"),
-  "system-patterns.md": [
-    "# System Patterns & Arquitetura",
-    "",
-    "## 1. Arquitetura Geral",
-    "- Camadas do sistema e separação de responsabilidades.",
-    "- Direção de dependências e regras de importação.",
-    "",
-    "## 2. Padrões de Código e Convenções",
-    "- Nomenclatura, tratamento de erros e convenções de estilo.",
-    "- Regras de schema e tipagem.",
-    "",
-    "## 3. Decisões Arquiteturais Chave (ADRs)",
-    "- Decisões importantes e suas justificativas técnicas.",
-  ].join("\n"),
-  "tech-context.md": [
-    "# Tech Context",
-    "",
-    "## 1. Stack Tecnológica",
-    "- Runtime / Linguagens principais.",
-    "- Frameworks, bibliotecas e bancos de dados.",
-    "",
-    "## 2. Comandos e Scripts de Desenvolvimento",
-    "- Testes: comando para rodar testes.",
-    "- Build / Lint / Typecheck: scripts de validação.",
-    "",
-    "## 3. Restrições do Ambiente",
-    "- Compatibilidade de SO, variáveis de ambiente e requisitos de segurança.",
-  ].join("\n"),
-  "active-context.md": [
-    "# Active Context",
-    "",
-    "## 1. Foco Atual",
-    "- Funcionalidade ou refatoração sendo desenvolvida no momento.",
-    "",
-    "## 2. Tarefas e Próximos Passos",
-    "- [ ] Próxima tarefa imediata.",
-    "",
-    "## 3. Descobertas e Decisões Recentes",
-    "- Notas para os próximos subagentes e sessões futuras.",
-  ].join("\n"),
-}
-
 export const Plugin = {
   id: "opencode.tool.omni_memory",
   effect: Effect.fn("OmniMemoryTool.Plugin")(function* (ctx: Context) {
@@ -142,7 +86,7 @@ export const Plugin = {
               const memoryDir = scope === "global"
                 ? globalMemoryDirectory(global.config)
                 : projectMemoryDirectory(rootDir)
-              const templates = scope === "global" ? GLOBAL_TEMPLATES : TEMPLATES
+              const templates = scope === "global" ? GLOBAL_TEMPLATES : PROJECT_TEMPLATES
               const scopeLabel = scope === "global" ? "global" : "do projeto"
               const selectFilename = (name: string) =>
                 scope === "global" ? globalMemoryFilename(name) : memoryFilename(name)
