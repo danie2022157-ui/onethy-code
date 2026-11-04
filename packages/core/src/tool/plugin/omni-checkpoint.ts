@@ -62,6 +62,21 @@ function runGit(cwd: string, args: string[]): { stdout: string; stderr: string; 
   }
 }
 
+/** Pure safety gate used before any Git operation that can modify the working tree. */
+export function checkpointRestoreBlocker(input: {
+  confirm?: boolean
+  status: { code: number; stdout: string }
+  head: { code: number; stdout: string }
+  expectedHead?: string
+}): string | undefined {
+  if (!input.confirm) return "Checkpoint restore requires explicit user approval."
+  if (input.status.code !== 0 || input.head.code !== 0) return "Cannot verify Git status and HEAD."
+  if (input.status.stdout.trim()) return "The working tree has local changes. Back them up before restoring."
+  if (!input.expectedHead || input.expectedHead !== input.head.stdout.trim())
+    return "HEAD changed since checkpoint creation."
+  return undefined
+}
+
 export const Plugin = {
   id: "opencode.tool.omni_checkpoint",
   effect: Effect.fn("OmniCheckpointTool.Plugin")(function* (ctx: Context) {
@@ -181,20 +196,15 @@ export const Plugin = {
                   })
                 }
 
-                if (!params.confirm) {
-                  return yield* new ToolFailure({ message: "Checkpoint restore needs explicit user approval and confirm=true." })
-                }
                 const status = runGit(rootDir, ["status", "--porcelain=v1", "--untracked-files=all"])
                 const head = runGit(rootDir, ["rev-parse", "--verify", "HEAD"])
-                if (status.code !== 0 || head.code !== 0) {
-                  return yield* new ToolFailure({ message: "Could not verify Git safety before restore." })
-                }
-                if (status.stdout.trim()) {
-                  return yield* new ToolFailure({ message: "Restore refused: working tree has changes. Commit, stash or back them up before restoring. No files were modified." })
-                }
-                if (!target.commitHash || head.stdout.trim() !== target.commitHash) {
-                  return yield* new ToolFailure({ message: "Restore refused: HEAD differs from the checkpoint base. No files were modified." })
-                }
+                const blocker = checkpointRestoreBlocker({
+                  confirm: params.confirm,
+                  status,
+                  head,
+                  expectedHead: target.commitHash,
+                })
+                if (blocker) return yield* new ToolFailure({ message: "Restore refused: " + blocker + " No files were modified." })
                 if (target.stashRef) {
                   const pinned = runGit(rootDir, ["rev-parse", "--verify", `refs/onethy/checkpoints/${target.id}`])
                   if (pinned.code !== 0 || pinned.stdout.trim() !== target.stashRef) {
