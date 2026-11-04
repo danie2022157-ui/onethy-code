@@ -6,7 +6,8 @@ Este incremento reutiliza a arquitetura existente de serviços do OnethyCode. N�
 
 Disponível para agentes quando OMNICODE_ACTIVE=1. A ferramenta tem as ações:
 
-- code: busca local por intenção e tokens de identificadores, com caminhos e linhas. É recuperação lexical enriquecida, **não** embeddings vetoriais; a qualidade pode variar por idioma e nomes do projeto.
+- code: busca local lexical por intenção e tokens de identificadores, com caminhos e linhas. Funciona offline sem modelo.
+- semantic: **embeddings vetoriais reais locais** com Ollama em `127.0.0.1:11434` e modelo `nomic-embed-text`. Exige Ollama já instalado e modelo presente. Faz uma indexação limitada por consulta (até 350 arquivos Git), com cache em memória do processo. Falha explicitamente quando o Ollama não está disponível; não envia código para servidores externos.
 - tools: catálogo contextual das tools registradas, skills e MCPs conectados. Descobrir uma ferramenta não autoriza executá-la.
 - history: pesquisa nas conversas do próprio serviço de sessões (até 30 sessões recentes, 30 mensagens por sessão), além de .omnicode/sessions, missions, plans e memory-bank. A busca é limitada ao projeto atual e não cobre toda a conta.
 - review: mostra alterações staged e unstaged sem modificá-las. Arquivos untracked aparecem na lista, sem seu conteúdo no diff. Aprovação/rejeição é feita pela interface de revisão existente.
@@ -14,6 +15,7 @@ Disponível para agentes quando OMNICODE_ACTIVE=1. A ferramenta tem as ações:
 
 Exemplos de solicitações ao agente:
 - "Use omni_intelligence action=code query='login do usuário' para achar a função de autenticação."
+- "Use omni_intelligence action=semantic query='onde a autenticação e sessão de usuário são validadas' para busca por embeddings locais."
 - "Use omni_intelligence action=tools query='automação no navegador' para localizar ferramentas disponíveis."
 - "Use omni_intelligence action=history query='decisão de arquitetura' para recuperar notas anteriores."
 - "Use omni_intelligence action=review antes de finalizar a implementação."
@@ -31,6 +33,6 @@ Exemplos de solicitações ao agente:
 
 ## Segurança e limites
 
-A busca não lê symlinks, .env, nomes de credenciais, nem diretórios gerados conhecidos. Os limites são 1.200 arquivos e 8 MiB de texto por consulta, com 128 KiB por arquivo. Não há comando de shell dinâmico na busca. A revisão roda apenas git status e git diff com argumentos fixos. Nenhuma ação desta ferramenta concede permissões, executa ferramentas externas ou aprova mudanças.
+A busca lexical e a vetorial não seguem symlinks nem indexam .env, nomes de credenciais ou diretórios gerados conhecidos. A vetorial depende de Git para respeitar exclusões. Os limites são 1.200 arquivos e 8 MiB de texto por consulta, com 128 KiB por arquivo. Não há comando de shell dinâmico na busca. A revisão roda apenas git status e git diff com argumentos fixos. Nenhuma ação desta ferramenta concede permissões, executa ferramentas externas ou aprova mudanças.
 
-Para validar no checkout: `bun --cwd packages/core test test/omni-intelligence.test.ts test/omni-task-graph.test.ts`, `bun --cwd packages/core run typecheck:tsc` e suíte `onethy-smoke` em Linux e Windows. Há testes de utilitários e typecheck, mas o fluxo completo com modelos reais, subagentes e sessões/worktrees em múltiplos ambientes ainda exige testes de integração antes de produção.
+Para validar no checkout: `bun --cwd packages/core test test/omni-intelligence.test.ts test/omni-task-graph.test.ts test/omni-embeddings.test.ts`, `bun --cwd packages/core run typecheck:tsc` e suíte `onethy-smoke` em Linux e Windows. Há testes de utilitários e typecheck, mas o fluxo completo com modelos reais, subagentes e sessões/worktrees em múltiplos ambientes ainda exige testes de integração antes de produção.
