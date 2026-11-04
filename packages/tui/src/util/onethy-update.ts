@@ -21,6 +21,9 @@ const runGit: GitRunner = (args, cwd) =>
 
 /** Locate the installed checkout, not the user's current coding project. */
 export function findOnethyRoot(): string | undefined {
+  const installed = process.env.ONETHY_INSTALL_ROOT
+  if (installed && fs.existsSync(path.join(installed, ".git")) && fs.existsSync(path.join(installed, "packages", "tui")))
+    return installed
   try {
     let directory = path.dirname(fileURLToPath(import.meta.url))
     for (let i = 0; i < 12; i++) {
