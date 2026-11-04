@@ -53,7 +53,7 @@ export default Runtime.handler(
       `Total: ${servers.length} | connected: ${counts.connected} | failed: ${counts.failed} | auth: ${counts.needs_auth} | disabled: ${counts.disabled} | pending: ${counts.pending}` + EOL,
     )
     if (counts.failed && !input.retry)
-      process.stdout.write("Run 'onethy mcp doctor --retry' to retry failed connections." + EOL)
+      process.stdout.write("Run 'opencode mcp doctor --retry' to retry failed connections." + EOL)
   }),
 )
 
@@ -71,7 +71,7 @@ export function advice(server: McpServer): string {
     case "pending":
       return "initializing; run doctor again if startup does not finish"
     case "needs_auth":
-      return `sign in with 'onethy mcp auth ${server.name}' (${safeError(server.status.error)})`
+      return `sign in with 'opencode mcp auth ${server.name}' (${safeError(server.status.error)})`
     case "disabled":
       return "disabled by configuration or discovery; explicitly enable this server in trusted project/global config"
     case "failed":
