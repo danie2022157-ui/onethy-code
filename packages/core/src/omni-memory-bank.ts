@@ -44,6 +44,13 @@ export function memoryFilename(input: string): string {
   return name
 }
 
+/** Global memory is intentionally limited to three reviewed user-wide documents. */
+export function globalMemoryFilename(input: string) {
+  const filename = memoryFilename(input)
+  if (!Object.hasOwn(GLOBAL_TEMPLATES, filename)) throw new Error("Unknown global memory document")
+  return filename
+}
+
 export function memoryFile(directory: string, name: string) {
   return path.join(directory, memoryFilename(name))
 }
