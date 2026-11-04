@@ -154,7 +154,9 @@ const layer = Layer.effect(
             Instructions.make({
               key: Instructions.Key.make("omnicode/memory-bank"),
               codec: Schema.toCodecJson(Schema.String),
-              read: Effect.sync(() => readMemoryBank(location.project.directory)),
+              read: Effect.sync(() =>
+                process.env.OMNICODE_ACTIVE === "1" ? readMemoryBank(location.project.directory) : Instructions.removed,
+              ),
               render: {
                 initial: (memory) => memory,
                 changed: (_previous, memory) => memory,
