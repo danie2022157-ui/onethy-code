@@ -6,12 +6,17 @@ import { fileURLToPath } from "node:url"
 type GitResult = { stdout: string; stderr: string; code: number }
 export type GitRunner = (args: string[], cwd: string) => Promise<GitResult>
 
-const OFFICIAL_ORIGIN = /(?:^|[/:@])github\.com[:/]danie2022157-ui\/onethy-code(?:\.git)?\/?$/i
+const OFFICIAL_ORIGINS = new Set([
+  "https://github.com/danie2022157-ui/onethy-code",
+  "git@github.com:danie2022157-ui/onethy-code",
+  "ssh://git@github.com/danie2022157-ui/onethy-code",
+])
 
 export function isOfficialOnethyOrigin(value: string): boolean {
-  return OFFICIAL_ORIGIN.test(value.trim())
+  const trimmed = value.trim().replace(/\/$/, "")
+  const normalized = trimmed.endsWith(".git") ? trimmed.slice(0, -4) : trimmed
+  return OFFICIAL_ORIGINS.has(normalized)
 }
-
 const runGit: GitRunner = (args, cwd) =>
   new Promise((resolve) => {
     execFile("git", args, { cwd, encoding: "utf8", timeout: 12000, windowsHide: true }, (error, stdout, stderr) =>
