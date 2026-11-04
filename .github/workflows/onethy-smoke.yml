@@ -32,7 +32,7 @@ jobs:
 
       - name: Validate Windows complete uninstaller (isolated test profile)
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: powershell
         run: |
           $tokens = $null
           $parseErrors = $null
