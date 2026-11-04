@@ -44,20 +44,20 @@ jobs:
             exit 1
           }
           $sandbox = Join-Path $env:RUNNER_TEMP "onethy-uninstall-ci"
-          $home = Join-Path $sandbox "profile"
-          $root = Join-Path $home "onethy-code-ci"
+          $testProfile = Join-Path $sandbox "profile"
+          $root = Join-Path $testProfile "onethy-code-ci"
           $oldUserProfile = $env:USERPROFILE
           $oldLocalApp = $env:LOCALAPPDATA
           $oldRoamingApp = $env:APPDATA
           New-Item -ItemType Directory -Force -Path (Join-Path $root "bin") | Out-Null
           Copy-Item bin/onethy.js (Join-Path $root "bin/onethy.js")
           Copy-Item install.ps1 (Join-Path $root "install.ps1")
-          New-Item -ItemType Directory -Force -Path (Join-Path $home "AppData/Local/omnicode/data") | Out-Null
-          New-Item -ItemType Directory -Force -Path (Join-Path $home "AppData/Roaming/omnicode") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $testProfile "AppData/Local/omnicode/data") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $testProfile "AppData/Roaming/omnicode") | Out-Null
           try {
-            $env:USERPROFILE = $home
-            $env:LOCALAPPDATA = Join-Path $home "AppData/Local"
-            $env:APPDATA = Join-Path $home "AppData/Roaming"
+            $env:USERPROFILE = $testProfile
+            $env:LOCALAPPDATA = Join-Path $testProfile "AppData/Local"
+            $env:APPDATA = Join-Path $testProfile "AppData/Roaming"
             & ./uninstall.ps1 -Checkout $root -Preview
             if (-not (Test-Path -LiteralPath $root)) { throw "Preview removed the installation!" }
             & ./uninstall.ps1 -Checkout $root -Yes
