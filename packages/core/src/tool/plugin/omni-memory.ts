@@ -12,6 +12,7 @@ import {
   globalMemoryDirectory,
   projectMemoryDirectory,
   memoryFilename,
+  globalMemoryFilename,
   readMemoryFile,
   initializeMemoryBank,
   writeMemoryFile,
@@ -143,6 +144,8 @@ export const Plugin = {
                 : projectMemoryDirectory(rootDir)
               const templates = scope === "global" ? GLOBAL_TEMPLATES : TEMPLATES
               const scopeLabel = scope === "global" ? "global" : "do projeto"
+              const selectFilename = (name: string) =>
+                scope === "global" ? globalMemoryFilename(name) : memoryFilename(name)
 
               if (scope === "global" && (params.action === "delete" || params.action === "clear") && !params.confirm) {
                 return yield* new ToolFailure({
@@ -178,7 +181,7 @@ export const Plugin = {
                 }
                 const files = fs.readdirSync(memoryDir).filter((f) => {
                   try {
-                    memoryFilename(f)
+                    selectFilename(f)
                     const stat = fs.lstatSync(path.join(memoryDir, f))
                     return stat.isFile() && !stat.isSymbolicLink()
                   } catch { return false }
@@ -203,7 +206,7 @@ export const Plugin = {
                 const targetFiles =
                   !params.file || params.file === "all"
                     ? Object.keys(templates)
-                    : [memoryFilename(params.file)]
+                    : [selectFilename(params.file)]
 
                 const contents: Record<string, string> = {}
                 const blocks: string[] = []
@@ -226,7 +229,7 @@ export const Plugin = {
 
               if (params.action === "update") {
                 ensureDir()
-                const fileName = memoryFilename(params.file ?? (scope === "global" ? "preferences" : "active-context"))
+                const fileName = selectFilename(params.file ?? (scope === "global" ? "preferences" : "active-context"))
                 const contentToWrite = params.content ?? ""
                 writeMemoryFile(memoryDir, fileName, contentToWrite, params.append ?? false)
 
@@ -240,7 +243,7 @@ export const Plugin = {
 
               if (params.action === "delete") {
                 ensureDir()
-                const fileName = memoryFilename(params.file ?? (scope === "global" ? "preferences" : "active-context"))
+                const fileName = selectFilename(params.file ?? (scope === "global" ? "preferences" : "active-context"))
                 if (deleteMemoryFile(memoryDir, fileName)) {
                   const summary = `Arquivo '${fileName}' excluído do Memory Bank com sucesso.`
                   return {
@@ -263,7 +266,7 @@ export const Plugin = {
                   let count = 0
                   for (const f of files) {
                     try {
-                      memoryFilename(f)
+                      selectFilename(f)
                       if (deleteMemoryFile(memoryDir, f)) count++
                     } catch {}
                   }
