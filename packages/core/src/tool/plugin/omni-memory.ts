@@ -6,10 +6,27 @@ import { ToolFailure } from "@opencode/ai/effect"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { Effect, Schema } from "effect"
 import { Location } from "../../location.js"
+import { Global } from "@opencode/util/global"
+import {
+  GLOBAL_TEMPLATES,
+  globalMemoryDirectory,
+  projectMemoryDirectory,
+  memoryFilename,
+  readMemoryFile,
+  initializeMemoryBank,
+  writeMemoryFile,
+  deleteMemoryFile,
+} from "../../omni-memory-bank.js"
 
 export const name = "omni_memory"
 
 export const Input = Schema.Struct({
+  scope: Schema.optionalKey(Schema.Literals(["project", "global"])).annotate({
+    description: "project (default) keeps project context isolated; global shares preferences across workspaces.",
+  }),
+  confirm: Schema.optionalKey(Schema.Boolean).annotate({
+    description: "Required to delete or clear global memory (only after the user explicitly asks).",
+  }),
   action: Schema.Literals(["read", "update", "init", "status", "delete", "clear"]).annotate({
     description:
       "Action to perform: 'read' reads memory bank files; 'update' updates a memory bank file; 'init' initializes the 4 memory bank files; 'status' checks memory bank readiness; 'delete' deletes a specific memory bank file; 'clear' clears all memory bank files.",
@@ -34,7 +51,10 @@ export const Output = Schema.Struct({
 })
 
 export const description = [
-  "Persistent Project Memory Bank (.omnicode/memory-bank/).",
+  "Persistent project and global memory banks.",
+  "scope='project' (default): .omnicode/memory-bank/; scope='global': user config/memory-bank/.",
+  "Global memory is available in all projects, but modifications require an explicit user request.",
+  "Never store credentials, passwords, tokens, customer data or secrets in global memory.",
   "Stores architectural decisions, project requirements, tech stack constraints, and current task focus across sessions.",
   "- 'read': Retrieves memory bank files so agents remember project patterns without context amnesia.",
   "- 'update': Writes or updates 'project-brief', 'system-patterns', 'tech-context', or 'active-context'.",
@@ -103,6 +123,7 @@ export const Plugin = {
   id: "opencode.tool.omni_memory",
   effect: Effect.fn("OmniMemoryTool.Plugin")(function* (ctx: Context) {
     const location = yield* Location.Service
+    const global = yield* Global.Service
 
     yield* ctx.tool
       .transform((editor) => {
@@ -116,28 +137,29 @@ export const Plugin = {
           execute: (params) =>
             Effect.gen(function* () {
               const rootDir = location.project.directory
-              const memoryDir = path.join(rootDir, ".omnicode", "memory-bank")
+              const scope = params.scope ?? "project"
+              const memoryDir = scope === "global"
+                ? globalMemoryDirectory(global.config)
+                : projectMemoryDirectory(rootDir)
+              const templates = scope === "global" ? GLOBAL_TEMPLATES : TEMPLATES
+              const scopeLabel = scope === "global" ? "global" : "do projeto"
+
+              if (scope === "global" && (params.action === "delete" || params.action === "clear") && !params.confirm) {
+                return yield* new ToolFailure({
+                  message: "To delete global memory, ask the user to confirm and set confirm=true.",
+                })
+              }
 
               const ensureDir = () => {
-                if (!fs.existsSync(memoryDir)) {
-                  fs.mkdirSync(memoryDir, { recursive: true })
-                }
+                fs.mkdirSync(memoryDir, { recursive: true, mode: 0o700 })
               }
 
               if (params.action === "init") {
-                ensureDir()
-                const created: string[] = []
-                for (const [filename, template] of Object.entries(TEMPLATES)) {
-                  const target = path.join(memoryDir, filename)
-                  if (!fs.existsSync(target)) {
-                    fs.writeFileSync(target, template, "utf-8")
-                    created.push(filename)
-                  }
-                }
+                const created = initializeMemoryBank(memoryDir, templates)
                 const summary =
                   created.length > 0
-                    ? `Memory Bank inicializado com sucesso em .omnicode/memory-bank/ (${created.join(", ")}).`
-                    : "Memory Bank já estava inicializado em .omnicode/memory-bank/."
+                    ? `Memory Bank ${scopeLabel} inicializado (${created.join(", ")}).`
+                    : `Memory Bank ${scopeLabel} já estava inicializado.`
                 return {
                   output: { action: "init", summary },
                   content: summary,
@@ -154,7 +176,13 @@ export const Plugin = {
                     metadata: { action: "status" },
                   }
                 }
-                const files = fs.readdirSync(memoryDir).filter((f) => f.endsWith(".md"))
+                const files = fs.readdirSync(memoryDir).filter((f) => {
+                  try {
+                    memoryFilename(f)
+                    const stat = fs.lstatSync(path.join(memoryDir, f))
+                    return stat.isFile() && !stat.isSymbolicLink()
+                  } catch { return false }
+                })
                 const details = files.map((f) => {
                   const stat = fs.statSync(path.join(memoryDir, f))
                   return `${f} (${stat.size} bytes, modificado em ${stat.mtime.toLocaleTimeString()})`
@@ -169,25 +197,20 @@ export const Plugin = {
 
               if (params.action === "read") {
                 if (!fs.existsSync(memoryDir)) {
-                  ensureDir()
-                  for (const [filename, template] of Object.entries(TEMPLATES)) {
-                    const target = path.join(memoryDir, filename)
-                    if (!fs.existsSync(target)) fs.writeFileSync(target, template, "utf-8")
-                  }
+                  initializeMemoryBank(memoryDir, templates)
                 }
 
                 const targetFiles =
                   !params.file || params.file === "all"
-                    ? ["project-brief.md", "system-patterns.md", "tech-context.md", "active-context.md"]
-                    : [`${params.file}.md`]
+                    ? Object.keys(templates)
+                    : [memoryFilename(params.file)]
 
                 const contents: Record<string, string> = {}
                 const blocks: string[] = []
 
                 for (const f of targetFiles) {
-                  const filePath = path.join(memoryDir, f)
-                  if (fs.existsSync(filePath)) {
-                    const data = fs.readFileSync(filePath, "utf-8")
+                  const data = readMemoryFile(memoryDir, f)
+                  if (data !== undefined) {
                     contents[f] = data
                     blocks.push(`=== ${f} ===\n${data}`)
                   }
@@ -203,21 +226,11 @@ export const Plugin = {
 
               if (params.action === "update") {
                 ensureDir()
-                const fileName = params.file
-                  ? params.file.endsWith(".md")
-                    ? params.file
-                    : `${params.file}.md`
-                  : "active-context.md"
-                const filePath = path.join(memoryDir, fileName)
+                const fileName = memoryFilename(params.file ?? (scope === "global" ? "preferences" : "active-context"))
                 const contentToWrite = params.content ?? ""
+                writeMemoryFile(memoryDir, fileName, contentToWrite, params.append ?? false)
 
-                if (params.append && fs.existsSync(filePath)) {
-                  fs.appendFileSync(filePath, `\n\n${contentToWrite}`, "utf-8")
-                } else {
-                  fs.writeFileSync(filePath, contentToWrite, "utf-8")
-                }
-
-                const summary = `Arquivo '${fileName}' atualizado no Memory Bank (${path.relative(rootDir, filePath)}).`
+                const summary = `Arquivo '${fileName}' atualizado no Memory Bank ${scopeLabel}.`
                 return {
                   output: { action: "update", summary },
                   content: summary,
@@ -227,11 +240,8 @@ export const Plugin = {
 
               if (params.action === "delete") {
                 ensureDir()
-                const rawName = params.file ?? "active-context"
-                const fileName = rawName.endsWith(".md") ? rawName : `${rawName}.md`
-                const filePath = path.join(memoryDir, fileName)
-                if (fs.existsSync(filePath)) {
-                  fs.unlinkSync(filePath)
+                const fileName = memoryFilename(params.file ?? (scope === "global" ? "preferences" : "active-context"))
+                if (deleteMemoryFile(memoryDir, fileName)) {
                   const summary = `Arquivo '${fileName}' excluído do Memory Bank com sucesso.`
                   return {
                     output: { action: "delete", summary },
@@ -252,14 +262,12 @@ export const Plugin = {
                   const files = fs.readdirSync(memoryDir)
                   let count = 0
                   for (const f of files) {
-                    if (f.endsWith(".md")) {
-                      try {
-                        fs.unlinkSync(path.join(memoryDir, f))
-                        count++
-                      } catch {}
-                    }
+                    try {
+                      memoryFilename(f)
+                      if (deleteMemoryFile(memoryDir, f)) count++
+                    } catch {}
                   }
-                  const summary = `Banco de memória limpo: ${count} arquivos removidos de .omnicode/memory-bank/.`
+                  const summary = `Banco de memória ${scopeLabel} limpo: ${count} arquivos removidos.`
                   return {
                     output: { action: "clear", summary },
                     content: summary,
