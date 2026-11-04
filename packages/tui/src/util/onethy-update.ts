@@ -57,7 +57,7 @@ export async function checkOnethyUpdate(input: {
   if (origin.code !== 0 || !isOfficialOnethyOrigin(origin.stdout)) return
   // Do not mistake an ahead/diverged local checkout for an available update.
   const ahead = await git(["rev-list", "--count", "origin/main..HEAD"], root)
-  if (ahead.code !== 0 || !/^\\d+$/.test(ahead.stdout) || Number(ahead.stdout) > 0) return
+  if (ahead.code !== 0 || !/^\d+$/.test(ahead.stdout) || Number(ahead.stdout) > 0) return
   const local = await git(["rev-parse", "HEAD"], root)
   if (local.code !== 0 || !/^[a-f0-9]{40}$/i.test(local.stdout)) return
   const remote = await git(["ls-remote", "origin", "refs/heads/main"], root)
