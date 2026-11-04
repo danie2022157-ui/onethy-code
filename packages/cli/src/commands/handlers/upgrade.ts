@@ -26,7 +26,9 @@ export default Runtime.handler(
           const git = (...args: string[]) =>
             execFileSync("git", args, { cwd: root, encoding: "utf8", timeout: 30000 }).trim()
           const origin = git("remote", "get-url", "origin")
-          if (!/(?:^|[/:@])github\\.com[:/]danie2022157-ui\\/onethy-code(?:\\.git)?\\/?$/i.test(origin)) {
+          const normalized = origin.endsWith(".git") ? origin.slice(0, -4) : origin
+          const official = ["https://github.com/danie2022157-ui/onethy-code", "git@github.com:danie2022157-ui/onethy-code", "ssh://git@github.com/danie2022157-ui/onethy-code"]
+          if (!official.includes(normalized)) {
             throw new Error("Not the official OnethyCode Git origin; update refused.")
           }
           if (git("branch", "--show-current") !== "main") throw new Error("Update only works on the main branch.")
