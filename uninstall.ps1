@@ -95,7 +95,7 @@ try {
   $targets = @()
   if ($localData) { $targets += $localData }
   if ($roamingData) { $targets += $roamingData }
-  $targets += @($ownedLaunchers)
+  foreach ($launcherFile in $ownedLaunchers) { $targets += $launcherFile }
   $targets += $root
 
   Write-Host 'Desinstalador completo do OnethyCode' -ForegroundColor Cyan
