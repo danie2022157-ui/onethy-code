@@ -183,8 +183,13 @@ export function deleteMemoryFile(directory: string, name: string): boolean {
 export function renderGlobalMemory(configDirectory: string) {
   const directory = globalMemoryDirectory(configDirectory)
   const sections = Object.keys(GLOBAL_TEMPLATES).flatMap((filename) => {
-    const value = readMemoryFile(directory, filename)?.trim()
-    return value ? [`### [Global Memory: ${filename}]\n${value.slice(0, 12000)}`] : []
+    try {
+      const value = readMemoryFile(directory, filename)?.trim()
+      return value ? [`### [Global Memory: ${filename}]\n${value.slice(0, 12000)}`] : []
+    } catch {
+      // Ignore unreadable notes instead of breaking sessions across every project.
+      return []
+    }
   })
   return [
     "<global_memory>",
