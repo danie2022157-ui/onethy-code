@@ -267,11 +267,18 @@ To manually lock a tier, use `/auto` or press `Ctrl+T` to choose:
 | `/undo` | `/desfazer` | Request a confirmed, safe restore of tracked changes (clean Git tree required) |
 | `/heal` | `/autofix` | Run tests and diagnose failures for a coding agent to fix and verify |
 | `/team` | `/squad` | Launch the 4-phase Planner → Architect → Coder → Reviewer pipeline |
+| `/mission` | — | Inspect saved mission progress through the `omni_mission` tool |
 | `/commit` | `/autocommit` | Generate conventional commit messages from git diff |
 | `/personalizacoes` | `/customizations` | Open catalog of specialized agents, skills, Mods, Hooks, and MCPs |
 | `/update` | `/atualizar` | Check for updates and sync directly with the GitHub repository |
 | `/projects` | `/project`, `/projetos` | Create, add, open, rename and remove project entries safely (without deleting files) |
 | `/connect` | `/integrations` | Connect or authenticate AI providers and MCP servers |
+
+### Agent Mission Control
+
+The `/omni`, `/ultrawork` and `/team` commands persist a task plan and supply an explicit mission ID. Agents can use the `omni_mission` tool with `status`, `claim`, `complete`, `fail` and `retry` actions to track progress and respect task dependencies. A reserved task is **not** completed until its assigned agent actually executes and reports the result. Use `/mission <mission-id>` to inspect an existing mission.
+
+The queue state survives restarts, and interrupted tasks require an explicit retry. This is **agent-driven coordination**, not an always-on autonomous worker service; agent executions still depend on the session and available tools.
 
 ### Automatic Update Alerts & Project Management
 
