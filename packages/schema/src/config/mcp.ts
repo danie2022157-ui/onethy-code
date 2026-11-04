@@ -19,4 +19,6 @@ export type Protocol = Mcp.Protocol
 export class Info extends Schema.Class<Info>("Config.MCP")({
   timeout: Timeout.pipe(optional),
   servers: Schema.Record(Schema.String, Server).pipe(optional),
+  // Per-name enable/disable overrides for servers declared by an earlier config layer or discovered source.
+  overrides: Schema.Record(Schema.String, Schema.Boolean).pipe(optional),
 }) {}

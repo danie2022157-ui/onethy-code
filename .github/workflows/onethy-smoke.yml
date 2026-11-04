@@ -46,6 +46,9 @@ jobs:
       - name: Core regression tests
         run: bun --cwd packages/core test test/omni-config.test.ts test/omni-memory-bank.test.ts test/omni-session.test.ts test/omni-model-selection.test.ts test/omni-orchestrator.test.ts test/omni-mission-control.test.ts test/omni-intelligence.test.ts test/omni-task-graph.test.ts test/omni-embeddings.test.ts test/instructions/builtins.test.ts
 
+      - name: MCP configuration and connectivity regressions
+        run: bun --cwd packages/core test test/config/normalization.test.ts test/mcp.test.ts
+
       - name: Subagent integration tests
         run: bun --cwd packages/core test test/tool-subagent.test.ts
 
@@ -55,6 +58,10 @@ jobs:
       - name: Core TypeScript check
         if: runner.os == 'Linux'
         run: bun --cwd packages/core run typecheck:tsc
+
+      - name: CLI TypeScript check
+        if: runner.os == 'Linux'
+        run: bun --cwd packages/cli run typecheck:tsc
 
       - name: TUI TypeScript check
         if: runner.os == 'Linux'

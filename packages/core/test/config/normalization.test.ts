@@ -480,11 +480,53 @@ describe("ConfigNormalize", () => {
     })
 
     const enabledOnly = normalized({ mcp: { servers: { enabled: true }, timeout: { enabled: false } } })
-    expect(enabledOnly.encoded.mcp).toBeUndefined()
-    expect(enabledOnly.diagnostics.map((item) => [item.kind, item.path])).toEqual([
-      ["unsupported", ["mcp", "servers"]],
-      ["unsupported", ["mcp", "timeout"]],
+    expect(enabledOnly.encoded.mcp).toEqual({ overrides: { servers: true, timeout: false } })
+    expect(enabledOnly.diagnostics).toEqual([])
+    expect(Schema.decodeUnknownSync(Info)(enabledOnly.encoded).mcp?.overrides).toEqual({
+      servers: true,
+      timeout: false,
+    })
+  })
+
+  test("preserves trusted enable-only MCP entries for earlier config layers", () => {
+    const result = normalized({ mcp: { github: { enabled: true }, internal: { enabled: false } } })
+    expect(result.diagnostics).toEqual([])
+    expect(result.encoded.mcp).toEqual({ overrides: { github: true, internal: false } })
+    expect(Schema.decodeUnknownSync(Info)(result.encoded).mcp?.overrides).toEqual({
+      github: true,
+      internal: false,
+    })
+  })
+
+  test("respects enabled in modern mcp.servers config without overriding explicit disabled", () => {
+    const result = normalized({
+      mcp: {
+        servers: {
+          github: { type: "remote", url: "https://example.com/mcp", enabled: false },
+          local: { type: "local", command: ["node", "server.js"], enabled: true },
+          explicit: { type: "local", command: ["node", "other.js"], enabled: true, disabled: true },
+        },
+      },
+    })
+    const servers = Schema.decodeUnknownSync(Info)(result.encoded).mcp?.servers
+    expect(servers?.github?.disabled).toBe(true)
+    expect(servers?.local?.disabled).toBe(false)
+    expect(servers?.explicit?.disabled).toBe(true)
+  })
+
+  test("supports explicit mcp.overrides for CLI connection approval", () => {
+    const result = normalized({
+      mcp: { overrides: { github: true, filesystem: false, invalid: "yes" } },
+    })
+    expect(result.encoded.mcp).toEqual({ overrides: { github: true, filesystem: false } })
+    expect(result.diagnostics.map((item) => [item.kind, item.path])).toEqual([
+      ["invalid", ["mcp", "overrides", "invalid"]],
     ])
+    expect(Schema.decodeUnknownSync(Info)(result.encoded).mcp?.overrides).toEqual({
+      github: true,
+      filesystem: false,
+    })
+    expect(normalized({ mcp: { overrides: {} } }).encoded.mcp).toEqual({ overrides: {} })
   })
 
   test("normalizes MCP timeout fields in schema order with per-leaf recovery", () => {

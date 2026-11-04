@@ -242,6 +242,20 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           description: "Listar servidores MCP configurados e seus status",
           globalFlags: ServerFlags,
         }),
+        Spec.make("doctor", {
+          description: "Diagnosticar MCPs desconectados e opcionalmente repetir conexões com falha",
+          globalFlags: ServerFlags,
+          params: {
+            retry: Flag.Boolean("retry").pipe(
+              Flag.withDescription("Retry failed MCP connections; never enables disabled servers or bypasses OAuth"),
+              Flag.withDefault(false),
+            ),
+            enable: Flag.String("enable").pipe(
+              Flag.withDescription("Approve and persistently enable one named MCP server in project config"),
+              Flag.optional,
+            ),
+          },
+        }),
         Spec.make("add", {
           description: "Adicionar um servidor MCP à configuração",
           params: {

@@ -616,6 +616,32 @@ describe("discovered MCP configuration", () => {
     expect(server.command).toEqual(["node", "trusted.js"])
   })
 
+  test("trusted enable-only settings switch discovered servers on without enabling untrusted files by default", () => {
+    const discovered = decodeDiscovered(
+      JSON.stringify({
+        mcpServers: {
+          github: { command: "node", args: ["github-server.js"], enabled: true },
+          notes: { command: "node", args: ["notes-server.js"] },
+        },
+      }),
+    )
+    expect(discovered.get("github")?.disabled).toBe(true)
+    const enable = new Document({
+      type: "document",
+      info: new Info({ mcp: { overrides: { github: true, notes: false } } }),
+    })
+    const resolved = mergeServers(discovered, [enable])
+    expect(resolved.get("github")).toMatchObject({ type: "local", command: ["node", "github-server.js"], disabled: false })
+    expect(resolved.get("notes")?.disabled).toBe(true)
+
+    const higherPrecedence = new Document({
+      type: "document",
+      info: new Info({ mcp: { servers: { github: { type: "local", command: ["node", "replacement.js"], disabled: true } } } }),
+    })
+    const merged = mergeServers(discovered, [enable, higherPrecedence])
+    expect(merged.get("github")).toMatchObject({ command: ["node", "replacement.js"], disabled: true })
+  })
+
   test("canonical containment rejects a symlink target outside the discovery root", async () => {
     const base = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-mcp-discovery-"))
     const root = path.join(base, ".claude")

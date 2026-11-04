@@ -2,11 +2,14 @@ export * as ConfigMcpPlugin from "./mcp.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
 import { Document, type Entry } from "@opencode/schema/config"
+import path from "node:path"
 import type { ServerConfig } from "@opencode/schema/mcp"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Effect, Stream } from "effect"
+import { parse as parseJsonc, type ParseError } from "jsonc-parser"
 import { Config } from "../../config.js"
 import { Mcp } from "../../mcp/index.js"
+import { Location } from "../../location.js"
 
 export const Plugin = define({
   id: "opencode.config.mcp",
@@ -20,6 +23,7 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
 ) {
   const config = yield* Config.Service
   const mcp = yield* Mcp.Service
+  const location = yield* Location.Service
   const fsOpt = yield* Effect.serviceOption(FSUtil.Service)
   const loaded = { entries: [] as Entry[], directoryServers: new Map<string, ServerConfig>() }
 
@@ -28,17 +32,32 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
     if (process.env.OMNICODE_ACTIVE !== "1" || fsOpt._tag === "None") return found
     const fs = fsOpt.value
     const roots = config.compatibility ? yield* config.compatibility() : { claude: [], agents: [] }
-    const directories = [
+    const directories = [...new Set([
+      location.project.directory,
+      location.directory,
       ...entries.flatMap((entry) => (entry.type === "directory" ? [entry.path] : [])),
       ...roots.claude,
       ...roots.agents,
-    ]
+    ])]
     const files = new Set<string>()
     for (const directory of directories) {
       const scanned = yield* fs
-        .scan("{mcp,mcps}/**/*.json", { cwd: directory, absolute: true, dot: true, symlink: false })
+        .scan("{mcp,mcps}/**/*.{json,jsonc}", { cwd: directory, absolute: true, dot: true, symlink: false })
         .pipe(Effect.orElseSucceed(() => [] as string[]))
-      for (const file of scanned) files.add(file)
+      for (const file of scanned.slice(0, 150)) files.add(file)
+      // Import familiar MCP configurations from Claude, Cursor and VS Code as disabled-by-default.
+      // A file on disk must never grant itself execution permission.
+      const explicit = [
+        "mcp.json", "mcp.jsonc", ".mcp.json", ".mcp.jsonc",
+        ".cursor/mcp.json", ".cursor/mcp.jsonc",
+        ".vscode/mcp.json", ".vscode/mcp.jsonc",
+        ".claude/mcp.json", ".claude/mcp.jsonc",
+        ".agents/mcp.json", ".agents/mcp.jsonc",
+      ]
+      for (const relative of explicit) {
+        const pathname = path.join(directory, relative)
+        if (yield* fs.isFile(pathname).pipe(Effect.orElseSucceed(() => false))) files.add(pathname)
+      }
     }
     for (const file of [...files].toSorted()) {
       const root = directories.find((directory) => isContained(directory, file))
@@ -48,7 +67,7 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
       )
       if (!realRoot || !realFile || !isContained(realRoot, realFile)) continue
       const text = yield* fs.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
-      if (!text) continue
+      if (!text || Buffer.byteLength(text, "utf8") > 128 * 1024) continue
       for (const [safeName, server] of decodeDiscovered(text)) {
         if (found.has(safeName)) {
           yield* Effect.logWarning("ignoring colliding discovered MCP server name", { name: safeName })
@@ -113,8 +132,15 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
 export function decodeDiscovered(text: string) {
   const found = new Map<string, ServerConfig>()
   try {
-    const parsed = JSON.parse(text) as { mcpServers?: unknown; servers?: unknown }
-    const rawServers = parsed.mcpServers ?? parsed.servers ?? {}
+    const errors: ParseError[] = []
+    const parsed = parseJsonc(text, errors, { allowTrailingComma: true }) as
+      | { mcpServers?: unknown; servers?: unknown; mcp?: unknown }
+      | undefined
+    if (errors.length || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) return found
+    const nested = parsed.mcp && typeof parsed.mcp === "object" && !Array.isArray(parsed.mcp)
+      ? parsed.mcp as { servers?: unknown }
+      : undefined
+    const rawServers = parsed.mcpServers ?? parsed.servers ?? nested?.servers ?? parsed.mcp ?? {}
     if (!rawServers || typeof rawServers !== "object" || Array.isArray(rawServers)) return found
     for (const [rawName, value] of Object.entries(rawServers)) {
       if (!value || typeof value !== "object" || Array.isArray(value)) continue
@@ -169,7 +195,14 @@ export function discoveredName(name: string) {
 export function mergeServers(discovered: Map<string, ServerConfig>, documents: readonly Document[]) {
   const servers = new Map(discovered)
   for (const document of documents) {
-    for (const [name, server] of Object.entries(document.info.mcp?.servers ?? {})) servers.set(name, server)
+    const config = document.info.mcp
+    for (const [name, server] of Object.entries(config?.servers ?? {})) servers.set(name, server)
+    // An explicit enable/disable entry is trusted config, unlike auto-discovered MCP files.
+    // Apply it after this layer's full definitions, preserving higher-precedence overrides.
+    for (const [name, enabled] of Object.entries(config?.overrides ?? {})) {
+      const previous = servers.get(name)
+      if (previous) servers.set(name, { ...previous, disabled: !enabled })
+    }
   }
   return servers
 }
