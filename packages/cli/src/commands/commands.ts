@@ -91,6 +91,12 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           Flag.withDescription("Remover também sessões, credenciais, configurações e estado do OnethyCode"),
           Flag.withDefault(false),
         ),
+        // Only for the detached /unistall worker: the running Windows launcher
+        // cannot safely delete itself while its .cmd/.ps1 stack is still active.
+        deferLaunchers: Flag.Boolean("defer-launchers").pipe(
+          Flag.withDefault(false),
+          Flag.withHidden,
+        ),
         dryRun: Flag.Boolean("dry-run").pipe(
           Flag.withDescription("Show what would be removed without removing"),
           Flag.withDefault(false),
