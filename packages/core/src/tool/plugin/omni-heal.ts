@@ -10,6 +10,7 @@ import type { Context } from "@opencode/plugin/effect/plugin"
 import { Effect, Schema } from "effect"
 import { Location } from "../../location.js"
 import { Permission } from "../../permission.js"
+import { ShellParse } from "../../shell/parse.js"
 import { Tool } from "../../tool.js"
 
 export const name = "omni_heal"
@@ -119,12 +120,13 @@ function runCommandAsync(
 
     let stdout = ""
     let stderr = ""
+    const bound = (existing: string, next: string) => (existing + next).slice(-128 * 1024)
 
     child.stdout?.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8")
+      stdout = bound(stdout, chunk.toString("utf8"))
     })
     child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8")
+      stderr = bound(stderr, chunk.toString("utf8"))
     })
 
     const timer = setTimeout(() => {
@@ -227,9 +229,28 @@ export const Plugin = {
               }
 
               if (params.action === "run_and_heal") {
+                // Match the native shell tool's per-command permission model.
+                const scanned = yield* ShellParse.scan(
+                  commandToRun,
+                  process.platform === "win32" ? "powershell.exe" : "bash",
+                  rootDir,
+                  { portable: true },
+                ).pipe(Effect.mapError((error) => new ToolFailure({
+                  message: "Test command could not be parsed safely.", error,
+                })))
+                if (scanned.commands.length === 0)
+                  return yield* new ToolFailure({ message: "No executable test command found." })
+                const normalizedRoot = process.platform === "win32" ? path.resolve(rootDir).toLowerCase() : path.resolve(rootDir)
+                if (scanned.directories.some((dir) => {
+                  const full = path.resolve(rootDir, dir)
+                  const value = process.platform === "win32" ? full.toLowerCase() : full
+                  return value !== normalizedRoot && !value.startsWith(normalizedRoot + path.sep)
+                }))
+                  return yield* new ToolFailure({ message: "Test command cannot change directory outside the project." })
                 yield* permission.assert({
                   action: "shell",
-                  resources: [commandToRun],
+                  resources: scanned.commands.map((command) => command.resource),
+                  save: scanned.commands.map((command) => command.save),
                   sessionID: context.sessionID,
                   agent: context.agent,
                   source: { type: "tool", messageID: context.messageID, id: context.id },
