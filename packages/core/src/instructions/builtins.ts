@@ -8,6 +8,7 @@ import { Global } from "@opencode/util/global"
 import { Location } from "../location.js"
 import { Instructions } from "./index.js"
 import { OmniOrchestrator } from "../omni-orchestrator.js"
+import { renderGlobalMemory } from "../omni-memory-bank.js"
 
 export interface Interface {
   readonly load: () => Effect.Effect<Instructions.List>
@@ -156,7 +157,18 @@ const layer = Layer.effect(
             Instructions.make({
               key: Instructions.Key.make("omnicode/memory-bank"),
               codec: Schema.toCodecJson(Schema.String),
-              read: Effect.sync(() => readMemoryBank(location.directory)),
+              read: Effect.sync(() => readMemoryBank(location.project.directory)),
+              render: {
+                initial: (memory) => memory,
+                changed: (_previous, memory) => memory,
+              },
+            }),
+            Instructions.make({
+              key: Instructions.Key.make("omnicode/global-memory"),
+              codec: Schema.toCodecJson(Schema.String),
+              read: Effect.sync(() =>
+                process.env.OMNICODE_ACTIVE === "1" ? renderGlobalMemory(global.config) : "",
+              ),
               render: {
                 initial: (memory) => memory,
                 changed: (_previous, memory) => memory,
