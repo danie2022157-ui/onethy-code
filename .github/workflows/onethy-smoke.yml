@@ -30,6 +30,56 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      - name: Validate Windows complete uninstaller (isolated test profile)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'uninstall.ps1'), [ref]$tokens, [ref]$parseErrors
+          ) | Out-Null
+          if ($parseErrors.Count -ne 0) {
+            $parseErrors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          $sandbox = Join-Path $env:RUNNER_TEMP "onethy-uninstall-ci"
+          $testProfile = Join-Path $sandbox "profile"
+          $root = Join-Path $testProfile "onethy-code-ci"
+          $oldUserProfile = $env:USERPROFILE
+          $oldLocalApp = $env:LOCALAPPDATA
+          $oldRoamingApp = $env:APPDATA
+          New-Item -ItemType Directory -Force -Path (Join-Path $root "bin") | Out-Null
+          Copy-Item bin/onethy.js (Join-Path $root "bin/onethy.js")
+          Copy-Item install.ps1 (Join-Path $root "install.ps1")
+          New-Item -ItemType Directory -Force -Path (Join-Path $testProfile "AppData/Local/omnicode/data") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $testProfile "AppData/Roaming/omnicode") | Out-Null
+          try {
+            $env:USERPROFILE = $testProfile
+            $env:LOCALAPPDATA = Join-Path $testProfile "AppData/Local"
+            $env:APPDATA = Join-Path $testProfile "AppData/Roaming"
+            $apps = Join-Path $env:LOCALAPPDATA "Microsoft/WindowsApps"
+            New-Item -ItemType Directory -Force -Path $apps | Out-Null
+            @{ checkout = $root; nodePath = "node.exe" } | ConvertTo-Json -Compress | Set-Content (Join-Path $apps "onethy-config.json")
+            Set-Content (Join-Path $apps "onethy.ps1") '$config = Get-Content "onethy-config.json"; Join-Path $config.checkout "bin\onethy.js"'
+            Set-Content (Join-Path $apps "onethy.cmd") '@echo off & WindowsPowerShell -File "%~dp0onethy.ps1" %*'
+            & ./uninstall.ps1 -Checkout $root -Preview
+            if (-not (Test-Path -LiteralPath $root)) { throw "Preview removed the installation!" }
+            & ./uninstall.ps1 -Checkout $root -Yes
+            if (Test-Path -LiteralPath $root) { throw "Onethy source was not removed" }
+            if (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA "omnicode")) { throw "Onethy data was not removed" }
+            if (Test-Path -LiteralPath (Join-Path $env:APPDATA "omnicode")) { throw "Onethy config was not removed" }
+            if (Test-Path -LiteralPath (Join-Path $apps "onethy.cmd")) { throw "Onethy command was not removed" }
+            if (Test-Path -LiteralPath (Join-Path $apps "onethy.ps1")) { throw "Onethy PowerShell launcher was not removed" }
+            if (Test-Path -LiteralPath (Join-Path $apps "onethy-config.json")) { throw "Onethy launcher config was not removed" }
+          } finally {
+            $env:USERPROFILE = $oldUserProfile
+            $env:LOCALAPPDATA = $oldLocalApp
+            $env:APPDATA = $oldRoamingApp
+            Set-Location $env:RUNNER_TEMP
+            Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Node.js 24
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:

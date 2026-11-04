@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { onethySourceCheckout, onethyInstalledLauncher, uninstallWorkerCommand } from "../src/feature-plugins/system/uninstall"
+import { onethySourceCheckout, uninstallWorkerArgs } from "../src/feature-plugins/system/uninstall"
 
 describe("OnethyCode source checkout removal confirmation", () => {
   test("recognizes a verified checkout within the user's home", async () => {
@@ -20,33 +20,21 @@ describe("OnethyCode source checkout removal confirmation", () => {
     }
   })
 
-  test("requires a verified checkout and launcher and deletes them only after the CLI returns", () => {
+  test("starts a self-contained PowerShell script and waits for Onethy processes", () => {
     const checkout = path.resolve("C:/Users/Demo/onethy-code")
-    const launcher = path.resolve("C:/Users/Demo/Microsoft/WindowsApps/onethy.cmd")
-    const script = uninstallWorkerCommand(123, checkout, launcher, 456)
-    expect(script).toContain("--purge --force --defer-launchers")
-    expect(script).toContain("Get-Process -Id 456")
-    expect(script.indexOf("--defer-launchers")).toBeLessThan(script.indexOf("Remove-Item"))
-    expect(script).toContain("onethy.ps1")
-    expect(script).toContain("onethy-config.json")
-    expect(script).toContain("Remove-Item -LiteralPath $checkout -Recurse -Force")
-    expect(() => uninstallWorkerCommand(123, "", launcher)).toThrow()
-    expect(() => uninstallWorkerCommand(-1, checkout, launcher)).toThrow()
-  })
-
-  test("verifies global onethy.cmd belongs to the current checkout", async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), "onethy-launcher-test-"))
-    const checkout = path.join(root, "onethy-code")
-    const directory = path.join(root, "Microsoft", "WindowsApps")
-    try {
-      await mkdir(directory, { recursive: true })
-      await writeFile(path.join(directory, "onethy-config.json"), JSON.stringify({ checkout }))
-      await writeFile(path.join(directory, "onethy.ps1"), 'Get-Content "onethy-config.json"; Join-Path $config.checkout "bin\\onethy.js"')
-      await writeFile(path.join(directory, "onethy.cmd"), 'powershell.exe -File "%~dp0onethy.ps1" %*')
-      expect(onethyInstalledLauncher(checkout, { LOCALAPPDATA: root })).toBe(path.join(directory, "onethy.cmd"))
-      expect(onethyInstalledLauncher(path.join(root, "other"), { LOCALAPPDATA: root })).toBeUndefined()
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    const script = path.resolve("C:/Temp/onethy-uninstall-1/uninstall.ps1")
+    const args = uninstallWorkerArgs(script, checkout, 123, 456)
+    expect(args).toContain("-File")
+    expect(args).toContain(script)
+    expect(args).toContain("-Checkout")
+    expect(args).toContain(checkout)
+    expect(args).toContain("-ChildPid")
+    expect(args).toContain("123")
+    expect(args).toContain("-ParentPid")
+    expect(args).toContain("456")
+    expect(args).toContain("-Yes")
+    expect(args).toContain("-KeepWindow")
+    expect(() => uninstallWorkerArgs(script, checkout, -1, 456)).toThrow()
+    expect(() => uninstallWorkerArgs("", checkout, 123, 456)).toThrow()
   })
 })
