@@ -2,6 +2,7 @@ import { spawn } from "node:child_process"
 import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs"
 import path from "node:path"
 import { Plugin } from "@opencode/plugin/tui"
+import { useExit } from "../../context/exit"
 import { useToast } from "../../ui/toast"
 
 /**
@@ -133,6 +134,7 @@ export default Plugin.define({
       append: "app",
       render() {
         const toast = useToast()
+        const exit = useExit()
         context.keymap.layer(() => ({
           mode: "global",
           commands: [{
@@ -186,7 +188,10 @@ export default Plugin.define({
                   worker.once("spawn", resolve)
                 })
                 worker.unref()
-                process.exit(0)
+                // Do not terminate Bun while Solid/OpenTUI still owns its native scene.
+                // Use the application's normal ExitProvider lifecycle, outside this
+                // command callback, so the renderer can release resources cleanly.
+                queueMicrotask(() => exit())
               } catch (error) {
                 toast.show({
                   message: error instanceof Error ? error.message : String(error),
