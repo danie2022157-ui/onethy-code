@@ -5,6 +5,7 @@ import { ToolFailure } from "@opencode/ai/effect"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { Effect, Schema } from "effect"
 import { Location } from "../../location.js"
+import { isSensitiveCommitPath, parseChangedGitPaths } from "../../omni-commit-safety.js"
 
 export const name = "omni_commit"
 
@@ -40,9 +41,9 @@ function runGit(cwd: string, args: string[]): { stdout: string; stderr: string; 
     return {
       stdout: res.stdout || "",
       stderr: res.stderr || "",
-      code: res.status ?? 0,
+      code: res.error ? 1 : (res.status ?? 1),
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     return { stdout: "", stderr: String(e), code: 1 }
   }
 }
@@ -92,6 +93,7 @@ export const Plugin = {
               const rootDir = location.project.directory
 
               const statusRes = runGit(rootDir, ["status", "--porcelain"])
+              if (statusRes.code !== 0) return yield* new ToolFailure({ message: "Cannot inspect Git status: " + statusRes.stderr })
               const statusLines = statusRes.stdout
                 .split("\n")
                 .map((l) => l.trim())
@@ -141,6 +143,15 @@ export const Plugin = {
                     message: "Nada para commitar: a árvore de trabalho está limpa.",
                   })
                 }
+
+                // Never bulk-stage credentials, Onethy runtime memory or saved sessions.
+                // Run a separate -z preflight so unusual filenames cannot bypass filtering.
+                const pending = runGit(rootDir, ["status", "--porcelain=v1", "--untracked-files=all", "-z"])
+                if (pending.code !== 0) return yield* new ToolFailure({ message: "Cannot inspect pending Git files." })
+                const risky = parseChangedGitPaths(pending.stdout).filter(isSensitiveCommitPath)
+                if (risky.length > 0) return yield* new ToolFailure({
+                  message: "Bulk commit blocked: sensitive/runtime files detected (" + risky.join(", ") + "). Review and stage allowed files manually.",
+                })
 
                 // git add -A
                 const addRes = runGit(rootDir, ["add", "-A"])
