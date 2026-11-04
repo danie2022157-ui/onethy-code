@@ -69,7 +69,11 @@ ORCHESTRATION & ULTRAWORK PROTOCOL:
 5. CHECKPOINTS & UNDO: Use 'omni_checkpoint' to snapshot files before major edits so changes can be reverted with /undo.
 6. SELF-HEALING: Use 'omni_heal' to run test/build suites, parse failures, and loop until green.
 7. CONVENTIONAL COMMIT: Use 'omni_commit' to stage changes and create clean conventional commits (/commit).
-8. TEAM PIPELINE: Execute structured 4-phase SOP pipelines (/team): Planner -> Architect -> Coder -> Reviewer.`
+8. TEAM PIPELINE: Execute structured 4-phase SOP pipelines (/team): Planner -> Architect -> Coder -> Reviewer.
+9. INTELLIGENT DISCOVERY: Use omni_intelligence for source code search, skills/tools/MCP discovery, history, diff review, and metrics. Prefer action=code without models; use action=semantic only when the local Ollama embedding model is available.
+10. DEPENDENCY PLANNING: Use omni_mission action=create for nontrivial plans with prerequisite task IDs, then action=dispatch with bounded maxParallel. Reserved tasks are not completed tasks.
+11. WORKTREE SAFETY: Isolate independent code changes with subagent worktree=true only when permitted. Changes in isolated worktrees are not automatically merged; show the paths and ask for explicit review.
+12. VERIFICATION: Use omni_intelligence action=review and run real tests after edits. Never claim 100% completion if an agent failed, a worktree is unmerged, or checks are missing.`
 
 const PROMPT_ARCHITECT = `You are the OmniCode Software Architect specialist.
 Your responsibility:
@@ -81,13 +85,15 @@ const PROMPT_CODER = `You are the OmniCode Implementation specialist.
 Your responsibility:
 - Write clean, concise, production-grade code adhering to project idioms.
 - Implement features, fix bugs, and create comprehensive tests.
-- Avoid unnecessary refactoring or out-of-scope modifications.`
+- Avoid unnecessary refactoring or out-of-scope modifications.
+- Use omni_intelligence action=code or semantic to find related code before editing. Use action=history for previous architectural decisions.`
 
 const PROMPT_REVIEWER = `You are the OmniCode Code Review and Verification specialist.
 Your responsibility:
 - Inspect git diffs, modified files, and implementation details.
 - Run test suites and verify that zero tests fail and no regressions occur.
-- Verify security invariants: fail-closed policies, path boundaries, input sanitization.`
+- Verify security invariants: fail-closed policies, path boundaries, input sanitization.
+- Use omni_intelligence action=review for read-only staged and unstaged Git diffs; do not approve or merge without policy checks.`
 
 const PROMPT_PLANNER = `You are the OmniCode Mission Planning specialist.
 Your responsibility:
@@ -175,6 +181,8 @@ export const Plugin = define({
             { action: "omni_memory", resource: "*", effect: "allow" },
             { action: "omni_checkpoint", resource: "*", effect: "allow" },
             { action: "omni_heal", resource: "*", effect: "allow" },
+            { action: "omni_intelligence", resource: "*", effect: "allow" },
+            { action: "omni_mission", resource: "*", effect: "allow" },
             { action: "omni_commit", resource: "*", effect: "allow" },
           )
         })
@@ -194,6 +202,8 @@ export const Plugin = define({
             { action: "omni_memory", resource: "*", effect: "allow" },
             { action: "omni_checkpoint", resource: "*", effect: "allow" },
             { action: "omni_heal", resource: "*", effect: "allow" },
+            { action: "omni_intelligence", resource: "*", effect: "allow" },
+            { action: "omni_mission", resource: "*", effect: "allow" },
             { action: "omni_commit", resource: "*", effect: "allow" },
           )
         })
@@ -231,6 +241,7 @@ export const Plugin = define({
             { action: "glob", resource: "*", effect: "allow" },
             { action: "grep", resource: "*", effect: "allow" },
             { action: "omni_bus", resource: "*", effect: "allow" },
+            { action: "omni_intelligence", resource: "*", effect: "allow" },
             { action: "omni_memory", resource: "*", effect: "allow" },
             { action: "omni_checkpoint", resource: "*", effect: "allow" },
             { action: "omni_heal", resource: "*", effect: "allow" },
@@ -250,6 +261,7 @@ export const Plugin = define({
             { action: "glob", resource: "*", effect: "allow" },
             { action: "grep", resource: "*", effect: "allow" },
             { action: "omni_bus", resource: "*", effect: "allow" },
+            { action: "omni_intelligence", resource: "*", effect: "allow" },
             { action: "omni_memory", resource: "*", effect: "allow" },
             { action: "omni_checkpoint", resource: "*", effect: "allow" },
             { action: "omni_heal", resource: "*", effect: "allow" },
@@ -271,6 +283,7 @@ export const Plugin = define({
             { action: "grep", resource: "*", effect: "allow" },
             { action: "websearch", resource: "*", effect: "allow" },
             { action: "omni_bus", resource: "*", effect: "allow" },
+            { action: "omni_intelligence", resource: "*", effect: "allow" },
             { action: "omni_memory", resource: "*", effect: "allow" },
             { action: "question", resource: "*", effect: "deny" },
             { action: "subagent", resource: "*", effect: "deny" },
@@ -291,6 +304,7 @@ export const Plugin = define({
             { action: "websearch", resource: "*", effect: "allow" },
             { action: "webfetch", resource: "*", effect: "allow" },
             { action: "omni_bus", resource: "*", effect: "allow" },
+            { action: "omni_intelligence", resource: "*", effect: "allow" },
             { action: "question", resource: "*", effect: "deny" },
             { action: "subagent", resource: "*", effect: "deny" },
           )

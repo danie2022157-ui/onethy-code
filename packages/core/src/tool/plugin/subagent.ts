@@ -1,6 +1,7 @@
 export * as SubagentTool from "./subagent.js"
 
 import fs from "node:fs"
+import crypto from "node:crypto"
 import os from "node:os"
 import path from "node:path"
 import { ToolFailure } from "@opencode/ai/effect"
@@ -11,6 +12,8 @@ import { Agent } from "../../agent.js"
 import { Config } from "../../config.js"
 import { Job } from "../../job.js"
 import { Model } from "../../model.js"
+import { Location } from "../../location.js"
+import { Worktree } from "../../worktree.js"
 import { ModelSelectionPolicy } from "../../model-selection-policy.js"
 import { OmniBus } from "../../omni-bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
@@ -22,10 +25,11 @@ import { SubagentJob } from "../../session/subagent-job.js"
 
 export const name = "subagent"
 
-const backgroundResult = (sessionID: SessionSchema.ID) => ({
+const backgroundResult = (sessionID: SessionSchema.ID, worktreeDirectory?: string) => ({
   sessionID,
   status: "running" as const,
   output: [
+    ...(worktreeDirectory ? ["Isolated worktree: " + worktreeDirectory] : []),
     `The subagent is working in the background (sessionID: ${sessionID}). You will be notified automatically when it finishes.`,
     "DO NOT sleep, poll for progress, ask the subagent for status, or duplicate this subagent's work; avoid working with the same files or topics it is using.",
     "Work on non-overlapping tasks, or briefly tell the user what you launched and end your response.",
@@ -149,6 +153,9 @@ export const Input = Schema.Struct({
     description:
       "Run the subagent in the background and return immediately. You will be notified when it completes. DO NOT sleep, poll, or proactively check on its progress.",
   }),
+  worktree: Schema.optionalKey(Schema.Boolean).annotate({
+    description: "Create and use a native Git worktree for a NEW child agent. Default off unless ONETHY_AGENT_WORKTREES=1 for coding agents. Changes remain for review.",
+  }),
 })
 
 export const Output = Schema.Struct({
@@ -163,12 +170,15 @@ export const description = [
   "Foreground (default) runs the subagent to completion and returns its final response.",
   "Background mode (background=true) launches it asynchronously and returns immediately; you are notified when it finishes.",
   "Use background only for independent work that can run while you continue elsewhere.",
+  "worktree=true isolates a new child in a separate detached Git worktree, with permission approval and verification.",
 ].join("\n")
 
 export const Plugin = {
   id: "opencode.tool.subagent",
   effect: Effect.fn("SubagentTool.Plugin")(function* (ctx: Context) {
     const sessions = yield* Session.Service
+    const location = yield* Location.Service
+    const worktreesOpt = yield* Effect.serviceOption(Worktree.Service)
     const jobs = yield* Job.Service
     const agents = yield* Agent.Service
     const config = yield* Config.Service
@@ -388,6 +398,26 @@ export const Plugin = {
                   ? parent.model
                   : undefined) ??
                 routedModel
+              const isolate = existing === undefined && process.env.OMNICODE_ACTIVE === "1" &&
+                (input.worktree ?? (process.env.ONETHY_AGENT_WORKTREES === "1" && agent.id === "coder"))
+              let isolatedDirectory: string | undefined
+              if (isolate) {
+                if (Option.isNone(worktreesOpt)) return yield* new ToolFailure({ message: "Native worktree service is unavailable." })
+                yield* permission.assert({
+                  action: "worktree",
+                  resources: ["create"],
+                  sessionID: context.sessionID,
+                  agent: context.agent,
+                  source: { type: "tool", messageID: context.messageID, id: context.id },
+                }).pipe(Effect.mapError((error) =>
+                  new ToolFailure({ message: "Worktree creation denied by session permissions.", error })))
+                const created = yield* worktreesOpt.value.create({
+                  projectID: location.project.id,
+                  name: "agent-" + agent.id + "-" + crypto.randomBytes(4).toString("hex"),
+                }).pipe(Effect.mapError((error) =>
+                  new ToolFailure({ message: "Cannot create isolated Git worktree. Check Git repository state.", error })))
+                isolatedDirectory = created.directory
+              }
               const child =
                 existing ??
                 (yield* sessions
@@ -403,6 +433,17 @@ export const Plugin = {
                     ),
                   ))
 
+              if (isolatedDirectory) {
+                yield* sessions.move({ sessionID: child.id, directory: isolatedDirectory as typeof location.directory }).pipe(
+                  Effect.mapError((error) => new ToolFailure({ message: "Could not move child into isolated worktree.", error })),
+                )
+                yield* sessions.wait(child.id)
+                const placement = yield* sessions.get(child.id)
+                if (placement.location.directory !== isolatedDirectory)
+                  return yield* new ToolFailure({
+                    message: "Child placement in isolated worktree could not be verified. Aborting before code execution.",
+                  })
+              }
               const background = input.background === true
               yield* context.progress({ sessionID: child.id, status: "running" })
 
@@ -448,7 +489,7 @@ export const Plugin = {
 
               if (background) {
                 yield* subagents.background(recovery)
-                return backgroundResult(child.id)
+                return backgroundResult(child.id, isolatedDirectory)
               }
 
               const result = yield* jobs.block({ id: child.id, sessionID: context.sessionID }).pipe(
@@ -484,7 +525,7 @@ export const Plugin = {
               return {
                 sessionID: child.id,
                 status: "completed" as const,
-                output: finalOutput,
+                output: isolatedDirectory ? finalOutput + "\n\nIsolated worktree: " + isolatedDirectory : finalOutput,
               }
             }).pipe(
               Effect.map((output) => ({

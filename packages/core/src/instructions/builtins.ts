@@ -154,7 +154,9 @@ const layer = Layer.effect(
             Instructions.make({
               key: Instructions.Key.make("omnicode/memory-bank"),
               codec: Schema.toCodecJson(Schema.String),
-              read: Effect.sync(() => readMemoryBank(location.project.directory)),
+              read: Effect.sync(() =>
+                process.env.OMNICODE_ACTIVE === "1" ? readMemoryBank(location.project.directory) : Instructions.removed,
+              ),
               render: {
                 initial: (memory) => memory,
                 changed: (_previous, memory) => memory,
@@ -163,9 +165,10 @@ const layer = Layer.effect(
             Instructions.make({
               key: Instructions.Key.make("omnicode/global-memory"),
               codec: Schema.toCodecJson(Schema.String),
-              read: Effect.sync(() =>
-                process.env.OMNICODE_ACTIVE === "1" ? renderGlobalMemory(global.config) : "",
-              ),
+              read: Effect.sync(() => {
+                const memory = process.env.OMNICODE_ACTIVE === "1" ? renderGlobalMemory(global.config) : ""
+                return memory.trim() ? memory : Instructions.removed
+              }),
               render: {
                 initial: (memory) => memory,
                 changed: (_previous, memory) => memory,
@@ -174,7 +177,11 @@ const layer = Layer.effect(
             Instructions.make({
               key: Instructions.Key.make("omnicode/auto-customizations"),
               codec: Schema.toCodecJson(Schema.String),
-              read: Effect.sync(() => renderAutoCustomizationsDirective(location.directory)),
+              read: Effect.sync(() => {
+                const directive = process.env.OMNICODE_ACTIVE === "1"
+                  ? renderAutoCustomizationsDirective(location.directory) : ""
+                return directive.trim() ? directive : Instructions.removed
+              }),
               render: {
                 initial: (directive) => directive,
                 changed: (_previous, directive) => directive,

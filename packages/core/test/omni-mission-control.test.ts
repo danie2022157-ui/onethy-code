@@ -19,6 +19,8 @@ describe("Onethy persistent mission control contract", () => {
     const decode = Schema.decodeUnknownSync(Input)
     expect(decode({ action: "status", missionID: "mission-1" }).action).toBe("status")
     expect(decode({ action: "claim", missionID: "mission-1", maxParallel: 2 }).maxParallel).toBe(2)
+    expect(decode({ action: "dispatch", missionID: "mission-1", maxParallel: 2, isolateWorkers: true }).action).toBe("dispatch")
+    expect(decode({ action: "create", missionID: "mission-2", goal: "Ship", tasks: [{ id: "code", title: "Implement", assignedAgent: "coder", dependsOn: [] }] }).action).toBe("create")
     expect(() => decode({ action: "delete", missionID: "mission-1" })).toThrow()
   })
 })
