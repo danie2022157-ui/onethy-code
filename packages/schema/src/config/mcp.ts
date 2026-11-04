@@ -19,4 +19,6 @@ export type Protocol = Mcp.Protocol
 export class Info extends Schema.Class<Info>("Config.MCP")({
   timeout: Timeout.pipe(optional),
   servers: Schema.Record(Schema.String, Server).pipe(optional),
+  /** Explicit opt-in/opt-out for MCP servers imported from IDE manifests. */
+  enabled: Schema.Record(Schema.String, Schema.Boolean).pipe(optional),
 }) {}
