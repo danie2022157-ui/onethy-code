@@ -5,6 +5,7 @@ import { Document, type Entry } from "@opencode/schema/config"
 import type { ServerConfig } from "@opencode/schema/mcp"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Effect, Stream } from "effect"
+import { parse as parseJsonc, type ParseError } from "jsonc-parser"
 import { Config } from "../../config.js"
 import { Mcp } from "../../mcp/index.js"
 import { Location } from "../../location.js"
@@ -124,7 +125,9 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
 export function decodeDiscovered(text: string) {
   const found = new Map<string, ServerConfig>()
   try {
-    const parsed = JSON.parse(text) as { mcpServers?: unknown; servers?: unknown }
+    const errors: ParseError[] = []
+    const parsed = parseJsonc(text, errors, { allowTrailingComma: true }) as { mcpServers?: unknown; servers?: unknown }
+    if (errors.length) return found
     const rawServers = parsed.mcpServers ?? parsed.servers ?? {}
     if (!rawServers || typeof rawServers !== "object" || Array.isArray(rawServers)) return found
     for (const [rawName, value] of Object.entries(rawServers)) {
