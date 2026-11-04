@@ -22,7 +22,7 @@ export function missionControlInstructions(missionID: string) {
     "Call 'fail' with the real blocker if an agent cannot run or the work fails; do not invent success.",
     "On failure, report the blocker and ask whether to retry. Respect stage dependencies.",
     "There is no autonomous persistent background worker; report unexecuted stages honestly.",
-  ].join("\\n")
+  ].join("\n")
 }
 
 export const Plugin = define({
