@@ -277,7 +277,7 @@ export const Plugin = {
                         message: "Auto-repair subagent could not run. Tests remain failed; review permissions and agent availability.",
                         error,
                       })),
-                  )
+                  ))
                   const workerStatus = repairResult.metadata?.status
                   if (workerStatus !== "completed")
                     return yield* new ToolFailure({
