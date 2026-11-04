@@ -151,10 +151,8 @@ export const { use: useUpdateNotification, provider: UpdateNotificationProvider 
         try {
           const update = await checkOnethyUpdate()
           if (!active) return
-          if (!update) {
-            setNotification((current) => current?.source === "onethy" ? undefined : current)
-            return
-          }
+          // A failed or offline check does not disprove a previously detected update.
+          if (!update) return
           const notice = { source: "onethy" as const, type: "available" as const, version: update.available }
           notify(notice)
           if (lastAnnounced === update.available) return
