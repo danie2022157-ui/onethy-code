@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { lstatSync, statSync } from "node:fs"
+import { lstatSync, realpathSync, statSync } from "node:fs"
 import path from "node:path"
 import { Plugin } from "@opencode/plugin/tui"
 import { useToast } from "../../ui/toast"
@@ -21,6 +21,11 @@ export function onethySourceCheckout(env: NodeJS.ProcessEnv = process.env, platf
     return
   if (!/^onethy[-_]?code(?:[-_].*)?$/i.test(path.basename(root))) return
   try {
+    const realHome = realpathSync(home)
+    const realRoot = realpathSync(root)
+    const resolvedRelative = path.relative(realHome, realRoot)
+    if (!resolvedRelative || resolvedRelative === ".." || resolvedRelative.startsWith(".." + path.sep) || path.isAbsolute(resolvedRelative))
+      return
     if (lstatSync(root).isSymbolicLink()) return
     if (!statSync(path.join(root, "bin", "onethy.js")).isFile()) return
     if (!statSync(path.join(root, "install.ps1")).isFile()) return
@@ -100,7 +105,7 @@ export default Plugin.define({
                     message: [
                       "Esta pasta sera apagada permanentemente, incluindo alteracoes locais nao enviadas ao GitHub:",
                       checkout,
-                      "Confirme somente se nao precisa mais de nenhum arquivo dessa pasta.",
+                      "Confirme somente se nao precisa mais de nenhum arquivo dessa pasta, inclusive eventuais projetos dentro dela.",
                     ].join("\n"),
                     label: { confirm: "Apagar codigo-fonte", cancel: "Preservar pasta" },
                   })
