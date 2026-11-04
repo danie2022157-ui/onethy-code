@@ -169,7 +169,14 @@ export function discoveredName(name: string) {
 export function mergeServers(discovered: Map<string, ServerConfig>, documents: readonly Document[]) {
   const servers = new Map(discovered)
   for (const document of documents) {
-    for (const [name, server] of Object.entries(document.info.mcp?.servers ?? {})) servers.set(name, server)
+    const config = document.info.mcp
+    for (const [name, server] of Object.entries(config?.servers ?? {})) servers.set(name, server)
+    // An explicit enable/disable entry is trusted config, unlike auto-discovered MCP files.
+    // Apply it after this layer's full definitions, preserving higher-precedence overrides.
+    for (const [name, enabled] of Object.entries(config?.overrides ?? {})) {
+      const previous = servers.get(name)
+      if (previous) servers.set(name, { ...previous, disabled: !enabled })
+    }
   }
   return servers
 }
