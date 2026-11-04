@@ -8,9 +8,16 @@ import { useExit } from "./exit"
 import { useEpilogue } from "./epilogue"
 import { useDialog } from "../ui/dialog"
 import { DialogUpdate } from "../component/dialog-update"
+import { DialogOmniUpdate } from "../component/dialog-omni-update"
+import { checkOnethyUpdate } from "../util/onethy-update"
+import { useToast } from "../ui/toast"
 
 type ClientNotice = { readonly type: "available" | "installed"; readonly version: string }
-type Notice = ClientNotice & ({ readonly source: "client" } | { readonly source: "server"; readonly remote: boolean })
+type Notice = ClientNotice & (
+  | { readonly source: "client" }
+  | { readonly source: "server"; readonly remote: boolean }
+  | { readonly source: "onethy" }
+)
 export type UpdateState =
   | ClientNotice
   | { readonly type: "installing"; readonly version: string }
@@ -33,6 +40,8 @@ export const { use: useUpdateNotification, provider: UpdateNotificationProvider 
     const exit = useExit()
     const epilogue = useEpilogue()
     const dialog = useDialog()
+    const toast = useToast()
+    const isOnethy = process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1"
     const log = useLog({ component: "update-notification" })
     const [state, setState] = createSignal<UpdateState>()
     const [notification, setNotification] = createSignal<Notice>()
@@ -41,14 +50,14 @@ export const { use: useUpdateNotification, provider: UpdateNotificationProvider 
     })
 
     const notify = (notice: Notice) => {
-      if (!props.updater) return
+      if (!props.updater && notice.source !== "onethy") return
       // Every way out of the TUI after a local install tells the user to start the new version.
       if (notice.type === "installed" && !(notice.source === "server" && notice.remote))
         epilogue.updatedVersion(notice.version)
-      if (
+      if (notice.source !== "onethy" && (
         notifications.versions.includes(`${notice.source}:${notice.version}`) ||
         (notice.source === "client" && notifications.versions.includes(notice.version))
-      )
+      ))
         return
       setNotification((current) => {
         if (notice.source === "server" && current?.source === "client") return current
@@ -60,6 +69,8 @@ export const { use: useUpdateNotification, provider: UpdateNotificationProvider 
       const current = notification()
       if (!current) return
       setNotification(undefined)
+      // The Onethy notice is refreshed on each launch if the update is still available.
+      if (current.source === "onethy") return
       // Only interactions with the automatic notification update its history.
       void markNotification((draft) => {
         draft.versions = [...draft.versions, `${current.source}:${current.version}`].slice(-100)
@@ -103,6 +114,10 @@ export const { use: useUpdateNotification, provider: UpdateNotificationProvider 
     }
 
     const open = (origin: "manual" | "notification") => {
+      if (notification()?.source === "onethy" || (!props.updater && isOnethy)) {
+        dialog.replace(() => <DialogOmniUpdate />)
+        return
+      }
       if (!props.updater) return
       const current = notification()
       const known = current && (current.source === "client" || !current.remote) ? current : undefined
@@ -124,8 +139,41 @@ export const { use: useUpdateNotification, provider: UpdateNotificationProvider 
     }
 
     onMount(() => {
-      if (!props.updater) return
-      onCleanup(props.updater.subscribe((notice) => notify({ ...notice, source: "client" })))
+      if (props.updater) onCleanup(props.updater.subscribe((notice) => notify({ ...notice, source: "client" })))
+      if (!isOnethy) return
+
+      let active = true
+      let checking = false
+      let lastAnnounced: string | undefined
+      const poll = async () => {
+        if (checking) return
+        checking = true
+        try {
+          const update = await checkOnethyUpdate()
+          if (!active) return
+          if (!update) {
+            setNotification((current) => current?.source === "onethy" ? undefined : current)
+            return
+          }
+          const notice = { source: "onethy" as const, type: "available" as const, version: update.available }
+          notify(notice)
+          if (lastAnnounced === update.available) return
+          lastAnnounced = update.available
+          toast.show({
+            variant: "info",
+            title: "Atualização do Onethy Code disponível",
+            message: `Nova versão ${update.available}. Digite /update para instalar.`,
+            duration: 7000,
+          })
+        } catch (error) {
+          log.error("OnethyCode update check failed", { error })
+        } finally {
+          checking = false
+        }
+      }
+      void poll()
+      const interval = setInterval(() => void poll(), 15 * 60 * 1000)
+      onCleanup(() => { active = false; clearInterval(interval) })
     })
 
     onCleanup(
@@ -152,7 +200,7 @@ export const { use: useUpdateNotification, provider: UpdateNotificationProvider 
     return {
       notification,
       dismiss,
-      open: props.updater ? open : undefined,
+      open: props.updater || isOnethy ? open : undefined,
     }
   },
 })
