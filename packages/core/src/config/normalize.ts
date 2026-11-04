@@ -250,6 +250,7 @@ function normalizeSkills(input: Record<string, unknown>, encoded: Record<string,
 function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, unknown>, diagnostics: Diagnostic[]) {
   const legacyServers: Record<string, unknown> = {}
   const enabledOverrides: Record<string, boolean> = {}
+  let hasOverrideSection = false
   const nativeServers: Record<string, unknown> = {}
   const timeout: Record<string, unknown> = {}
   if (isRecord(input.experimental) && own(input.experimental, "mcp_timeout")) {
@@ -272,9 +273,12 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
         const path = ["mcp", name]
         if (name === "overrides" && !isDirectLegacyMcp(value)) {
           if (!isRecord(value)) invalid(path, diagnostics)
-          else for (const [serverName, enabled] of Object.entries(value)) {
+          else {
+            hasOverrideSection = true
+            for (const [serverName, enabled] of Object.entries(value)) {
             if (typeof enabled !== "boolean") invalid([...path, serverName], diagnostics)
             else setOwn(enabledOverrides, serverName, enabled)
+            }
           }
           return
         }
@@ -304,14 +308,14 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
     }
   }
   const servers = mergeMaps(legacyServers, nativeServers, ["mcp", "servers"], diagnostics)
-  if (!Object.keys(servers).length && !Object.keys(timeout).length && !Object.keys(enabledOverrides).length) {
+  if (!Object.keys(servers).length && !Object.keys(timeout).length && !Object.keys(enabledOverrides).length && !hasOverrideSection) {
     if (isRecord(input.mcp) && !Object.keys(input.mcp).length) encoded.mcp = {}
     return
   }
   encoded.mcp = {
     ...(Object.keys(timeout).length ? { timeout } : {}),
     ...(Object.keys(servers).length ? { servers } : {}),
-    ...(Object.keys(enabledOverrides).length ? { overrides: enabledOverrides } : {}),
+    ...(Object.keys(enabledOverrides).length || hasOverrideSection ? { overrides: enabledOverrides } : {}),
   }
 }
 
