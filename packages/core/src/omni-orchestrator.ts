@@ -12,6 +12,7 @@ import { Location } from "./location.js"
 import { OmniBus } from "./omni-bus.js"
 import { OmniConfig } from "./omni-config.js"
 import { OmniSession } from "./omni-session.js"
+import { OmniTaskGraph } from "./omni-task-graph.js"
 
 function getAutoModelFilePath(): string {
   const stateDir =
@@ -121,6 +122,8 @@ export interface TaskItem {
   readonly assignedAgent: string
   readonly category?: TaskCategory
   readonly parallel?: boolean
+  /** Dependencies are used by custom graph missions; absent for legacy plans. */
+  readonly dependsOn?: ReadonlyArray<string>
   readonly preferredModel?: string
   status: "pending" | "running" | "completed" | "failed"
   result?: string
@@ -161,6 +164,7 @@ export interface Interface {
   readonly isModelInCooldown: (providerID: string, modelID: string) => Effect.Effect<boolean>
   readonly getAgents: () => Effect.Effect<ReadonlyArray<AgentDefinition>, never>
   readonly planMission: (goal: string, missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
+  readonly createMission: (goal: string, missionID: string, tasks: ReadonlyArray<OmniTaskGraph.Definition>) => Effect.Effect<ReadonlyArray<TaskItem>, never>
   readonly planUltrawork: (goal: string, missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
   readonly planArena: (problem: string, models: ReadonlyArray<string>, missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
   readonly planTeamPipeline: (goal: string, missionID?: string) => Effect.Effect<ReadonlyArray<TaskItem>, never>
@@ -298,6 +302,34 @@ const layer = Layer.effect(
     const assertNewMission = Effect.fn("OmniOrchestrator.assertNewMission")(function* (missionID: string, goal: string) {
       if (!goal.trim()) throw new Error("Mission goal cannot be empty")
       if (yield* missionTasks(missionID)) throw new Error(`Mission '${missionID}' already exists. Reuse its tasks instead of overwriting history.`)
+    })
+
+    const createMission = Effect.fn("OmniOrchestrator.createMission")(function* (
+      goal: string, missionID: string, definitions: ReadonlyArray<OmniTaskGraph.Definition>,
+    ) {
+      OmniTaskGraph.validate(definitions)
+      yield* assertNewMission(missionID, goal)
+      const tasks: TaskItem[] = definitions.map((task) => ({
+        id: task.id,
+        missionID,
+        title: task.title.trim(),
+        assignedAgent: task.assignedAgent,
+        dependsOn: [...(task.dependsOn ?? [])],
+        parallel: true,
+        status: "pending",
+      }))
+      yield* store.saveMissionTasks(missionID, tasks)
+      missions.set(missionID, tasks)
+      yield* bus.publish({
+        sender: "supervisor", type: "plan",
+        payload: {
+          missionID, goal, mode: "dependency_graph",
+          subtasks: tasks.map((task) => ({
+            id: task.id, title: task.title, agent: task.assignedAgent, dependsOn: task.dependsOn,
+          })),
+        },
+      })
+      return tasks.map((task) => ({ ...task }))
     })
 
     const planMission = Effect.fn("OmniOrchestrator.planMission")(function* (goal: string, missionID = `mission-${crypto.randomUUID()}`) {
@@ -622,6 +654,19 @@ const layer = Layer.effect(
     const claimReadyTasks = Effect.fn("OmniOrchestrator.claimReadyTasks")(function* (missionID: string, maxParallel = 3) {
       const tasks = yield* missionTasks(missionID)
       if (!tasks || !Number.isInteger(maxParallel) || maxParallel < 1 || maxParallel > 8) return []
+      // Graph missions can dispatch non-contiguous independent tasks. Legacy stage order remains intact.
+      if (tasks.some((task) => task.dependsOn !== undefined)) {
+        const claimable = OmniTaskGraph.ready(tasks, maxParallel)
+        for (const task of claimable) {
+          task.status = "running"
+          yield* bus.publish({
+            sender: "supervisor", target: task.assignedAgent, taskId: task.id,
+            type: "status", payload: { missionID, status: "running" },
+          })
+        }
+        if (claimable.length) yield* store.saveMissionTasks(missionID, tasks)
+        return claimable.map((task) => ({ ...task }))
+      }
       const running = tasks.filter((task) => task.status === "running")
       if (running.some((task) => !task.parallel)) return []
       const remaining = maxParallel - running.length
@@ -695,6 +740,7 @@ const layer = Layer.effect(
       isModelInCooldown,
       getAgents,
       planMission,
+      createMission,
       planUltrawork,
       planArena,
       planTeamPipeline,
