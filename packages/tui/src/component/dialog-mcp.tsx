@@ -238,7 +238,7 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
                   onTrigger: (option: { value: string }) => void manage("enable", option.value),
                 },
                 {
-                  title: "desenable",
+                  title: "disable",
                   command: "onethy.mcp.disable",
                   bind: "ctrl+d",
                   onTrigger: (option: { value: string }) => void manage("disable", option.value),
