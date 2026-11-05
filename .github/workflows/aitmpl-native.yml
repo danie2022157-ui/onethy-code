@@ -1,0 +1,25 @@
+name: AITmpl native integration tests
+on:
+  pull_request:
+    paths:
+      - 'script/aitmpl-sync.mjs'
+      - 'script/aitmpl-sync.test.mjs'
+      - '.github/workflows/aitmpl-native.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'script/aitmpl-sync.mjs'
+      - 'script/aitmpl-sync.test.mjs'
+      - '.github/workflows/aitmpl-native.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check script/aitmpl-sync.mjs
+      - run: node --test script/aitmpl-sync.test.mjs
