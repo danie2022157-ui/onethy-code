@@ -56,10 +56,7 @@ const SCOPED = new Set<DesktopAction>([
   "snapshot", "find", "list-apps", "list-windows", "list-surfaces", "press",
   "focus-window", "minimize", "maximize", "restore",
 ])
-const READ_ONLY = new Set<DesktopAction>([
-  "status", "permissions", "version", "list-apps", "list-windows", "list-displays",
-  "list-surfaces", "snapshot", "find", "get", "is", "wait",
-])
+const NO_APPROVAL = new Set<DesktopAction>(["status", "permissions", "version"])
 
 function required(value: string | undefined, field: string, max = 256) {
   if (!value?.trim() || value.length > max || value.includes("\0")) {
@@ -161,7 +158,7 @@ export function buildDesktopInvocation(input: DesktopRequest): DesktopInvocation
     args,
     resource: (input.headed ? "headed:" : "") +
       input.action + ":" + (input.app ?? input.windowId ?? (input.ref ? "element" : "*")),
-    requiresApproval: !["status", "permissions", "version"].includes(input.action),
+    requiresApproval: !NO_APPROVAL.has(input.action),
   }
 }
 
