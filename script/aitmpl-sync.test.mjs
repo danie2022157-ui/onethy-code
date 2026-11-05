@@ -85,4 +85,7 @@ test("MCP converter supports remote URLs, sanitizes headers and rejects unsafe w
   assert.ok(!("headers" in server))
   assert.ok(!value.json.includes("SECRET"))
   assert.ok(value.warnings.some(w => w.includes("shell wrapper")))
+  const sensitive = convertMcpTemplate(JSON.stringify({ mcpServers: { leaked: { url: "https://example.org/mcp?token=secret" }, argv: { command: "npx", args: ["--token=secret"] } } }), "unsafe/sample.json")
+  assert.equal(sensitive.count, 0)
+  assert.equal(sensitive.json, null)
 })
