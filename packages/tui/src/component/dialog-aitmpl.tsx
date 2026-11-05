@@ -6,6 +6,7 @@ import { useToast } from "../ui/toast"
 import { useData } from "../context/data"
 import { useLocation } from "../context/location"
 import {
+  activateReviewedTemplate,
   fetchVerifiedTemplate,
   searchTemplates,
   stageTemplate,
@@ -95,6 +96,39 @@ export function DialogAitmpl() {
     ))
   }
 
+  function confirmActivation(entry: TemplateEntry) {
+    dialog.push(() => (
+      <DialogSelect
+        title={"Ativar no projeto: " + entry.name}
+        description={
+          "Somente agentes, comandos e loops Markdown de arquivo único podem ser ativados por esta interface. " +
+          "Você deve revisar o conteúdo integral antes de autorizar. " +
+          "Ativar um comando pode permitir que a IA siga instruções externas. " +
+          "Nenhum arquivo existente será substituído."
+        }
+        skipFilter
+        options={[
+          { value: "cancel", title: "Cancelar", onSelect: () => dialog.pop() },
+          {
+            value: "activate",
+            title: "Confirmo a revisão e quero ativar neste projeto",
+            onSelect: () => {
+              const ref = location.ref ?? data.location.default()
+              if (!ref?.directory) {
+                toast.show({ variant: "warning", message: "Abra um projeto antes de ativar." })
+                return
+              }
+              void activateReviewedTemplate(entry, ref.directory).then((target) => {
+                dialog.clear()
+                toast.show({ variant: "success", title: "Arquivo ativado no projeto", message: target + " · use /reload se necessário" })
+              }).catch((cause) => error("Ativação não concluída", cause))
+            },
+          },
+        ]}
+      />
+    ))
+  }
+
   function detail(entry: TemplateEntry) {
     dialog.push(() => (
       <DialogSelect
@@ -108,6 +142,9 @@ export function DialogAitmpl() {
         options={[
           { value: "preview", title: "Visualizar conteúdo verificado", onSelect: () => preview(entry) },
           { value: "stage", title: "Baixar arquivo para revisão (não ativa)", onSelect: () => confirmStage(entry) },
+          ...(["agents", "commands", "loops"].includes(entry.type)
+            ? [{ value: "activate", title: "Ativar cópia já revisada no projeto", onSelect: () => confirmActivation(entry) }]
+            : []),
           { value: "back", title: "Voltar ao catálogo", onSelect: () => dialog.pop() },
         ]}
       />
