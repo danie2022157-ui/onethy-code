@@ -24,13 +24,10 @@ export function convertOnethyCodeHook(relativePath, source) {
 export function convertOnethyCodeMod(name, manifest, readme = "") {
   const id = safeCustomizationId(name)
   const implementation = name.replaceAll("\\", "/").toLowerCase() === "security/secret-redactor" ? "secret-redactor" : "reference-only"
-  let description = "OnethyCode Claude mod; its runtime hooks cannot execute in OnethyCode without an adapter."
-  if (manifest) {
-    try {
-      const raw = JSON.parse(manifest)
-      if (typeof raw.description === "string") description = raw.description.slice(0, 500)
-    } catch {}
-  }
+  // Source metadata is not a supported first-party runtime guarantee.
+  const description = implementation === "secret-redactor"
+    ? "Oculta formatos conhecidos de tokens nas respostas das ferramentas quando ativado."
+    : "Personalização disponível como referência; requer adaptação nativa para executar."
   return {
     id,
     supported: implementation !== "reference-only",
