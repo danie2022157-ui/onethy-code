@@ -150,12 +150,12 @@ if (-not (Test-OnethyCheckout $checkout)) {
     [Console]::Error.WriteLine("[OnethyCode] The saved checkout path is no longer valid. Open the folder containing bin\onethy.js and run .\install.ps1 again.")
     exit 1
   }
-  [Console]::Error.WriteLine("[OnethyCode] Repaired stale checkout path: $checkout")
+  [Console]::Out.WriteLine("[OnethyCode] Repaired stale checkout path: $checkout")
   $config.checkout = $checkout
   $temporary = "$configPath.$PID.tmp"
   try {
     $serialized = ConvertTo-Json -InputObject $config -Depth 8 -Compress
-    [System.IO.File]::WriteAllText($temporary, $serialized, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($temporary, $serialized, [System.Text.UTF8Encoding]::new($false))
     Move-Item -LiteralPath $temporary -Destination $configPath -Force
   } catch {
     [Console]::Error.WriteLine("[OnethyCode] Warning: path repaired for this launch only; re-run install.ps1 to persist it.")
