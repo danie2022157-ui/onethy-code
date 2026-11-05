@@ -15,7 +15,7 @@ O OnethyCode disponibiliza um catálogo de personalizações **interno à experi
 
 ## Preferência por MCPs locais
 
-A importação aceita **somente** servidores locais verificados em uma lista restrita, como memória, raciocínio sequencial e utilitários locais compatíveis. Os modelos são rejeitados quando têm:
+A importação aceita apenas MCPs locais selecionados. Também inclui três modelos desativados por padrão: Playwright (navegador), Sequential Thinking (raciocínio) e Time (fusos horários). Os modelos são rejeitados quando têm:
 
 - URLs para serviços MCP hospedados, credenciais, login, OAuth, cabeçalhos de autorização ou variáveis de ambiente usadas para autenticação;
 - pacotes fora da lista restrita, scripts de shell, argumentos arbitrários e parâmetros com tokens;
