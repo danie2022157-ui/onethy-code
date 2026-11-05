@@ -100,7 +100,7 @@ jobs:
         run: bun --cwd packages/core run typecheck:tsc
 
       - name: MCP CLI configuration regression
-        run: bun --cwd packages/cli test test/mcp-config-path.test.ts test/mcp-auth-choices.test.ts
+        run: bun --cwd packages/cli test test/mcp-config-path.test.ts test/mcp-auth-choices.test.ts test/mcp-management.test.ts
 
       - name: CLI TypeScript check
         if: runner.os == 'Linux'

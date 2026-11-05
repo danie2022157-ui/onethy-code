@@ -48,6 +48,11 @@ const Handlers = Runtime.handlers(Commands, {
   mcp: {
     list: () => import("./commands/handlers/mcp/list"),
     doctor: () => import("./commands/handlers/mcp/doctor"),
+    manage: () => import("./commands/handlers/mcp/manage"),
+    enable: () => import("./commands/handlers/mcp/enable"),
+    disable: () => import("./commands/handlers/mcp/disable"),
+    remove: () => import("./commands/handlers/mcp/remove"),
+    restore: () => import("./commands/handlers/mcp/restore"),
     add: () => import("./commands/handlers/mcp/add"),
     auth: () => import("./commands/handlers/mcp/auth"),
     logout: () => import("./commands/handlers/mcp/logout"),

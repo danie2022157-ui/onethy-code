@@ -265,6 +265,55 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
             ),
           },
         }),
+        Spec.make("manage", {
+          description: "Abrir menu interativo para gerenciar MCPs nativos e personalizados",
+          params: {
+            global: Flag.Boolean("global").pipe(
+              Flag.withDescription("Gerenciar os servidores da configuração global"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
+        Spec.make("enable", {
+          description: "Ativar um MCP persistindo a autorização no escopo selecionado",
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Nome do servidor MCP")),
+            global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
+          },
+        }),
+        Spec.make("disable", {
+          description: "Desativar um MCP sem excluir sua configuração",
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Nome do servidor MCP")),
+            global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
+          },
+        }),
+        Spec.make("remove", {
+          description: "Excluir um MCP no escopo do projeto ou global (com confirmação)",
+          aliases: ["delete"],
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Nome do servidor MCP")),
+            global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
+            yes: Flag.Boolean("yes").pipe(
+              Flag.withAlias("y"),
+              Flag.withDescription("Confirmar exclusão em execução não interativa"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
+        Spec.make("restore", {
+          description: "Restaurar um MCP nativo, ou todos os oito com --all",
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Nome do MCP nativo"), Argument.optional),
+            all: Flag.Boolean("all").pipe(Flag.withDefault(false)),
+            global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
+            yes: Flag.Boolean("yes").pipe(
+              Flag.withAlias("y"),
+              Flag.withDescription("Confirmar redefinição de todos os MCPs"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
         Spec.make("auth", {
           description: "Authenticate with an OAuth-capable remote MCP server",
           globalFlags: ServerFlags,
