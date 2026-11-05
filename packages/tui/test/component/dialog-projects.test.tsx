@@ -44,7 +44,7 @@ test("/projects imports a File Explorer path with quotes and spaces without nest
   setup.mockInput.pressArrow("down")
   setup.mockInput.pressEnter()
   await setup.waitForFrame((frame) =>
-    frame.includes("Add existing project") && frame.includes("quotes and spaces are supported"),
+    frame.includes("Add existing project") && frame.includes("Paste an existing folder path"),
   )
   await setup.mockInput.typeText('"' + target + '"')
   setup.mockInput.pressEnter()
