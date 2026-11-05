@@ -21,7 +21,12 @@ on:
       - '.github/workflows/aitmpl-native.yml'
 jobs:
   personalization-test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
@@ -35,6 +40,7 @@ jobs:
       - run: node --check script/aitmpl-personalizations-bootstrap.mjs
       - run: node --test script/aitmpl-sync.test.mjs
       - name: Verify real catalog import preview (no writes)
+        shell: bash
         run: |
           node --input-type=module <<'NODE'
           import { syncAITmpl } from './packages/cli/src/services/aitmpl-native.mjs'
