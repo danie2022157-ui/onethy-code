@@ -12,7 +12,7 @@ test("/projects renders project-management actions and opens the create form", a
   await setup.waitForFrame((frame) =>
     frame.includes("Manage projects") &&
     frame.includes("Create new project") &&
-    frame.includes("Adicionar pasta existente"),
+    frame.includes("Add existing folder"),
   )
   setup.mockInput.pressEnter()
   await setup.waitForFrame((frame) => frame.includes("Create new project") && frame.includes("New folder name or path"))
