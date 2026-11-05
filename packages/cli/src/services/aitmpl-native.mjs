@@ -5,6 +5,7 @@ import { tmpdir, homedir } from "node:os"
 import { join, relative, resolve, dirname, basename, extname, sep } from "node:path"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
+import { convertMcpTemplate, safeMcpId } from "./aitmpl-mcp.mjs"
 
 
 const CATALOG = "https://github.com/davila7/claude-code-templates.git"
@@ -91,12 +92,12 @@ async function safeAncestors(base, out) {
   }
   return true
 }
-async function record(type, name, sourceFile, out, convert) {
+async function record(type, name, sourceFile, out, convert, prepared) {
   const base = join(destination, type)
   if (!inside(base, out) || !(await safeAncestors(base, out))) { report.rejected++; return }
   if (await exists(out)) { report.existing++; return }
   const input = convert ? await readFile(sourceFile, "utf8") : undefined
-  const result = convert ? convertMarkdown(input, type, name) : undefined
+  const result = prepared !== undefined ? { body: prepared } : convert ? convertMarkdown(input, type, name) : undefined
   if (result?.warning) {
     report.components[type].warnings.push({ name, warning: result.warning })
   }
@@ -104,7 +105,7 @@ async function record(type, name, sourceFile, out, convert) {
   if (!install || verify) return
   await mkdir(dirname(out), { recursive: true })
   try {
-    if (convert) await writeFile(out, result.body, { flag: "wx" })
+    if (convert || prepared !== undefined) await writeFile(out, result.body, { flag: "wx" })
     else await copyFile(sourceFile, out, 1)
     report.installed++
   } catch (e) {
@@ -121,7 +122,27 @@ try {
     const root = join(source, "cli-tool", "components", type)
     report.components[type] = { files: 0, warnings: [] }
     if (!(await exists(root))) { report.components[type].missing = true; continue }
-    // Dangerous or Claude-runtime specific categories need explicit adapters; inventory only.
+    // OnethyCode already discovers mcp/**/*.json and always disables discovered
+    // servers by default. Import only sanitized definitions, never credentials.
+    if (type === "mcps") {
+      for await (const file of traverse(root)) {
+        if (extname(file).toLowerCase() !== ".json") continue
+        report.components[type].files++
+        const relativeId = relative(root, file).replaceAll(sep, "/")
+        const input = await readFile(file, "utf8")
+        const converted = convertMcpTemplate(input, relativeId)
+        for (const warning of converted.warnings) {
+          report.components[type].warnings.push({ name: relativeId, warning })
+        }
+        if (!converted.json) { report.pending++; continue }
+        const name = safeMcpId(relativeId)
+        const dest = join(destination, "mcp", "aitmpl", name + ".json")
+        await record("mcp", name, file, dest, false, converted.json)
+      }
+      continue
+    }
+    // Claude Code-specific event hooks, mods and settings cannot be made
+    // executable safely by renaming them. Inventory but do not activate.
     if (!["skills", "agents"].includes(type)) {
       for await (const file of traverse(root)) report.components[type].files++
       report.pending += report.components[type].files
