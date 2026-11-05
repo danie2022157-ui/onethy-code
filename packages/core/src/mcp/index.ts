@@ -18,6 +18,7 @@ import { KeyedMutex } from "../effect/keyed-mutex.js"
 import { Location } from "../location.js"
 import { waitForAbort } from "@opencode/util/process"
 import { State } from "../state.js"
+import { MCP_POLICY, retryDelay, retryAllowed, canIdle, shouldHealthCheck } from "./lifecycle.js"
 import type { McpClient } from "./client.js"
 
 export const ServerName = Schema.String.pipe(Schema.brand("MCP.ServerName"))
