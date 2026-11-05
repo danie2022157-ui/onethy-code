@@ -47,15 +47,22 @@ export function DialogProjects() {
     visibleProjectDirectories(existing().map((project) => project.canonical), registry),
   )
 
+  // A bare project name should not create folders inside OnethyCode's own packages/cli source tree.
+  // Prefer the user's Documents folder; fall back to the home directory.
+  const projectBase = () => {
+    const documents = path.join(paths.home, "Documents")
+    return fs.existsSync(documents) ? documents : paths.home
+  }
+
   function showError(title: string, error: unknown) {
     toast.show({ variant: "error", title, message: error instanceof Error ? error.message : String(error) })
   }
 
   function open(directory: string) {
     try {
-      addProjectDirectory(directory, paths.cwd)
+      const normalized = addProjectDirectory(directory, projectBase())
       dialog.clear()
-      const target = { directory }
+      const target = { directory: normalized }
       route.navigate({ type: "home", location: target })
       location.set(target)
     } catch (error) {
@@ -71,13 +78,20 @@ export function DialogProjects() {
         subtitle={existingFolder
           ? "The folder must already exist. No files will be changed."
           : "Creates an empty folder at the specified path; existing projects will not be overwritten."}
+        description={() => (
+          <text wrapMode="word">
+            {existingFolder
+              ? "Paste an existing folder path (quotes and spaces are supported). Relative paths start in: " + projectBase()
+              : "Enter a new folder name or full path. Relative names are created in: " + projectBase()}
+          </text>
+        )}
         onCancel={() => dialog.pop()}
         onConfirm={(input) => {
           void (async () => {
             try {
               const directory = existingFolder
-                ? addProjectDirectory(input, paths.cwd)
-                : createProjectDirectory(input, paths.cwd)
+                ? addProjectDirectory(input, projectBase())
+                : createProjectDirectory(input, projectBase())
               await change((draft) => rememberProject(draft, directory))
               toast.show({ variant: "success", title: existingFolder ? "Project added" : "Project created", message: directory })
               open(directory)
