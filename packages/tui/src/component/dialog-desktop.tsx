@@ -4,8 +4,18 @@ import { buildDesktopInvocation, runAgentDesktop } from "@opencode/core/agent-de
 import { DialogSelect } from "../ui/dialog-select"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
+import { desktopReportRows, type DesktopReportRow } from "./desktop-report"
+import { DialogDesktopReport } from "./dialog-desktop-report"
 
 const PACKAGE = "agent-desktop@1.2.0"
+
+const usageRows: readonly DesktopReportRow[] = [
+  { label: "Using the tool", value: "Ask an agent to inspect and operate a desktop application with desktop_control. It will request permission before reading windows or performing actions.", severity: "normal" },
+  { label: "Where it runs", value: "Desktop control operates on the machine hosting the OnethyCode backend. It cannot automatically control a different computer.", severity: "normal" },
+  { label: "Recommended workflow", value: "Check native runtime status, list windows, inspect a scoped accessibility snapshot, act on a qualified element reference, then verify with a new snapshot.", severity: "normal" },
+  { label: "Privacy", value: "Never share private snapshots, credentials or diagnostic logs with other agents or repositories without authorization.", severity: "warning" },
+]
+
 
 /** OnethyCode's native, English-language desktop integration manager. */
 export function DialogDesktop() {
@@ -18,15 +28,12 @@ export function DialogDesktop() {
     setBusy(true)
     void runAgentDesktop(buildDesktopInvocation({ action }))
       .then((result) => {
-        const details = JSON.stringify(result.data ?? result).slice(0, 900)
         dialog.push(() => (
-          <DialogSelect
+          <DialogDesktopReport
             title={action === "status" ? "Agent Desktop — Runtime status" : "Agent Desktop — OS permissions"}
-            description={details}
-            skipFilter
-            options={[{ value: "back", title: "Back", onSelect: () => dialog.pop() }]}
+            rows={desktopReportRows(result)}
           />
-        ))
+        ), undefined, { size: "large" })
       })
       .catch((error) => toast.show({
         variant: "error",
@@ -79,7 +86,8 @@ export function DialogDesktop() {
     dialog.push(() => (
       <DialogSelect
         title="Install Agent Desktop locally?"
-        description={"Installs " + PACKAGE + " globally with npm. The official package downloads a platform-specific binary. No install is started without your confirmation."}
+        renderFilter={false}
+        footer={<text wrapMode="word">{"Installs " + PACKAGE + " globally with npm. The official package downloads a platform-specific binary. Installation starts only after you select Yes, install."}</text>}
         skipFilter
         options={[
           { value: "cancel", title: "Cancel", onSelect: () => dialog.pop() },
@@ -121,13 +129,8 @@ export function DialogDesktop() {
           description: "Agents use desktop_control for snapshots, clicks, typing and window management",
           category: "Guide",
           onSelect: () => dialog.push(() => (
-            <DialogSelect
-              title="Agent Desktop — Usage"
-              description={"Ask your agent to inspect and operate a desktop app. It will use desktop_control and ask for required permissions. Desktop access operates on the machine hosting the OnethyCode server, not a remote client. Do not share sensitive snapshots or logs."}
-              skipFilter
-              options={[{ value: "back", title: "Back", onSelect: () => dialog.pop() }]}
-            />
-          )),
+            <DialogDesktopReport title="Agent Desktop — Usage" rows={usageRows} />
+          ), undefined, { size: "large" }),
         },
       ]}
     />
