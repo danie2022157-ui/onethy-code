@@ -21,7 +21,11 @@ export const LOCAL_MCP_NAMES = Object.freeze([
 ])
 
 export function curatedLocalMCPs() {
-  const local = (command, args) => ({ type: "stdio", command, args, disabled: true })
+  const local = (command, args) => ({
+    type: "stdio", command, args, disabled: true,
+    // First-run package downloads and language-server initialization can be slow.
+    timeout: { startup: 120000, catalog: 60000 },
+  })
   return JSON.stringify({ mcpServers: {
     "onethy-playwright": local("npx", ["-y", "@playwright/mcp@latest"]),
     "onethy-chrome-devtools": local("npx", ["-y", "chrome-devtools-mcp@latest"]),
