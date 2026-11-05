@@ -28,3 +28,13 @@ jobs:
       - run: node --check packages/cli/src/services/aitmpl-native.mjs
       - run: node --check script/aitmpl-personalizations-bootstrap.mjs
       - run: node --test script/aitmpl-sync.test.mjs
+      - name: Verify real catalog import preview (no writes)
+        run: |
+          node --input-type=module <<'NODE'
+          import { syncAITmpl } from './packages/cli/src/services/aitmpl-native.mjs'
+          const report = await syncAITmpl({ type: 'agents' })
+          if (report.ready < 1 || report.errors.length) {
+            throw new Error('Live AITmpl agents were not discovered')
+          }
+          console.log('Native personalization catalog preview verified:', report.ready, 'agents')
+          NODE
