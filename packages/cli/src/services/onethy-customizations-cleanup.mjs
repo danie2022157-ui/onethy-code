@@ -97,3 +97,43 @@ export async function cleanupGeneratedOnethyMCPs(configRoot) {
   }
   return removed
 }
+
+
+/**
+ * Migrate the original three-server OnethyCode bundle to the requested eight
+ * servers. Only remove the exact unmodified old template, and only when the
+ * containing directories and file are regular filesystem objects.
+ *
+ * Never discard a user-edited bundle or one with enabled servers.
+ */
+export async function migrateOldOnethyLocalMCPBundle(configRoot) {
+  const parent = join(configRoot, "mcp")
+  const directory = join(parent, "onethy")
+  const file = join(directory, "local-tools.json")
+  for (const target of [parent, directory]) {
+    try {
+      const info = await lstat(target)
+      if (!info.isDirectory() || info.isSymbolicLink()) return false
+    } catch (error) {
+      if (error.code === "ENOENT") return false
+      throw error
+    }
+  }
+  try {
+    const info = await lstat(file)
+    if (!info.isFile() || info.isSymbolicLink()) return false
+  } catch (error) {
+    if (error.code === "ENOENT") return false
+    throw error
+  }
+  const previous = { mcpServers: {
+    "onethy-browser": { type: "stdio", command: "npx", args: ["-y", "@playwright/mcp@latest"], disabled: true },
+    "onethy-sequential-thinking": { type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-sequential-thinking"], disabled: true },
+    "onethy-time": { type: "stdio", command: "uvx", args: ["mcp-server-time"], disabled: true },
+  } }
+  let existing
+  try { existing = JSON.parse(await readFile(file, "utf8")) } catch { return false }
+  if (JSON.stringify(existing) !== JSON.stringify(previous)) return false
+  await unlink(file)
+  return true
+}
