@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, onMount, Show } from "solid-js"
 import { useData } from "../context/data"
 import { useClient } from "../context/client"
 import { pipe, sortBy } from "remeda"
@@ -11,6 +11,8 @@ import { useToast } from "../ui/toast"
 import { DialogErrorDetails } from "./dialog-error-details"
 import { DialogIntegration } from "./dialog-integration"
 import { useLocation } from "../context/location"
+import { Global } from "@opencode/util/global"
+import { managedMcpList, manageMcp, type McpAction } from "../../../cli/src/services/mcp-manager"
 
 function statusError(status: McpServer["status"]) {
   if (status.status === "failed" || status.status === "needs_auth") return status.error
@@ -40,10 +42,14 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
   const location = useLocation()
   const toast = useToast()
   const theme = useTheme().surface("dialog")
+  onMount(() => {
+    if (process.env.OMNICODE_ACTIVE === "1") dialog.setSize("large")
+  })
   const current = () => location.ref ?? data.location.default()
+  const [hidden, setHidden] = createSignal<ReadonlySet<string>>(new Set())
   const servers = createMemo(() =>
     pipe(
-      data.location.mcp.server.list(current()) ?? [],
+      (data.location.mcp.server.list(current()) ?? []).filter((server) => !hidden().has(server.name)),
       sortBy((server) => server.name),
     ),
   )
@@ -53,6 +59,7 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
     props.details && initial?.status.status === "failed" ? initial : undefined,
   )
   const [loading, setLoading] = createSignal<ReadonlySet<string>>(new Set())
+  const [saving, setSaving] = createSignal(false)
 
   const statusColor = (status: McpServer["status"]) => {
     if (status.status === "connected") return theme.text.feedback.success.base
@@ -131,6 +138,74 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
     )
   }
 
+  // File-based management is OnethyCode-only and uses the same persistence layer
+  // as the existing CLI commands. It never launches an MCP itself.
+  const manage = async (action: McpAction, name: string) => {
+    if (saving()) return
+    if (current().workspaceID) {
+      toast.show({ variant: "warning", message: "Gerenciamento local indisponível em workspace remoto." })
+      return
+    }
+    setSaving(true)
+    try {
+      const directory = current().directory
+      const globalRoot = process.env.OPENCODE_CONFIG_DIR || Global.Path.config
+      const entries = await managedMcpList(directory, globalRoot)
+      const entry = entries.find((item) => item.name === name)
+      const global = action === "restore" ? true
+        : action === "remove" ? entry?.location === "global"
+        : false // Enabled/disabled status is scoped to this workspace.
+      const message = await manageMcp({ action, name, cwd: directory, globalRoot, global })
+      if (action === "remove") {
+        setHidden((before) => new Set([...before, name]))
+        await client.api.experimental.mcp.remove({
+          server: name, location: { directory },
+        }).catch(() => undefined)
+      } else if (action === "enable") {
+        await client.api.experimental.mcp.connect({
+          server: name, location: { directory },
+        }).catch(toast.error)
+      } else if (action === "disable") {
+        await client.api.experimental.mcp.disconnect({
+          server: name, location: { directory },
+        }).catch(toast.error)
+      } else {
+        setHidden(new Set())
+      }
+      toast.show({ variant: "success", message })
+      void data.location.mcp.server.sync(current()).catch(() => undefined)
+    } catch (error) {
+      toast.error(error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const confirmManage = (action: "remove" | "restore", name: string) => {
+    const title = action === "remove" ? `Excluir ${name}?` : "Restaurar os 8 MCPs nativos?"
+    dialog.push(() => (
+      <DialogSelect
+        title={title}
+        description={action === "remove"
+          ? "A configuração será excluída permanentemente. Outros MCPs serão preservados."
+          : "As configurações dos 8 MCPs nativos serão redefinidas e desativadas."}
+        options={[
+          { value: "cancel", title: "Cancelar", category: "Confirmação" },
+          { value: "confirm", title: action === "remove" ? "Sim, excluir" : "Sim, restaurar", category: "Confirmação" },
+        ]}
+        onSelect={(option) => {
+          dialog.pop()
+          if (option.value !== "confirm") return
+          if (action === "remove") {
+            void manage("remove", name)
+          } else {
+            void manage("restore", "all")
+          }
+        }}
+      />
+    ))
+  }
+
   return (
     <box>
       <Show
@@ -153,6 +228,33 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
                   toggle(option.value as string)
                 },
               },
+              ...(process.env.OMNICODE_ACTIVE === "1" ? [
+                {
+                  title: "ativar",
+                  command: "onethy.mcp.enable",
+                  bind: "ctrl+e",
+                  onTrigger: (option: { value: string }) => void manage("enable", option.value),
+                },
+                {
+                  title: "desativar",
+                  command: "onethy.mcp.disable",
+                  bind: "ctrl+d",
+                  onTrigger: (option: { value: string }) => void manage("disable", option.value),
+                },
+                {
+                  title: "excluir",
+                  command: "onethy.mcp.delete",
+                  bind: "ctrl+x",
+                  onTrigger: (option: { value: string }) => confirmManage("remove", option.value),
+                },
+                {
+                  title: "restaurar os 8",
+                  command: "onethy.mcp.restore",
+                  bind: "ctrl+r",
+                  selection: "none" as const,
+                  onTrigger: () => confirmManage("restore", "all"),
+                },
+              ] : []),
             ]}
             footerHints={focusedError() ? [{ title: "view error", label: "enter", group: "primary" }] : []}
           />

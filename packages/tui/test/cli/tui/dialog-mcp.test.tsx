@@ -2,6 +2,9 @@
 import { testRender } from "@opentui/solid"
 import { expect, test } from "bun:test"
 import { onMount } from "solid-js"
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { DialogMcp } from "../../../src/component/dialog-mcp"
 import { ConfigProvider } from "../../../src/config"
 import { ClientProvider } from "../../../src/context/client"
@@ -62,7 +65,57 @@ test("opens an investigation draft for a failed MCP server at its originating lo
   }
 })
 
-async function renderMcp(options?: { failed?: boolean; location?: { directory: string; workspaceID?: string } }) {
+
+test("OnethyCode MCP dialog exposes persistent shortcuts and deletes only selected config after confirmation", async () => {
+  const former = process.env.OMNICODE_ACTIVE
+  process.env.OMNICODE_ACTIVE = "1"
+  const root = await mkdtemp(join(tmpdir(), "onethy-mcp-tui-"))
+  const directory = join(root, "project")
+  const configuration = join(directory, "onethy.json")
+  let fixture: Awaited<ReturnType<typeof renderMcp>> | undefined
+  try {
+    await mkdir(directory, { recursive: true })
+    await writeFile(configuration, JSON.stringify({ mcp: { servers: {
+      linear: { type: "local", command: ["npx", "-y", "test-mcp"], disabled: true },
+      untouched: { type: "local", command: ["uvx", "other-mcp"], disabled: true },
+    } } }))
+    fixture = await renderMcp({ disabled: true, location: { directory } })
+    await fixture.app.waitForFrame(frame => frame.includes("linear") && frame.includes("ctrl+e"))
+    async function eventually(check: () => Promise<boolean>) {
+      for (let attempt = 0; attempt < 40; attempt++) {
+        if (await check()) return
+        await Bun.sleep(25)
+      }
+      throw new Error("MCP configuration change was not saved")
+    }
+    fixture.app.mockInput.pressKey("e", { ctrl: true })
+    await eventually(async () => JSON.parse(await readFile(configuration, "utf8")).mcp.overrides?.linear === true)
+    const first = JSON.parse(await readFile(configuration, "utf8"))
+    expect(first.mcp.overrides.linear).toBe(true)
+
+    fixture.app.mockInput.pressKey("d", { ctrl: true })
+    await eventually(async () => JSON.parse(await readFile(configuration, "utf8")).mcp.overrides?.linear === false)
+    const second = JSON.parse(await readFile(configuration, "utf8"))
+    expect(second.mcp.overrides.linear).toBe(false)
+
+    fixture.app.mockInput.pressKey("x", { ctrl: true })
+    await fixture.app.waitForFrame(frame => frame.includes("Excluir linear?"))
+    fixture.app.mockInput.pressArrow("down")
+    fixture.app.mockInput.pressEnter()
+    await eventually(async () => JSON.parse(await readFile(configuration, "utf8")).mcp.servers?.linear === undefined)
+    const third = JSON.parse(await readFile(configuration, "utf8"))
+    expect(third.mcp.servers.linear).toBeUndefined()
+    expect(third.mcp.overrides.linear).toBeUndefined()
+    expect(third.mcp.servers.untouched).toBeDefined()
+  } finally {
+    fixture?.app.renderer.destroy()
+    if (former === undefined) delete process.env.OMNICODE_ACTIVE
+    else process.env.OMNICODE_ACTIVE = former
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+async function renderMcp(options?: { failed?: boolean; disabled?: boolean; location?: { directory: string; workspaceID?: string } }) {
   const events = createEventStream()
   let oauth = 0
   let connect = 0
@@ -79,9 +132,11 @@ async function renderMcp(options?: { failed?: boolean; location?: { directory: s
         data: [
           {
             name: "linear",
-            status: options?.failed
-              ? { status: "failed", error: "MCP error -32000: Connection closed" }
-              : { status: "needs_auth", error: "Authentication required" },
+            status: options?.disabled
+              ? { status: "disabled" }
+              : options?.failed
+                ? { status: "failed", error: "MCP error -32000: Connection closed" }
+                : { status: "needs_auth", error: "Authentication required" },
             integrationID: "mcp_linear",
           },
         ],
