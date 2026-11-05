@@ -76,9 +76,24 @@ function convertMarkdown(contents, kind, name) {
     warning = [warning, "Runtime-specific references may require manual changes"].filter(Boolean).join("; ")
   return { body: "---\n" + updated + "\n---\n" + body, warning }
 }
+async function safeAncestors(base, out) {
+  // Imported content must never follow a preexisting symlink outside the native config.
+  const chain = [base]
+  const parts = relative(base, dirname(out)).split(sep).filter(Boolean)
+  for (const part of parts) chain.push(join(chain.at(-1), part))
+  for (const candidate of chain) {
+    try {
+      const info = await lstat(candidate)
+      if (info.isSymbolicLink() || !info.isDirectory()) return false
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error
+    }
+  }
+  return true
+}
 async function record(type, name, sourceFile, out, convert) {
   const base = join(destination, type)
-  if (!inside(base, out)) { report.rejected++; return }
+  if (!inside(base, out) || !(await safeAncestors(base, out))) { report.rejected++; return }
   if (await exists(out)) { report.existing++; return }
   const input = convert ? await readFile(sourceFile, "utf8") : undefined
   const result = convert ? convertMarkdown(input, type, name) : undefined
