@@ -104,4 +104,25 @@ describe("InstructionBuiltIns", () => {
     })),
   )
 
+  it.effect("OnethyCode always exposes all seven capability categories to every agent despite retired flags", () =>
+    withEnv({
+      OMNICODE_ACTIVE: "1",
+      OMNICODE_AUTO_CUSTOMIZATIONS: JSON.stringify({
+        enabled: false, useSkills: false, useAgents: false,
+        useMcps: false, useHooks: false, useMods: false,
+        useCommands: false, useSettings: false,
+      }),
+    }, () => Effect.gen(function* () {
+      const builtins = yield* InstructionBuiltIns.Service
+      const initial = yield* readInitial(yield* builtins.load())
+      expect(initial.text).toContain("<auto_customizations_orchestrator>")
+      expect(initial.text).toContain("ATIVO PARA TODOS OS AGENTES")
+      for (const feature of ["[SKILLS]", "[SUBAGENTES]", "[SERVIDORES MCP]", "[GANCHOS & HOOKS]", "[MODS & PLUGINS]", "[COMANDOS SLASH & LOOPS]", "[MODOS & SETTINGS]"]) {
+        expect(initial.text).toContain(feature)
+      }
+      expect(initial.text).toContain("MCPs conectados")
+      expect(initial.text).toContain("Respeitar permissões")
+    })),
+  )
+
 })
