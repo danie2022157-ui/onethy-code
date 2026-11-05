@@ -4,6 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import {
   addProjectDirectory,
+  cleanProjectPath,
   createProjectDirectory,
   forgetProject,
   rememberProject,
@@ -68,4 +69,48 @@ describe("Onethy project management", () => {
       }
     }),
   )
+
+  test("accepts File Explorer Copy as path with quotes, spaces and absolute Windows drive paths", () => {
+    const cwd = "C:\\Users\\Daniel\\onethy-code\\onethy-code\\packages\\cli"
+    const expected = "C:\\Users\\Daniel\\Documents\\REMOTION VIDEO CRIA"
+    expect(cleanProjectPath('  "' + expected + '"  ')).toBe(expected)
+    expect(resolveProjectDirectory('"' + expected + '"', cwd, "win32")).toBe(expected)
+    expect(resolveProjectDirectory("'" + expected + "'", cwd, "win32")).toBe(expected)
+    expect(resolveProjectDirectory("“" + expected + "”", cwd, "win32")).toBe(expected)
+    expect(resolveProjectDirectory(expected, cwd, "win32")).toBe(expected)
+    expect(resolveProjectDirectory("new-project", cwd, "win32")).toBe(
+      "C:\\Users\\Daniel\\onethy-code\\onethy-code\\packages\\cli\\new-project",
+    )
+    expect(resolveProjectDirectory('"\\\\server\\share\\folder with spaces"', cwd, "win32")).toBe(
+      "\\\\server\\share\\folder with spaces",
+    )
+    expect(() => resolveProjectDirectory('"C:\\\\"', cwd, "win32")).toThrow("root")
+    expect(() => resolveProjectDirectory("C:relative-project", cwd, "win32")).toThrow("full Windows path")
+    expect(() => resolveProjectDirectory("\\relative-to-drive", cwd, "win32")).toThrow("full Windows path")
+  })
+
+  test("pasted quoted paths with spaces work for both existing and newly created projects", () =>
+    sandbox((root) => {
+      const existing = path.join(root, "REMOTION VIDEO CRIA")
+      fs.mkdirSync(existing)
+      expect(addProjectDirectory('"' + existing + '"', root)).toBe(existing)
+      const created = path.join(root, "new project with spaces")
+      expect(createProjectDirectory('"' + created + '"', root)).toBe(created)
+      expect(fs.statSync(created).isDirectory()).toBe(true)
+      expect(() => createProjectDirectory(created, root)).toThrow("Add existing folder")
+      expect(() => addProjectDirectory('"'+path.join(root,"not-present")+'"', root)).toThrow("Create new project")
+      expect(() => createProjectDirectory(path.join(root, "not-present", "child"), root)).toThrow("Parent folder")
+    }),
+  )
+
+  test("rejects malformed input and Windows paths in a non-Windows backend with actionable messages", () => {
+    expect(() => cleanProjectPath('  ""  ')).toThrow("valid project folder")
+    expect(() => cleanProjectPath('"C:\\foo" garbage')).toThrow("embedded quotes")
+    expect(() => cleanProjectPath('hello\nworld')).toThrow("line breaks")
+    if (process.platform !== "win32") {
+      expect(() => resolveProjectDirectory('"C:\\Users\\Daniel\\Documents\\REMOTION VIDEO CRIA"', "/tmp", "linux"))
+        .toThrow("OnethyCode directly on Windows")
+    }
+  })
+
 })
