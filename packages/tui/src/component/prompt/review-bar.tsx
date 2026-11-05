@@ -1,26 +1,19 @@
 import { RGBA, TextAttributes, type MouseEvent } from "@opentui/core"
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
-import { execFile } from "node:child_process"
 import { useClient } from "../../context/client"
+import { useRoute } from "../../context/route"
+import { isCurrentSessionDiff, sessionReviewFiles, sessionReviewFingerprint, type ChangedFile } from "./review-bar-session"
 import { useData } from "../../context/data"
-import { useLocation } from "../../context/location"
 import { useTheme } from "../../context/theme"
 import { Keymap } from "../../context/keymap"
 import { useToast } from "../../ui/toast"
 
-export interface ChangedFile {
-  readonly file: string
-  readonly additions: number
-  readonly deletions: number
-  readonly status: "added" | "modified" | "deleted" | string
-}
-
-type DismissListener = (sessionID?: string) => void
+type DismissListener = (sessionID: string) => void
 const dismissListeners = new Set<DismissListener>()
 
-// Global dismiss trigger for the review bar
+// Each /keep action must name its owning session; it must never broadcast to other tabs.
 export const ReviewBarSignals = {
-  dismiss: (sessionID?: string) => {
+  dismiss: (sessionID: string) => {
     for (const listener of dismissListeners) {
       try {
         listener(sessionID)
@@ -33,74 +26,31 @@ export const ReviewBarSignals = {
   },
 }
 
-function parseGitNumstat(output: string): ChangedFile[] {
-  const result: ChangedFile[] = []
-  const lines = output.split(/\r?\n/)
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    const parts = trimmed.split(/\t+/)
-    if (parts.length >= 3) {
-      const adds = parseInt(parts[0], 10) || 0
-      const dels = parseInt(parts[1], 10) || 0
-      const file = parts.slice(2).join("\t").trim()
-      if (file) {
-        result.push({
-          file,
-          additions: adds,
-          deletions: dels,
-          status: "modified",
-        })
-      }
-    }
-  }
-  return result
-}
-
-function runGitDiff(cwd: string): Promise<ChangedFile[]> {
-  return new Promise((resolve) => {
-    execFile("git", ["diff", "--numstat"], { cwd }, (err, stdout) => {
-      if (err) {
-        resolve([])
-        return
-      }
-      const files = parseGitNumstat(stdout)
-      execFile("git", ["status", "--porcelain"], { cwd }, (statusErr, statusStdout) => {
-        if (!statusErr && statusStdout) {
-          const statusLines = statusStdout.split(/\r?\n/)
-          for (const sLine of statusLines) {
-            const sTrimmed = sLine.trim()
-            if (sTrimmed.startsWith("??")) {
-              const untrackedFile = sTrimmed.slice(2).trim()
-              if (untrackedFile && !files.some((f) => f.file === untrackedFile)) {
-                files.push({
-                  file: untrackedFile,
-                  additions: 1,
-                  deletions: 0,
-                  status: "added",
-                })
-              }
-            }
-          }
-        }
-        resolve(files)
-      })
-    })
-  })
-}
-
-export function PromptReviewBar(props: { sessionID?: string }) {
+export function PromptReviewBar(props: { sessionID?: string; active?: boolean }) {
   const client = useClient()
   const data = useData()
-  const location = useLocation()
+  const route = useRoute()
   const theme = useTheme()
   const keymap = Keymap.use()
   const toast = useToast()
 
-  const [files, setFiles] = createSignal<readonly ChangedFile[]>([])
-  const [expanded, setExpanded] = createSignal(false)
-  const [dismissedSession, setDismissedSession] = createSignal<string | null>(null)
-  const [dismissedFingerprint, setDismissedFingerprint] = createSignal<string>("")
+  // The component can remain mounted while tabs switch, so attach every result and
+  // interaction state to a session ID. Old tab results never appear in the new tab.
+  const [diffState, setDiffState] = createSignal<{ sessionID: string; files: readonly ChangedFile[] }>({
+    sessionID: "",
+    files: [],
+  })
+  const files = createMemo(() =>
+    diffState().sessionID === props.sessionID ? diffState().files : [],
+  )
+  const [expandedBySession, setExpandedBySession] = createSignal<Record<string, boolean>>({})
+  const [dismissedBySession, setDismissedBySession] = createSignal<Record<string, string>>({})
+  const expanded = createMemo(() => Boolean(expandedBySession()[props.sessionID ?? ""]))
+  const toggleExpanded = () => {
+    const sid = props.sessionID
+    if (!sid) return
+    setExpandedBySession((current) => ({ ...current, [sid]: !current[sid] }))
+  }
 
   const status = createMemo(() => (props.sessionID ? data.session.status(props.sessionID) : undefined))
   const messages = createMemo(() => (props.sessionID ? data.session.message.list(props.sessionID) : []))
@@ -110,72 +60,19 @@ export function PromptReviewBar(props: { sessionID?: string }) {
 
   const executeLoadDiff = async () => {
     const sid = props.sessionID
-    if (!sid) {
-      setFiles([])
-      return
-    }
+    if (!sid) return
 
     const currentRequestId = ++diffRequestId
-
     try {
-      let resolved: ChangedFile[] = []
-
-      // 1. Try session.diff first
-      try {
-        const sessionDiffRes: any = await client.api.session.diff({ sessionID: sid })
-        const sessionDiff = Array.isArray(sessionDiffRes) ? sessionDiffRes : (sessionDiffRes?.data ?? [])
-        if (Array.isArray(sessionDiff) && sessionDiff.length > 0) {
-          resolved = sessionDiff.map((item: any) => ({
-            file: item.file ?? "",
-            additions: typeof item.additions === "number" ? item.additions : 0,
-            deletions: typeof item.deletions === "number" ? item.deletions : 0,
-            status: item.status ?? "modified",
-          }))
-        }
-      } catch {
-        // session.diff may not have snapshot records
-      }
-
-      // 2. Fallback to vcs.diff("working")
-      if (resolved.length === 0) {
-        try {
-          const vcsRes: any = await client.api.vcs.diff({ mode: "working" })
-          const vcsList = Array.isArray(vcsRes) ? vcsRes : (vcsRes?.data ?? [])
-          if (Array.isArray(vcsList) && vcsList.length > 0) {
-            resolved = vcsList.map((item: any) => ({
-              file: item.file ?? "",
-              additions: typeof item.additions === "number" ? item.additions : 0,
-              deletions: typeof item.deletions === "number" ? item.deletions : 0,
-              status: item.status ?? "modified",
-            }))
-          }
-        } catch {
-          // vcs not available
-        }
-      }
-
-      // 3. Fallback to direct git diff in workspace
-      if (resolved.length === 0) {
-        try {
-          const cwd = location.ref?.directory || process.cwd()
-          const gitFiles = await runGitDiff(cwd)
-          if (gitFiles.length > 0) {
-            resolved = gitFiles
-          }
-        } catch {
-          // git command fallback failed
-        }
-      }
-
-      // Guard against out-of-order resolution
-      if (currentRequestId === diffRequestId) {
-        resolved = resolved.filter((f) => f.file && f.file.trim().length > 0)
-        setFiles(resolved)
-      }
+      // Only the owning session's recorded turn is permitted. An empty response is
+      // genuinely empty; workspace-level vcs.diff/git status may belong to other tabs.
+      const response = await client.api.session.diff({ sessionID: sid, context: 0 })
+      if (!isCurrentSessionDiff(sid, currentRequestId, props.sessionID, diffRequestId)) return
+      setDiffState({ sessionID: sid, files: sessionReviewFiles(response) })
     } catch {
-      if (currentRequestId === diffRequestId) {
-        setFiles([])
-      }
+      // Fail closed on missing snapshots/errors; never show another session's git changes.
+      if (!isCurrentSessionDiff(sid, currentRequestId, props.sessionID, diffRequestId)) return
+      setDiffState({ sessionID: sid, files: [] })
     }
   }
 
@@ -186,16 +83,18 @@ export function PromptReviewBar(props: { sessionID?: string }) {
     }, delay)
   }
 
-  // React to status changes and message length changes
+  // Reset immediately when the route changes, before the next async request resolves.
+  let activeSessionID: string | undefined
   createEffect(() => {
     const sid = props.sessionID
-    const s = status()
+    const state = status()
     void messages().length
-    if (sid) {
-      scheduleLoadDiff(s === "running" ? 500 : 150)
-    } else {
-      setFiles([])
+    if (sid !== activeSessionID) {
+      diffRequestId++
+      activeSessionID = sid
+      setDiffState({ sessionID: sid ?? "", files: [] })
     }
+    if (sid) scheduleLoadDiff(state === "running" ? 500 : 150)
   })
 
   // Listen to meaningful client events (filtering out streaming delta deluges)
@@ -234,12 +133,12 @@ export function PromptReviewBar(props: { sessionID?: string }) {
 
     // Listen to global dismiss events from /keep command or ReviewBarSignals
     const unsubDismiss = ReviewBarSignals.onDismiss((targetSessionID) => {
-      if (!targetSessionID || targetSessionID === props.sessionID) {
+      if (targetSessionID === props.sessionID) {
         dismissCurrent()
       }
     })
 
-    // Periodic check every 3 seconds to keep working tree changes fresh
+    // Refresh the active session's own recorded turn (never the working tree).
     const pollInterval = setInterval(() => {
       void executeLoadDiff()
     }, 3000)
@@ -249,34 +148,34 @@ export function PromptReviewBar(props: { sessionID?: string }) {
       unsubDismiss()
       clearInterval(pollInterval)
       if (debounceTimer) clearTimeout(debounceTimer)
+      diffRequestId++
     })
   })
 
   const totalAdditions = createMemo(() => files().reduce((acc, f) => acc + f.additions, 0))
   const totalDeletions = createMemo(() => files().reduce((acc, f) => acc + f.deletions, 0))
 
-  const currentFingerprint = createMemo(() => {
-    return files()
-      .map((f) => `${f.file}:${f.additions}:${f.deletions}`)
-      .join("|")
-  })
+  const lastTurnID = createMemo(() => messages().filter((message) => message.type === "user").at(-1)?.id ?? "")
+  const currentFingerprint = createMemo(() =>
+    sessionReviewFingerprint(props.sessionID ?? "", lastTurnID(), files()),
+  )
 
   const visible = createMemo(() => {
-    if (!props.sessionID || files().length === 0) return false
-    if (dismissedSession() === props.sessionID && dismissedFingerprint() === currentFingerprint()) return false
-    return true
+    const sid = props.sessionID
+    if (!sid || props.active === false || route.data.type !== "session" || route.data.sessionID !== sid) return false
+    if (files().length === 0) return false
+    return dismissedBySession()[sid] !== currentFingerprint()
   })
 
   const dismissCurrent = () => {
-    if (props.sessionID) {
-      setDismissedSession(props.sessionID)
-      setDismissedFingerprint(currentFingerprint())
-      toast.show({
-        variant: "success",
-        message: `✓ Changes kept (${files().length} ${files().length === 1 ? "file" : "files"})`,
-        duration: 3000,
-      })
-    }
+    const sid = props.sessionID
+    if (!sid || !visible()) return
+    setDismissedBySession((current) => ({ ...current, [sid]: currentFingerprint() }))
+    toast.show({
+      variant: "success",
+      message: `✓ Changes kept (${files().length} ${files().length === 1 ? "file" : "files"})`,
+      duration: 3000,
+    })
   }
 
   const triggerUndo = async () => {
@@ -312,7 +211,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
         bind: "alt+d",
         title: "Toggle changed files list",
         group: "Review",
-        run: () => setExpanded((prev) => !prev),
+        run: () => toggleExpanded(),
       },
       {
         id: "session.review.undo",
@@ -336,31 +235,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
 
   const toggleExpand = (e: MouseEvent) => {
     e.stopPropagation()
-    setExpanded((prev) => !prev)
-  }
-
-  const undoSingleFile = (e: MouseEvent, item: ChangedFile) => {
-    e.stopPropagation()
-    const cwd = location.ref?.directory || process.cwd()
-    execFile("git", ["checkout", "HEAD", "--", item.file], { cwd }, (err) => {
-      if (err && item.status === "added") {
-        execFile("git", ["clean", "-f", "--", item.file], { cwd }, () => {
-          toast.show({
-            variant: "info",
-            message: `⏪ File reverted: ${item.file}`,
-            duration: 2400,
-          })
-          scheduleLoadDiff(150)
-        })
-        return
-      }
-      toast.show({
-        variant: err ? "warning" : "info",
-        message: err ? `Unable to revert ${item.file} via git` : `⏪ File reverted: ${item.file}`,
-        duration: 2400,
-      })
-      scheduleLoadDiff(150)
-    })
+    toggleExpanded()
   }
 
   return (
@@ -476,16 +351,7 @@ export function PromptReviewBar(props: { sessionID?: string }) {
                       -{item.deletions}
                     </text>
                   </Show>
-                  <box
-                    paddingLeft={1}
-                    paddingRight={1}
-                    backgroundColor={RGBA.fromHex("#1E293B")}
-                    onMouseUp={(e) => undoSingleFile(e, item)}
-                  >
-                    <text fg={RGBA.fromHex("#38BDF8")} selectable={false}>
-                      [Revert file]
-                    </text>
-                  </box>
+
                 </box>
               )}
             </For>
