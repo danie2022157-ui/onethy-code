@@ -36,7 +36,7 @@ interface MemoryEntry {
   readonly safe: boolean
 }
 
-const PROJECT_NOTES = "# Memória durável do projeto\n\nDecisões técnicas importantes e conhecimento de longo prazo.\n"
+const PROJECT_NOTES = "# Durable Project Memory\n\nImportant technical decisions and long-term knowledge.\n"
 const MAX_FILE_BYTES = 96 * 1024
 
 /** This dialog manages local project memory and local user-wide memory separately. */
@@ -56,7 +56,7 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
     : projectMemoryDirectory(projectRoot())
 
   const names = () => scope() === "global" ? GLOBAL_TEMPLATES : PROJECT_TEMPLATES
-  const scopeText = () => scope() === "global" ? "Global — todos os projetos" : "Projeto atual"
+  const scopeText = () => scope() === "global" ? "Global — all projects" : "Current project"
 
   function notify(variant: "success" | "error" | "info", title: string, message: string) {
     toast.show({ variant, title, message })
@@ -91,7 +91,7 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
 
     if (scope() === "project") {
       const notesDirectory = path.join(projectRoot(), ".omnicode")
-      items.push(inspect(notesDirectory, "memory.md", "Notas do projeto (não globais)", PROJECT_NOTES))
+      items.push(inspect(notesDirectory, "memory.md", "Project notes (not global)", PROJECT_NOTES))
       try {
         if (fs.existsSync(directory)) {
           const standard = new Set(Object.keys(templates))
@@ -102,11 +102,11 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
             } catch {
               continue
             }
-            items.push(inspect(directory, name, "Arquivo adicional deste projeto", "# Memória do projeto\n"))
+            items.push(inspect(directory, name, "Additional project file", "# Project Memory\n"))
           }
         }
       } catch (error) {
-        notify("error", "Erro de leitura", String(error))
+        notify("error", "Read error", String(error))
       }
     }
     return items
@@ -124,24 +124,24 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
         created.push(...initializeMemoryBank(notesDir, { "memory.md": PROJECT_NOTES }))
       }
       refresh()
-      notify("success", "Memória inicializada", created.length
-        ? "Criados: " + created.join(", ")
-        : "Os arquivos desta memória já existem.")
+      notify("success", "Memory initialized", created.length
+        ? "Created: " + created.join(", ")
+        : "These memory files already exist.")
     } catch (error) {
-      notify("error", "Falha ao inicializar", String(error))
+      notify("error", "Initialization failed", String(error))
     }
   }
 
   async function edit(entry: MemoryEntry) {
     if (!entry.safe) {
-      notify("error", "Arquivo indisponível", "Arquivo inválido, simbólico ou maior que 96 KiB.")
+      notify("error", "File unavailable", "Invalid file, symbolic link, or file larger than 96 KiB.")
       return
     }
     try {
       if (!entry.exists) {
         initializeMemoryBank(entry.directory, { [entry.name]: entry.content })
         refresh()
-        notify("success", "Memória criada", entry.name)
+        notify("success", "Memory created", entry.name)
         return
       }
       const before = readMemoryFile(entry.directory, entry.name)
@@ -154,9 +154,9 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
       if (current !== before) throw new Error("Memory changed while editing. Reopen it to avoid losing changes.")
       writeMemoryFile(entry.directory, entry.name, after)
       refresh()
-      notify("success", "Memória atualizada", entry.name)
+      notify("success", "Memory updated", entry.name)
     } catch (error) {
-      notify("error", "Erro ao editar", String(error))
+      notify("error", "Editing failed", String(error))
     }
   }
 
@@ -167,10 +167,10 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
         description={description}
         skipFilter
         options={[
-          { value: "cancel", title: "Cancelar", onSelect: () => dialog.pop() },
+          { value: "cancel", title: "Cancel", onSelect: () => dialog.pop() },
           {
             value: "confirm",
-            title: "Confirmar exclusão",
+            title: "Confirm deletion",
             onSelect: () => {
               dialog.pop()
               action()
@@ -187,10 +187,10 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
       if (scope() === "global") globalMemoryFilename(entry.name)
       if (deleteMemoryFile(entry.directory, entry.name)) {
         refresh()
-        notify("success", "Memória excluída", entry.name)
-      } else notify("info", "Arquivo ausente", entry.name)
+        notify("success", "Memory deleted", entry.name)
+      } else notify("info", "File not found", entry.name)
     } catch (error) {
-      notify("error", "Erro ao excluir", String(error))
+      notify("error", "Deletion failed", String(error))
     }
   }
 
@@ -208,8 +208,8 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
     }
     refresh()
     if (errors.length) {
-      notify("error", "Limpeza incompleta", "Excluídos: " + count + ". Falhas: " + errors.join("; "))
-    } else notify("success", "Memória limpa", count + " arquivo(s) excluído(s) somente deste escopo.")
+      notify("error", "Cleanup incomplete", "Deleted: " + count + ". Failures: " + errors.join("; "))
+    } else notify("success", "Memory cleared", count + " file(s) deleted from this scope only.")
   }
 
   const options = createMemo<DialogSelectOption<string>[]>(() => {
@@ -218,30 +218,30 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
     const result: DialogSelectOption<string>[] = [
       {
         value: "__switch",
-        title: active === "project" ? "🌐 Alternar para memória GLOBAL" : "📁 Alternar para memória do PROJETO",
+        title: active === "project" ? "🌐 Switch to GLOBAL memory" : "📁 Switch to PROJECT memory",
         description: active === "project"
-          ? "Preferências compartilhadas entre todos os projetos locais"
-          : "Decisões e notas específicas da pasta de trabalho atual",
-        category: "Gerenciamento",
+          ? "Preferences shared across all local projects"
+          : "Decisions and notes specific to the current workspace",
+        category: "Management",
         onSelect: () => setScope((current) => current === "project" ? "global" : "project"),
       },
       {
         value: "__init",
-        title: "Inicializar arquivos padrão",
-        description: "Cria somente arquivos que ainda não existem; não sobrescreve os atuais",
-        category: "Gerenciamento",
+        title: "Initialize default files",
+        description: "Creates only missing files; existing files are never overwritten",
+        category: "Management",
         onSelect: initBank,
       },
     ]
 
     for (const entry of items) {
-      const status = !entry.exists ? "não criado" : !entry.safe ? "indisponível" : (entry.size / 1024).toFixed(1) + " KB"
+      const status = !entry.exists ? "not created" : !entry.safe ? "unavailable" : (entry.size / 1024).toFixed(1) + " KB"
       result.push({
         value: entry.id,
         title: (entry.exists ? entry.safe ? "● " : "⚠ " : "○ ") + entry.label + " [" + status + "]",
         description: entry.description,
-        category: entry.exists ? "Arquivos disponíveis" : "Arquivos para criar",
-        footer: entry.safe ? (entry.exists ? "Enter: editar" : "Enter: criar") : "Arquivo não editável",
+        category: entry.exists ? "Available files" : "Files to create",
+        footer: entry.safe ? (entry.exists ? "Enter: edit" : "Enter: create") : "File cannot be edited",
         onSelect: () => void edit(entry),
       })
     }
@@ -249,12 +249,12 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
     if (items.some((entry) => entry.exists)) {
       result.push({
         value: "__clear",
-        title: "🗑 Limpar memória " + (active === "global" ? "GLOBAL" : "do PROJETO"),
-        description: "Solicita confirmação; não afeta o outro escopo",
-        category: "Gerenciamento",
+        title: "🗑 Clear " + (active === "global" ? "GLOBAL" : "PROJECT"),
+        description: "Requires confirmation; the other scope is not affected",
+        category: "Management",
         onSelect: () => confirm(
-          "Excluir memória " + scopeText() + "?",
-          "Esta ação exclui os arquivos deste escopo. Não é possível desfazer.",
+          "Delete memory for " + scopeText() + "?",
+          "This permanently deletes files in the selected scope. This cannot be undone.",
           clearBank,
         ),
       })
@@ -265,23 +265,23 @@ export function DialogMemoryBank(props: { projectDir?: string; configDir?: strin
   function requestDelete(selected: string) {
     const entry = entries().find((file) => file.id === selected)
     if (!entry?.exists) return
-    confirm("Excluir " + entry.name + "?", "Exclui somente este arquivo da memória " + scopeText() + ".", () => remove(entry))
+    confirm("Delete " + entry.name + "?", "Deletes only this file from the " + scopeText() + ".", () => remove(entry))
   }
 
   return (
     <DialogSelect
-      title={"🧠 Memória Onethy — " + scopeText()}
-      placeholder="Buscar memórias..."
+      title={"🧠 Onethy Memory — " + scopeText()}
+      placeholder="Search memory files..."
       options={options()}
       actions={[
         {
           command: "session.delete",
-          title: "excluir memória",
+          title: "delete memory",
           disabled: (option) => !entries().some((entry) => entry.id === option?.value && entry.exists),
           onTrigger: (option) => requestDelete(option.value),
         },
       ]}
-      footerHints={[{ title: "abrir / criar", label: "enter" }]}
+      footerHints={[{ title: "open / create", label: "enter" }]}
     />
   )
 }

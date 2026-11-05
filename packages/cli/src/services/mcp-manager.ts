@@ -34,14 +34,14 @@ async function snapshot(directory: string): Promise<Snapshot> {
     throw error
   })
   if (stat && (!stat.isFile() || stat.isSymbolicLink()))
-    throw new Error("Configuração MCP não pode ser um link simbólico: " + file)
+    throw new Error("MCP configuration cannot be a symbolic link: " + file)
   const source = stat ? await readFile(file, "utf8") : "{}"
   const errors: ParseError[] = []
   const data = parse(source, errors, { allowTrailingComma: true }) as ConfigData
   if (errors.length || !data || typeof data !== "object" || Array.isArray(data))
-    throw new Error("Configuração JSON/JSONC inválida: " + file)
+    throw new Error("Invalid JSON/JSONC configuration: " + file)
   if (data.mcp !== undefined && (typeof data.mcp !== "object" || data.mcp === null || Array.isArray(data.mcp)))
-    throw new Error("Campo 'mcp' inválido: " + file)
+    throw new Error("Invalid 'mcp' field: " + file)
   return { file, source, data }
 }
 const own = (value: unknown, name: string) =>
@@ -71,7 +71,7 @@ async function atomicWrite(file: string, data: string) {
     throw error
   })
   if (stat && (!stat.isFile() || stat.isSymbolicLink()))
-    throw new Error("Não é permitido modificar configurações por links simbólicos")
+    throw new Error("Refusing to modify configuration through symbolic links")
   await mkdir(path.dirname(file), { recursive: true })
   const temporary = file + "." + randomUUID() + ".tmp"
   await writeFile(temporary, data.endsWith("\n") ? data : data + "\n", { flag: "wx", mode: 0o600 })
@@ -132,7 +132,7 @@ export async function manageMcp(input: {
   global?: boolean
 }): Promise<string> {
   const { action, name, cwd, globalRoot } = input
-  if (!name || name.length > 128) throw new Error("Informe um nome MCP válido")
+  if (!name || name.length > 128) throw new Error("Enter a valid MCP server name")
   const projectRoot = path.join(cwd, ".opencode")
   const root = input.global ? globalRoot : projectRoot
   const directory = input.global ? globalRoot : cwd
@@ -140,12 +140,12 @@ export async function manageMcp(input: {
 
   if (action === "restore") {
     if (!isNativeMCP(name) && name !== "all")
-      throw new Error("A restauração está disponível somente para MCPs nativos do OnethyCode")
+      throw new Error("Only native OnethyCode MCPs can be restored")
     const restored = await restoreNativeMCP(root, name)
     await editConfig(target, restored
       .filter(id => override(target, id) !== undefined)
       .map(id => ({ path: ["mcp", "overrides", id], value: undefined })))
-    return "Restaurados " + restored.length + " MCP(s) nativos em " + bundlePath(root)
+    return "Restored " + restored.length + " native MCP server(s) at " + bundlePath(root)
   }
 
   const projectNative = await listNativeMCPs(projectRoot)
@@ -158,18 +158,18 @@ export async function manageMcp(input: {
   const available = input.global
     ? inGlobalNative || configured(globalConfig, name)
     : inProjectNative || inGlobalNative || configured(localConfig, name) || configured(globalConfig, name)
-  if (!available) throw new Error("MCP não encontrado: " + name + ". Use 'onethy mcp restore' para MCPs nativos.")
+  if (!available) throw new Error("MCP not found: " + name + ". Use 'onethy mcp restore' for native MCPs.")
 
   if (action === "enable" || action === "disable") {
     await editConfig(target, [{ path: ["mcp", "overrides", name], value: action === "enable" }])
-    return "MCP " + name + (action === "enable" ? " habilitado" : " desativado") +
-      " no escopo " + (input.global ? "global" : "do projeto") + "."
+    return "MCP " + name + (action === "enable" ? " enabled" : " disabled") +
+      " in the " + (input.global ? "global" : "project") + "."
   }
   if (action === "remove") {
     if (!currentNative && !configured(target, name)) {
       if (inGlobalNative && !input.global)
-        throw new Error("Esse MCP está instalado globalmente. Use --global para excluí-lo.")
-      throw new Error("MCP não encontrado no escopo selecionado: " + name)
+        throw new Error("This MCP is installed globally. Use --global to delete it.")
+      throw new Error("MCP not found in the selected scope: " + name)
     }
     if (currentNative) await removeNativeMCP(root, name)
     const changes: Array<{ path: string[]; value: unknown }> = []
@@ -179,8 +179,8 @@ export async function manageMcp(input: {
     if (override(target, name) !== undefined)
       changes.push({ path: ["mcp", "overrides", name], value: undefined })
     await editConfig(target, changes)
-    return "MCP " + name + " excluído do escopo " + (input.global ? "global" : "do projeto") +
-      ". Outros MCPs foram preservados."
+    return "MCP " + name + " removed from the " + (input.global ? "global" : "project") +
+      ". Other MCP servers were preserved."
   }
-  throw new Error("Ação MCP desconhecida: " + action)
+  throw new Error("Unknown MCP action: " + action)
 }

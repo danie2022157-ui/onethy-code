@@ -226,7 +226,7 @@ export function Logo() {
         </box>
       ) : (
         <box alignItems="center" flexDirection="column">
-          {/* Meia-Lua ascendente no centro do topo (atrás do meio do nome) */}
+          {/* Rising crescent at the top center (behind the middle of the name) */}
           <Show when={dimensions().height >= 22 && dimensions().width >= 64}>
             <box flexDirection="column" alignItems="center" justifyContent="center">
               <For each={moonRows}>
@@ -249,7 +249,7 @@ export function Logo() {
             </box>
           </Show>
 
-          {/* Nome ONETHYCODE com scanlines cósmicas nas laterais */}
+          {/* ONETHYCODE name with cosmic scanlines along the sides */}
           <For each={bigRows}>
             {(rowIdx) => {
               const glitch = () => glitchGlifs[rowIdx] ?? { left: "", right: "" }
@@ -281,14 +281,14 @@ export function Logo() {
             }}
           </For>
 
-          {/* Subtítulo idêntico ao design com diamantes/losangos */}
+          {/* Subtitle matching the diamond-themed design */}
           <Show when={dimensions().height >= 22}>
             <box flexDirection="row" paddingTop={1} gap={1} alignItems="center" justifyContent="center">
               <text fg={RGBA.fromHex("#D946EF")} attributes={TextAttributes.BOLD} selectable={false}>
                 ◇
               </text>
               <text fg={RGBA.fromHex("#A855F7")} attributes={TextAttributes.BOLD} selectable={false}>
-                ORQUESTRADOR MULTI-AGENTE IA
+                AI MULTI-AGENT ORCHESTRATOR
               </text>
               <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
                 ◇

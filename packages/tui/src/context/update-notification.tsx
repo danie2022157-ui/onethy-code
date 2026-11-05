@@ -159,8 +159,8 @@ export const { use: useUpdateNotification, provider: UpdateNotificationProvider 
           lastAnnounced = update.available
           toast.show({
             variant: "info",
-            title: "Atualização do Onethy Code disponível",
-            message: `Nova versão ${update.available}. Digite /update para instalar.`,
+            title: "OnethyCode update available",
+            message: `New version ${update.available} is available. Enter /update to install.`,
             duration: 7000,
           })
         } catch (error) {
