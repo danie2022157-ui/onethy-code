@@ -141,7 +141,7 @@ try {
       for (const plugin of plugins) {
         report.components[type].files++
         const output = join(destination, "plugins", "onethy", plugin.file)
-        await record("plugins", plugin.id, source, output, false, JSON.stringify(plugin, null, 2) + "\\n")
+        await record("plugins", plugin.id, source, output, false, JSON.stringify(plugin, null, 2) + "\n")
       }
       continue
     }
