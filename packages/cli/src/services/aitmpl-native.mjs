@@ -8,7 +8,7 @@ import { createHash } from "node:crypto"
 
 
 const CATALOG = "https://github.com/davila7/claude-code-templates.git"
-export const types = ["skills", "agents", "commands", "settings", "hooks", "mcps", "plugins", "mods", "loops"]
+export const types = ["skills", "agents", "settings", "hooks", "mcps", "plugins", "mods", "loops"]
 export async function syncAITmpl(options = {}) {
 const install = options.install === true
 const verify = options.verify === true
@@ -16,7 +16,12 @@ const chosen = options.type || "all"
 const sourceDir = options.sourceDir
 if (chosen !== "all" && !types.includes(chosen)) throw new Error("Unknown --type: " + chosen)
 const kinds = chosen === "all" ? types : [chosen]
-const destination = options.global ? join(homedir(), ".config", "opencode") : resolve(options.cwd || process.cwd(), ".opencode")
+const destination = options.global
+  ? resolve(options.globalDir || process.env.OMNICODE_CONFIG_DIR ||
+      (process.platform === "win32"
+        ? join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "omnicode")
+        : join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omnicode")))
+  : resolve(options.cwd || process.cwd(), ".opencode")
 const report = { mode: verify ? "verify" : install ? "install" : "preview", target: destination, ready: 0, installed: 0, existing: 0, rejected: 0, pending: 0, errors: [], components: {} }
 const staging = sourceDir ? undefined : await mkdtemp(join(tmpdir(), "onethy-aitmpl-"))
 const source = sourceDir ? resolve(sourceDir) : join(staging, "catalog")
@@ -102,7 +107,7 @@ try {
     report.components[type] = { files: 0, warnings: [] }
     if (!(await exists(root))) { report.components[type].missing = true; continue }
     // Dangerous or Claude-runtime specific categories need explicit adapters; inventory only.
-    if (!["skills", "agents", "commands"].includes(type)) {
+    if (!["skills", "agents"].includes(type)) {
       for await (const file of traverse(root)) report.components[type].files++
       report.pending += report.components[type].files
       continue
@@ -127,7 +132,7 @@ try {
       continue
     }
     for await (const file of traverse(root)) {
-      if (extname(file).toLowerCase() !== ".md") continue
+      if (type !== "agents" || extname(file).toLowerCase() !== ".md") continue
       const name = slug(relative(root, file).slice(0, -3).split(sep).join("-"))
       const out = join(destination, type, name + ".md")
       report.components[type].files++
