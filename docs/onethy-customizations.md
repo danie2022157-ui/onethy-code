@@ -11,17 +11,30 @@ O OnethyCode disponibiliza um catálogo de personalizações **interno à experi
 | Comandos personalizados | Arquivos `commands/*.md` | A interpolação de shell de templates externos é removida; os comandos só rodam quando invocados |
 | Hooks | Descritores em `hooks/onethy/*.json` | Não executam scripts externos; apenas adaptadores internos suportados podem ser habilitados |
 | Mods | Descritores em `mods/onethy/*.json` | Não executam código externo; adaptadores internos ficam desativados até habilitação explícita |
-| MCPs | Arquivo nativo `mcp/onethy/local-tools.json` | Exatamente três modelos locais: navegador, raciocínio e horário; desativados por padrão |
+| MCPs | Arquivo nativo `mcp/onethy/local-tools.json` | Oito servidores locais selecionados; desativados por padrão |
 
-## Preferência por MCPs locais
+## MCPs locais incluídos
 
-O OnethyCode fornece somente três modelos próprios desativados por padrão: Playwright (navegador), Sequential Thinking (raciocínio) e Time (fusos horários). **Não importa mais definições MCP de catálogos externos** — independentemente de exigirem ou não uma chave de API.
+O OnethyCode oferece **oito definições nativas** para executar servidores MCP localmente. Não há dependência de login, OAuth, API key ou serviços MCP remotos.
 
-Durante a atualização são retirados os arquivos MCP gerados pela importação anterior quando ainda desativados e intactos. Não são apagados MCPs configurados, habilitados ou modificados pelo usuário.
+| MCP | Ferramenta | Inicialização |
+| --- | --- | --- |
+| Playwright | Automação do navegador | `npx -y @playwright/mcp@latest` |
+| Chrome DevTools | Depuração e inspeção de páginas no Chrome | `npx -y chrome-devtools-mcp@latest` |
+| Serena | Busca semântica e edição de código | `uvx -p 3.13 --from serena-agent serena start-mcp-server --project-from-cwd --context ide --open-web-dashboard false` |
+| Filesystem | Arquivos restritos ao projeto corrente | `npx -y @modelcontextprotocol/server-filesystem .` |
+| Git | Git restrito ao repositório do projeto | `uvx mcp-server-git --repository .` |
+| Memory | Memória persistente local | `npx -y @modelcontextprotocol/server-memory` |
+| MarkItDown | Conversão de documentos em Markdown | `uvx markitdown-mcp` |
+| Desktop Commander | Operações locais com arquivos e processos | `npx -y @wonderwhy-er/desktop-commander@latest` |
 
-Pacotes locais executados com `npx` ou `uvx` podem precisar de internet **na instalação do pacote**, mas não dependem de uma chave de API de provedor para funcionar. Nenhum MCP importado é executado ou habilitado automaticamente.
+Os servidores são executados em **stdio**, não por um endereço HTTP hospedado, e começam **todos desativados**. A distribuição já contém suas configurações, mas a instalação dos pacotes pode exigir internet na primeira execução. Para Serena, `uvx` também pode precisar preparar Python 3.13 e servidores de linguagem; Playwright e Chrome DevTools podem exigir navegadores instalados.
 
-Os modelos usam serviços locais, não precisam de login ou chave de API de provedor, mas a primeira instalação dos pacotes pode exigir internet.
+**Segurança:** o processo MCP usa o diretório do workspace como diretório de trabalho. Filesystem recebe apenas `.` como raiz; Git recebe `--repository .`. Desktop Commander pode manipular processos e arquivos com as permissões da sua conta do sistema e deve ser habilitado somente quando necessário.
+
+Na atualização, a lista anterior de três MCPs é trocada pela de oito **apenas se o arquivo antigo ainda estiver exatamente como foi gerado**. Configurações alteradas ou habilitadas manualmente não são sobrescritas. Os antigos registros MCP importados automaticamente e ainda intactos/desativados são limpos sem apagar configurações de sua autoria.
+
+Para ligar um MCP, habilite o servidor pela configuração canônica do OnethyCode (por exemplo, em `mcp.overrides`); o campo `disabled` no arquivo descoberto não concede permissão para inicializar um servidor sozinho.
 
 ## Plugins nativos
 

@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm, stat, symlink, readdir } from 
 import { join, dirname } from "node:path"
 import { tmpdir } from "node:os"
 import { syncOnethyCustomizations } from "../packages/cli/src/services/onethy-customizations.mjs"
+import { LOCAL_MCP_NAMES, curatedLocalMCPs } from "../packages/cli/src/services/onethy-customizations-local-mcp.mjs"
 
 test("native customizations import local-only MCPs, commands, hooks and mods without running external code", async () => {
   const root = await mkdtemp(join(tmpdir(), "onethy-customization-test-"))
@@ -76,7 +77,7 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
     assert.deepEqual(mcpFiles, ["local-tools.json"])
     const localDefaults = JSON.parse(await readFile(join(config, "mcp/onethy/local-tools.json"), "utf8"))
     assert.deepEqual(Object.keys(localDefaults.mcpServers).toSorted(),
-      ["onethy-browser", "onethy-sequential-thinking", "onethy-time"])
+      [...LOCAL_MCP_NAMES].toSorted())
     assert.ok(Object.values(localDefaults.mcpServers).every(server =>
       server.disabled === true && server.type === "stdio" && !("env" in server) && !("headers" in server)))
 
@@ -201,6 +202,68 @@ test("obsolete generated MCP imports are removed without touching user-managed c
     assert.ok((await stat(enabled)).isFile())
     assert.ok((await stat(modified)).isFile())
     assert.ok((await stat(join(folder, "local-tools.json"))).isFile())
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+
+test("all eight first-party MCPs have local account-free commands and workspace confinement", () => {
+  const names = [
+    "onethy-playwright", "onethy-chrome-devtools", "onethy-serena",
+    "onethy-filesystem", "onethy-git", "onethy-memory",
+    "onethy-markitdown", "onethy-desktop-commander",
+  ]
+  assert.deepEqual([...LOCAL_MCP_NAMES], names)
+  const doc = JSON.parse(curatedLocalMCPs())
+  assert.deepEqual(Object.keys(doc), ["mcpServers"])
+  assert.equal(Object.keys(doc.mcpServers).length, 8)
+  assert.deepEqual(Object.keys(doc.mcpServers), names)
+  for (const [id, config] of Object.entries(doc.mcpServers)) {
+    assert.equal(config.disabled, true, id)
+    assert.equal(config.type, "stdio", id)
+    assert.ok(["npx", "uvx"].includes(config.command), id)
+    assert.ok(config.args.length >= 1, id)
+    assert.ok(config.args.every(arg => typeof arg === "string"), id)
+    assert.ok(!("env" in config) && !("headers" in config) && !("url" in config), id)
+    assert.ok(!config.args.some(arg => /(?:api[_-]?key|access[_-]?token|oauth|remote)/i.test(arg)), id)
+  }
+  assert.equal(doc.mcpServers["onethy-filesystem"].args.at(-1), ".")
+  assert.deepEqual(doc.mcpServers["onethy-git"].args.slice(-2), ["--repository", "."])
+  assert.ok(doc.mcpServers["onethy-serena"].args.includes("--project-from-cwd"))
+  assert.ok(!doc.mcpServers["onethy-desktop-commander"].args.includes("remote"))
+})
+
+test("upgrade from unmodified three-MCP bundle installs all eight and preserves edited versions", async () => {
+  const root = await mkdtemp(join(tmpdir(), "onethy-eight-mcp-upgrade-"))
+  try {
+    const dir = join(root, ".opencode", "mcp", "onethy")
+    await mkdir(dir, { recursive: true })
+    const file = join(dir, "local-tools.json")
+    const original = { mcpServers: {
+      "onethy-browser": { type: "stdio", command: "npx", args: ["-y", "@playwright/mcp@latest"], disabled: true },
+      "onethy-sequential-thinking": { type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-sequential-thinking"], disabled: true },
+      "onethy-time": { type: "stdio", command: "uvx", args: ["mcp-server-time"], disabled: true },
+    } }
+    await writeFile(file, JSON.stringify(original, null, 2))
+    const report = await syncOnethyCustomizations({
+      sourceDir: join(root, "not-required"), cwd: root, type: "mcps", install: true,
+    })
+    assert.equal(report.migratedLocalMcpBundle, true)
+    assert.equal(report.installed, 1)
+    assert.deepEqual(Object.keys(JSON.parse(await readFile(file, "utf8")).mcpServers), [...LOCAL_MCP_NAMES])
+
+    await writeFile(file, JSON.stringify({ mcpServers: {
+      ...original.mcpServers,
+      "local-custom": { type: "stdio", command: "uvx", args: ["my-custom-tool"], disabled: false },
+    } }))
+    const preserved = await syncOnethyCustomizations({
+      sourceDir: join(root, "not-required"), cwd: root, type: "mcps", install: true,
+    })
+    assert.equal(preserved.migratedLocalMcpBundle, false)
+    assert.equal(preserved.installed, 0)
+    assert.equal(preserved.existing, 1)
+    assert.equal(Object.keys(JSON.parse(await readFile(file, "utf8")).mcpServers).length, 4)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

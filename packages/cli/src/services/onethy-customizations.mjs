@@ -5,7 +5,7 @@ import { tmpdir, homedir } from "node:os"
 import { join, relative, resolve, dirname, basename, extname, sep } from "node:path"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { cleanupObsoleteGeneratedMCPs, cleanupGeneratedOnethyMCPs } from "./onethy-customizations-cleanup.mjs"
+import { cleanupObsoleteGeneratedMCPs, cleanupGeneratedOnethyMCPs, migrateOldOnethyLocalMCPBundle } from "./onethy-customizations-cleanup.mjs"
 import { curatedLocalMCPs } from "./onethy-customizations-local-mcp.mjs"
 import { curatedNativePlugins } from "./onethy-customizations-local-plugins.mjs"
 import { convertOnethyCodeAgent } from "./onethy-customizations-agent.mjs"
@@ -31,8 +31,10 @@ const destination = options.global
 const report = { mode: verify ? "verify" : install ? "install" : "preview", target: destination, ready: 0, installed: 0, existing: 0, rejected: 0, pending: 0, errors: [], components: {} }
 const staging = sourceDir ? undefined : await mkdtemp(join(tmpdir(), "onethy-onethy-"))
 const source = sourceDir ? resolve(sourceDir) : join(staging, "catalog")
-if (install && !verify) {
-  report.obsoleteGeneratedMcpRemoved = (await cleanupObsoleteGeneratedMCPs(destination)) + (await cleanupGeneratedOnethyMCPs(destination))
+if (install && !verify && kinds.includes("mcps")) {
+  report.obsoleteGeneratedMcpRemoved =
+    (await cleanupObsoleteGeneratedMCPs(destination)) + (await cleanupGeneratedOnethyMCPs(destination))
+  report.migratedLocalMcpBundle = await migrateOldOnethyLocalMCPBundle(destination)
 }
 
 function git(...argv) {
