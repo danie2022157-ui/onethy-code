@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
 import {
-  buildDesktopInvocation, formatDesktopResult, runAgentDesktop,
+  buildDesktopInvocation, formatDesktopResult, resolveDesktopBinary, runAgentDesktop,
   type DesktopRequest,
 } from "../src/agent-desktop"
 
@@ -48,6 +51,18 @@ describe("native Agent Desktop bridge", () => {
     expect(() => buildDesktopInvocation(request("launch", { app: "" }))).toThrow("app")
     expect(() => buildDesktopInvocation(request("snapshot", { app: "Editor\0Private" }))).toThrow("--app")
     expect(() => buildDesktopInvocation(request("not-a-command" as DesktopRequest["action"]))).toThrow("Unsupported")
+  })
+
+  test("finds the installed native executable on Windows instead of executing an npm .cmd shim", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "onethy-desktop-"))
+    try {
+      const executable = path.join(root, "npm", "node_modules", "agent-desktop", "bin", "agent-desktop-win32-x64.exe")
+      fs.mkdirSync(path.dirname(executable), { recursive: true })
+      fs.writeFileSync(executable, "placeholder executable")
+      expect(resolveDesktopBinary({ APPDATA: root, PATH: "" }, "win32", "x64")).toBe(executable)
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
   })
 
   test("keeps text redacted even if the native tool echoes the entered value", () => {
