@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, mkdir, readFile, writeFile, rm, stat } from "node:fs/promises"
+import { mkdtemp, mkdir, readFile, writeFile, rm, stat, symlink, readdir } from "node:fs/promises"
 import { join, dirname } from "node:path"
 import { tmpdir } from "node:os"
 import { syncAITmpl } from "../packages/cli/src/services/aitmpl-native.mjs"
@@ -41,6 +41,15 @@ test("AITmpl imports only native personalizations; never imports slash commands 
     assert.equal(repeat.existing, 3)
     await assert.rejects(stat(join(project, ".opencode/commands")))
     await assert.rejects(stat(join(project, "should-not-exist")))
+    const otherSkill = join(catalog, "cli-tool/components/skills/development/escape/SKILL.md")
+    await mkdir(dirname(otherSkill), { recursive: true })
+    await writeFile(otherSkill, "---\\nname: escape\\ndescription: Another skill\\n---\\nunsafe destination")
+    const external = join(root, "external")
+    await mkdir(external, { recursive: true })
+    await symlink(external, join(project, ".opencode/skills/development-escape"), process.platform === "win32" ? "junction" : "dir")
+    const guarded = await run(true)
+    assert.ok(guarded.rejected > 0)
+    assert.deepEqual(await readdir(external), [])
     const global = join(root, "native-global")
     const globally = await syncAITmpl({ sourceDir: catalog, global: true, globalDir: global, install: true, type: "skills" })
     assert.equal(globally.installed, 2)
