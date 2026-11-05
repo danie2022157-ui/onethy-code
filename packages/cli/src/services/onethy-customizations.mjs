@@ -175,6 +175,7 @@ try {
           const readme = await readFile(readmeFile, "utf8").catch(e => e.code === "ENOENT" ? "" : Promise.reject(e))
           if (!manifest && !readme) continue
           const id = category.name + "/" + folder.name
+          if (/tmpl|marketplace|catalog/i.test(id)) { report.pending++; continue }
           const converted = convertOnethyCodeMod(id, manifest, readme)
           const dest = join(destination, "mods", "onethy", converted.id + ".json")
           report.components[type].files++
