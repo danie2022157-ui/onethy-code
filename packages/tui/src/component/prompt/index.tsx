@@ -1693,7 +1693,7 @@ export function Prompt(props: PromptProps) {
     <>
       <box ref={(r: BoxRenderable) => (anchor = r)} visible={props.visible !== false} width="100%">
         <Show when={props.sessionID}>
-          <PromptReviewBar sessionID={props.sessionID} />
+          <PromptReviewBar sessionID={props.sessionID} active={props.visible !== false} />
         </Show>
         <box
           width="100%"
