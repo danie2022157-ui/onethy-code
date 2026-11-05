@@ -38,8 +38,8 @@ function summary(value: unknown): string {
 
 export function desktopReportRows(response: DesktopResult): DesktopReportRow[] {
   const rows: DesktopReportRow[] = [{
-    label: "Native runtime",
-    value: response.ok ? "Connected" : "Failed",
+    label: "Native command",
+    value: response.ok ? "Responding" : "Failed",
     severity: response.ok ? "success" : "error",
   }]
   const seen = new WeakSet<object>()
