@@ -44,3 +44,56 @@ export async function cleanupObsoleteGeneratedMCPs(configRoot) {
   }
   return removed
 }
+
+
+/**
+ * Retire the old optional MCP template files generated under mcp/onethy.
+ * Keep the three curated local tools, any enabled or manually customized
+ * definitions, and anything that cannot be conclusively identified.
+ */
+export async function cleanupGeneratedOnethyMCPs(configRoot) {
+  const parent = join(configRoot, "mcp")
+  const directory = join(parent, "onethy")
+  for (const target of [parent, directory]) {
+    try {
+      const info = await lstat(target)
+      if (!info.isDirectory() || info.isSymbolicLink()) return 0
+    } catch (error) {
+      if (error.code === "ENOENT") return 0
+      throw error
+    }
+  }
+  let removed = 0
+  for (const item of await readDir(directory)) {
+    if (!item.isFile() || !/^[a-z0-9-]+-[a-f0-9]{8}\\.json$/.test(item.name)) continue
+    const file = join(directory, item.name)
+    if (!(await lstat(file)).isFile()) continue
+    let raw
+    let parsed
+    try {
+      raw = await readFile(file, "utf8")
+      if (raw.length > 128000) continue
+      parsed = JSON.parse(raw)
+    } catch { continue }
+    if (!parsed || Object.keys(parsed).length !== 1) continue
+    const servers = parsed.mcpServers
+    if (!servers || typeof servers !== "object" || Array.isArray(servers)) continue
+    const all = Object.entries(servers)
+    if (!all.length || !all.every(([key, server]) => {
+      if (!/^onethy-[a-z0-9-]+-[a-f0-9]{8}$/.test(key)) return false
+      if (!server || typeof server !== "object" || Array.isArray(server) || server.disabled !== true) return false
+      const fields = Object.keys(server).toSorted()
+      const expected = server.type === "stdio"
+        ? ["args", "command", "disabled", "type"]
+        : server.type === "http" ? ["disabled", "type", "url"] : []
+      if (JSON.stringify(fields) !== JSON.stringify(expected)) return false
+      if (server.type === "stdio")
+        return typeof server.command === "string" && Array.isArray(server.args) &&
+          server.args.every(x => typeof x === "string")
+      return server.type === "http" && typeof server.url === "string"
+    })) continue
+    await unlink(file)
+    removed++
+  }
+  return removed
+}
