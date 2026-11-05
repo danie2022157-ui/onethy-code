@@ -9,6 +9,7 @@ import { TextAttributes } from "@opentui/core"
 import type { McpServer } from "@opencode/client"
 import { useToast } from "../ui/toast"
 import { DialogErrorDetails } from "./dialog-error-details"
+import { mcpFailurePreview, mcpFailureHelp } from "../util/mcp-diagnostics"
 import { DialogIntegration } from "./dialog-integration"
 import { useLocation } from "../context/location"
 import { Global } from "@opencode/util/global"
@@ -83,6 +84,7 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
         title: server.name,
         footer: <Status status={server.status} loading={pending} />,
         footerColor: pending ? theme.text.muted : statusColor(server.status),
+        detail: server.status.status === "failed" ? mcpFailurePreview(server.status.error) : undefined,
       }
     })
   })
@@ -263,13 +265,15 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
         {(server) => (
           <DialogErrorDetails
             title={`MCP server: ${server().name}`}
-            error={statusError(server().status) ?? "Unknown MCP connection error"}
+            error={server().status.status === "failed"
+              ? `${mcpFailureHelp(server().status.error)}\n\n${server().status.error}`
+              : statusError(server().status) ?? "Unknown MCP connection error"}
             context={`Status: ${server().status.status}\nConfiguration: mcp.servers.${server().name}${
               server().integrationID ? `\nIntegration: ${server().integrationID}` : ""
             }`}
             onBack={() => {
               setDetail(undefined)
-              dialog.setSize("medium")
+              dialog.setSize(process.env.OMNICODE_ACTIVE === "1" ? "large" : "medium")
             }}
           />
         )}
