@@ -21,18 +21,18 @@ export default Runtime.handler(
           value: item.name,
           label: item.name,
           hint: [
-            item.kind === "native" ? "nativo" : "personalizado",
-            !item.present ? "não instalado" : item.enabled === true ? "habilitado" : item.enabled === false ? "desativado" : "sem autorização explícita",
-            item.location === "global" ? "global" : item.location === "project" ? "projeto" : "restaurável",
+            item.kind === "native" ? "native" : "custom",
+            !item.present ? "not installed" : item.enabled === true ? "enabled" : item.enabled === false ? "disabled" : "not explicitly enabled",
+            item.location === "global" ? "global" : item.location === "project" ? "project" : "restorable",
           ].join(" • "),
         })),
       }))
       const item = items.find(entry => entry.name === name)!
       const actions: Array<{value: McpAction; label: string; hint: string}> = []
       if (item.present) {
-        actions.push({ value: "enable", label: "Ativar", hint: "Permite iniciar o servidor" })
-        actions.push({ value: "disable", label: "Desativar", hint: "Mantém configuração e arquivos" })
-        actions.push({ value: "remove", label: "Excluir", hint: "Remove do escopo selecionado" })
+        actions.push({ value: "enable", label: "Enable", hint: "Permite iniciar o servidor" })
+        actions.push({ value: "disable", label: "Disable", hint: "Mantém configuração e arquivos" })
+        actions.push({ value: "remove", label: "Delete", hint: "Remove do escopo selecionado" })
       }
       if (item.kind === "native") actions.push({
         value: "restore", label: "Restaurar configuração nativa", hint: "Reverte o modelo original, desativado",
