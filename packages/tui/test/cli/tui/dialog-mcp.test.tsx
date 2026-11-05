@@ -81,13 +81,20 @@ test("OnethyCode MCP dialog exposes persistent shortcuts and deletes only select
     } } }))
     fixture = await renderMcp({ disabled: true, location: { directory } })
     await fixture.app.waitForFrame(frame => frame.includes("linear") && frame.includes("ctrl+e"))
+    async function eventually(check: () => Promise<boolean>) {
+      for (let attempt = 0; attempt < 40; attempt++) {
+        if (await check()) return
+        await Bun.sleep(25)
+      }
+      throw new Error("MCP configuration change was not saved")
+    }
     fixture.app.mockInput.pressKey("e", { ctrl: true })
-    await fixture.app.waitForFrame(frame => frame.includes("MCP linear habilitado"))
+    await eventually(async () => JSON.parse(await readFile(configuration, "utf8")).mcp.overrides?.linear === true)
     const first = JSON.parse(await readFile(configuration, "utf8"))
     expect(first.mcp.overrides.linear).toBe(true)
 
     fixture.app.mockInput.pressKey("d", { ctrl: true })
-    await fixture.app.waitForFrame(frame => frame.includes("MCP linear desativado"))
+    await eventually(async () => JSON.parse(await readFile(configuration, "utf8")).mcp.overrides?.linear === false)
     const second = JSON.parse(await readFile(configuration, "utf8"))
     expect(second.mcp.overrides.linear).toBe(false)
 
@@ -95,7 +102,7 @@ test("OnethyCode MCP dialog exposes persistent shortcuts and deletes only select
     await fixture.app.waitForFrame(frame => frame.includes("Excluir linear?"))
     fixture.app.mockInput.pressArrow("down")
     fixture.app.mockInput.pressEnter()
-    await fixture.app.waitForFrame(frame => frame.includes("MCP linear excluído"))
+    await eventually(async () => JSON.parse(await readFile(configuration, "utf8")).mcp.servers?.linear === undefined)
     const third = JSON.parse(await readFile(configuration, "utf8"))
     expect(third.mcp.servers.linear).toBeUndefined()
     expect(third.mcp.overrides.linear).toBeUndefined()
