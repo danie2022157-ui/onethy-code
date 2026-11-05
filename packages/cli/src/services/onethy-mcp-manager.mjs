@@ -4,7 +4,7 @@
  * This module is deliberately dependency-free so it can be tested using Node
  * on Windows and Linux. No MCP process is started by a management operation.
  */
-import { mkdtemp, mkdir, readFile, lstat, open, rename, unlink } from "node:fs/promises"
+import { mkdir, readFile, lstat, open, rename, unlink } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { randomUUID } from "node:crypto"
 import { curatedLocalMCPs, LOCAL_MCP_NAMES } from "./onethy-customizations-local-mcp.mjs"
