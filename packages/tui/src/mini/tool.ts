@@ -462,7 +462,7 @@ function runPatch(p: ToolProps): ToolInline {
 function runTodo(p: ToolProps): ToolInline {
   return {
     icon: "#",
-    title: "Todos",
+    title: "Tasks",
     mode: "block",
     body: parseTodos(p.frame.input.todos)
       .map((item) => `${todoMarker(item.status)} ${item.content}`)
