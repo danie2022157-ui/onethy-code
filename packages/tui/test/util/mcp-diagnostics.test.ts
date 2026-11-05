@@ -9,7 +9,7 @@ test("MCP diagnostic explains a missing executable", () => {
 test("MCP diagnostic distinguishes Git root and dependency failures", () => {
   expect(mcpFailureHelp("fatal: not a git repository")).toContain("Git repository")
   expect(mcpFailureHelp("ModuleNotFoundError: No module named 'markitdown'")).toContain("Python")
-  expect(mcpFailureHelp("MCP connect timed out")).toContain("tempo")
+  expect(mcpFailureHelp("MCP connect timed out")).toContain("timed out")
 })
 
 test("MCP diagnostic retains full failure in the details view instead of the list", () => {
