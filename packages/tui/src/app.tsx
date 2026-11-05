@@ -76,6 +76,7 @@ import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogAgent } from "./component/dialog-agent"
 import { DialogCustomizations } from "./component/dialog-customizations"
+import { DialogAitmpl } from "./component/dialog-aitmpl"
 import { DialogAutoCustomizations } from "./component/dialog-auto-customizations"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogOpen, DialogOpenKey, moveOpenSession } from "./component/dialog-open"
@@ -1039,6 +1040,16 @@ function App() {
               slash: { name: "customizations", aliases: ["personalizacoes", "catalog", "all"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="all" />)
+              },
+            },
+            {
+              name: "omnicode.aitmpl",
+              title: "AI Templates — Catálogo nativo de componentes (somente revisão)",
+              description: "Buscar templates de skills, agentes, comandos, MCPs, hooks e mods no catálogo incluído",
+              category: "OmniCode",
+              slash: { name: "aitmpl", aliases: ["templates-ia"] },
+              run: () => {
+                dialog.replace(() => <DialogAitmpl />)
               },
             },
             {
