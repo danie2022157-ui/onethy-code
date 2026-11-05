@@ -288,7 +288,7 @@ export function Logo() {
                 ◇
               </text>
               <text fg={RGBA.fromHex("#A855F7")} attributes={TextAttributes.BOLD} selectable={false}>
-                ORQUESTRADOR MULTI-AGENTE IA
+                AI MULTI-AGENT ORCHESTRATOR
               </text>
               <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD} selectable={false}>
                 ◇
