@@ -925,15 +925,22 @@ export const layer = (options?: Options) =>
           }
           const target = yield* requireServer(server)
           yield* target.entry.startup.await
+          yield* wake(target.name, target.entry)
           if (!target.entry.client)
             return yield* new ToolCallError({
               server: target.name,
               tool: input.name,
               message: unavailable(target.name, target.entry.status),
             })
+          target.entry.lastUsedAt = Date.now()
+          target.entry.activeCalls = (target.entry.activeCalls ?? 0) + 1
           const result = yield* recovering(target.name, target.entry, target.entry.client, (connection) =>
             connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID }),
           ).pipe(
+            Effect.ensuring(Effect.sync(() => {
+              target.entry.activeCalls = Math.max(0, (target.entry.activeCalls ?? 1) - 1)
+              target.entry.lastUsedAt = Date.now()
+            })),
             Effect.mapError(
               (error) =>
                 new ToolCallError({
@@ -962,6 +969,8 @@ export const layer = (options?: Options) =>
         prompt: Effect.fn("MCP.prompt")(function* (input) {
           const target = yield* requireServer(ServerName.make(input.server))
           yield* target.entry.startup.await
+          yield* wake(target.name, target.entry)
+          target.entry.lastUsedAt = Date.now()
           if (!target.entry.client) return undefined
           const result = yield* recovering(target.name, target.entry, target.entry.client, (connection) =>
             connection.prompt({ name: input.name, args: input.args }),
@@ -974,9 +983,12 @@ export const layer = (options?: Options) =>
           const catalogs = yield* Effect.forEach(
             Array.from(entries),
             ([name, entry]) =>
-              entry.client
-                ? loadCatalog(name, entry, entry.client).pipe(Effect.orElseSucceed(() => empty))
-                : Effect.succeed(empty),
+              Effect.gen(function* () {
+                yield* wake(name, entry)
+                if (!entry.client) return empty
+                entry.lastUsedAt = Date.now()
+                return yield* loadCatalog(name, entry, entry.client).pipe(Effect.orElseSucceed(() => empty))
+              }),
             { concurrency: "unbounded" },
           )
           return mergeCatalogs(catalogs)
@@ -984,12 +996,16 @@ export const layer = (options?: Options) =>
         resources: Effect.fn("MCP.resources")(function* (input) {
           const target = yield* requireServer(ServerName.make(input.server))
           yield* target.entry.startup.await
+          yield* wake(target.name, target.entry)
+          target.entry.lastUsedAt = Date.now()
           if (!target.entry.client) return ResourceCatalog.make({ resources: [], templates: [] })
           return mergeCatalogs([yield* loadCatalog(target.name, target.entry, target.entry.client)])
         }),
         readResource: Effect.fn("MCP.readResource")(function* (input) {
           const target = yield* requireServer(ServerName.make(input.server))
           yield* target.entry.startup.await
+          yield* wake(target.name, target.entry)
+          target.entry.lastUsedAt = Date.now()
           if (!target.entry.client) return undefined
           const result = yield* recovering(target.name, target.entry, target.entry.client, (connection) =>
             connection.readResource({ uri: input.uri }),
