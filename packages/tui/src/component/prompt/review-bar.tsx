@@ -2,7 +2,7 @@ import { RGBA, TextAttributes, type MouseEvent } from "@opentui/core"
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { useClient } from "../../context/client"
 import { useRoute } from "../../context/route"
-import { isCurrentSessionDiff, sessionReviewFiles, sessionReviewFingerprint, type ChangedFile } from "./review-bar-session"
+import { isCurrentSessionDiff, loadSessionReview, sessionReviewFingerprint, type ChangedFile } from "./review-bar-session"
 import { useData } from "../../context/data"
 import { useTheme } from "../../context/theme"
 import { Keymap } from "../../context/keymap"
@@ -66,9 +66,11 @@ export function PromptReviewBar(props: { sessionID?: string; active?: boolean })
     try {
       // Only the owning session's recorded turn is permitted. An empty response is
       // genuinely empty; workspace-level vcs.diff/git status may belong to other tabs.
-      const response = await client.api.session.diff({ sessionID: sid, context: 0 })
+      const resolved = await loadSessionReview(sid, (sessionID) =>
+        client.api.session.diff({ sessionID, context: 0 }),
+      )
       if (!isCurrentSessionDiff(sid, currentRequestId, props.sessionID, diffRequestId)) return
-      setDiffState({ sessionID: sid, files: sessionReviewFiles(response) })
+      setDiffState({ sessionID: sid, files: resolved })
     } catch {
       // Fail closed on missing snapshots/errors; never show another session's git changes.
       if (!isCurrentSessionDiff(sid, currentRequestId, props.sessionID, diffRequestId)) return
