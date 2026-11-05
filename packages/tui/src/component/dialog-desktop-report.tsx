@@ -15,7 +15,7 @@ export function DialogDesktopReport(props: { title: string; rows: readonly Deskt
   }
 
   return (
-    <DialogLayout header={<DialogHeader title={props.title} onClose={() => dialog.pop()} />}>
+    <DialogLayout header={<DialogHeader title={props.title} closeLabel="← Back (Esc)" onClose={() => dialog.pop()} />}>
       <box flexDirection="column" gap={1}>
         <scrollbox maxHeight={18} scrollbarOptions={{ visible: true }}>
           <box flexDirection="column" gap={1} paddingRight={1}>
