@@ -849,6 +849,7 @@ function App() {
             title: "Manage desktop computer use",
             description: "Inspect accessibility permissions and install the Agent Desktop runtime",
             category: "OnethyCode",
+            suggested: true,
             slash: { name: "desktop" },
             run: () => dialog.replace(() => <DialogDesktop />),
           }]
