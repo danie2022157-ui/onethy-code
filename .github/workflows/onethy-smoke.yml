@@ -43,6 +43,46 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Windows install and global command smoke test (PowerShell 5.1)
+        if: runner.os == 'Windows'
+        shell: powershell
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $originalLocalAppData = $env:LOCALAPPDATA
+          $originalPath = $env:PATH
+          $sandbox = Join-Path $env:RUNNER_TEMP "onethy-installer-ci"
+          $env:LOCALAPPDATA = Join-Path $sandbox "AppData/Local"
+          $windowsApps = Join-Path $env:LOCALAPPDATA "Microsoft/WindowsApps"
+          try {
+            New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA | Out-Null
+            & ./install.ps1
+            if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw "Installer returned $LASTEXITCODE" }
+            foreach ($name in @("onethy.cmd", "onethy-code.cmd", "omni.cmd", "omnicode.cmd", "onethy.ps1", "onethy-config.json")) {
+              if (-not (Test-Path -LiteralPath (Join-Path $windowsApps $name) -PathType Leaf)) {
+                throw "Installer did not create $name"
+              }
+            }
+            $config = Get-Content -LiteralPath (Join-Path $windowsApps "onethy-config.json") -Raw | ConvertFrom-Json
+            if ([IO.Path]::GetFullPath($config.checkout) -ne [IO.Path]::GetFullPath((Get-Location).Path)) {
+              throw "Launcher checkout does not match repository"
+            }
+            $env:PATH = "$windowsApps;$originalPath"
+            $resolved = (Get-Command onethy -ErrorAction Stop).Source
+            if (-not $resolved.StartsWith($windowsApps, [StringComparison]::OrdinalIgnoreCase)) {
+              throw "onethy did not resolve from installed WindowsApps"
+            }
+            $output = & onethy --help 2>&1 | Out-String
+            $exitCode = $LASTEXITCODE
+            Write-Host $output
+            if ($exitCode -ne 0) { throw "onethy --help failed with exit code $exitCode" }
+            if ($output -notmatch 'onethy') { throw "onethy --help did not show OnethyCode CLI" }
+          } finally {
+            $env:LOCALAPPDATA = $originalLocalAppData
+            $env:PATH = $originalPath
+            Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Core regression tests
         run: bun --cwd packages/core test test/omni-config.test.ts test/omni-memory-bank.test.ts test/omni-session.test.ts test/omni-model-selection.test.ts test/omni-orchestrator.test.ts test/omni-mission-control.test.ts test/omni-intelligence.test.ts test/omni-task-graph.test.ts test/omni-embeddings.test.ts test/instructions/builtins.test.ts
 
