@@ -2,6 +2,7 @@ export interface SyncAITmplOptions {
   readonly install?: boolean
   readonly verify?: boolean
   readonly global?: boolean
+  readonly globalDir?: string
   readonly type?: string
   readonly sourceDir?: string
   readonly cwd?: string
