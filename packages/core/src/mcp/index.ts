@@ -88,6 +88,12 @@ type ServerEntry = {
   // Set when a remote server is registered as an OAuth integration; the credential lives in the global store.
   integrationID?: Integration.ID
   registration?: State.Registration
+  lastUsedAt?: number
+  lastHealthAt?: number
+  healthFailures?: number
+  activeCalls?: number
+  failures?: number
+  retryAt?: number
 }
 
 // A client-hosted MCP server attached over a connection the client opened. Internal: never listed,
@@ -429,6 +435,8 @@ export const layer = (options?: Options) =>
         connection.onClose((reason) =>
           live(
             Effect.gen(function* () {
+              entry.failures = (entry.failures ?? 0) + 1
+              entry.retryAt = Date.now() + retryDelay(entry.failures)
               entry.status = { status: "failed", error: reason }
               yield* stopServer(name, entry)
               yield* bus.publish(McpEvent.StatusChanged, { server: name })
@@ -482,6 +490,11 @@ export const layer = (options?: Options) =>
             entry.tools = result.value.tools.map((tool) => toTool(name, entry, tool))
             entry.prompts = []
             entry.status = { status: "connected" }
+            entry.lastUsedAt = Date.now()
+            entry.lastHealthAt = Date.now()
+            entry.healthFailures = 0
+            entry.failures = 0
+            entry.retryAt = undefined
             watch(name, entry, result.value.connection)
             yield* Effect.logInfo("mcp connected", { server: name, tools: entry.tools.length })
             // The tool registry reads on this event; a late-connecting server has no other way to appear.
@@ -498,6 +511,10 @@ export const layer = (options?: Options) =>
             error instanceof McpClient.NeedsAuthError
               ? { status: "needs_auth", error: error.message }
               : { status: "failed", error: error instanceof Error ? error.message : String(error) }
+          if (entry.status.status === "failed") {
+            entry.failures = (entry.failures ?? 0) + 1
+            entry.retryAt = Date.now() + retryDelay(entry.failures)
+          }
           yield* Effect.logWarning("mcp connect failed", { server: name, status: entry.status })
           yield* bus.publish(McpEvent.StatusChanged, { server: name })
         }).pipe(
@@ -505,17 +522,21 @@ export const layer = (options?: Options) =>
           Effect.annotateLogs({ server: name, directory: location.directory, connectionID: crypto.randomUUID() }),
         )
 
-      const stopServer = Effect.fnUntraced(function* (name: ServerName, entry: ServerEntry) {
+      const stopServer = Effect.fnUntraced(function* (name: ServerName, entry: ServerEntry, preserveCatalog = false) {
         const scope = entry.scope
         if (!scope) return
         entry.scope = undefined
         entry.client = undefined
-        entry.tools = undefined
-        entry.prompts = undefined
+        if (!preserveCatalog) {
+          entry.tools = undefined
+          entry.prompts = undefined
+        }
         yield* Scope.close(scope, Exit.void)
-        yield* bus.publish(McpEvent.ToolsChanged, { server: name })
-        yield* bus.publish(McpEvent.ResourcesChanged, { server: name })
-        yield* bus.publish(PromptsChanged, { server: name })
+        if (!preserveCatalog) {
+          yield* bus.publish(McpEvent.ToolsChanged, { server: name })
+          yield* bus.publish(McpEvent.ResourcesChanged, { server: name })
+          yield* bus.publish(PromptsChanged, { server: name })
+        }
       })
 
       const disposeServer = Effect.fnUntraced(function* (name: ServerName, entry: ServerEntry) {
