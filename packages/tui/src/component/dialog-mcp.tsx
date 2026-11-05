@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, onMount, Show } from "solid-js"
 import { useData } from "../context/data"
 import { useClient } from "../context/client"
 import { pipe, sortBy } from "remeda"
@@ -42,6 +42,9 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
   const location = useLocation()
   const toast = useToast()
   const theme = useTheme().surface("dialog")
+  onMount(() => {
+    if (process.env.OMNICODE_ACTIVE === "1") dialog.setSize("large")
+  })
   const current = () => location.ref ?? data.location.default()
   const [hidden, setHidden] = createSignal<ReadonlySet<string>>(new Set())
   const servers = createMemo(() =>
@@ -253,15 +256,7 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
                 },
               ] : []),
             ]}
-            footerHints={[
-              ...(focusedError() ? [{ title: "view error", label: "enter", group: "primary" as const }] : []),
-              ...(process.env.OMNICODE_ACTIVE === "1" ? [
-                { title: "ativar", label: "ctrl+e" },
-                { title: "desativar", label: "ctrl+d" },
-                { title: "excluir", label: "ctrl+x" },
-                { title: "restaurar", label: "ctrl+r" },
-              ] : []),
-            ]}
+            footerHints={focusedError() ? [{ title: "view error", label: "enter", group: "primary" }] : []}
           />
         }
       >
