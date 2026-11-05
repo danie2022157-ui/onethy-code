@@ -52,7 +52,7 @@ test("AITmpl imports only native personalizations; never imports slash commands 
     assert.deepEqual(await readdir(external), [])
     const global = join(root, "native-global")
     const globally = await syncAITmpl({ sourceDir: catalog, global: true, globalDir: global, install: true, type: "skills" })
-    assert.equal(globally.installed, 2)
+    assert.equal(globally.installed, 3)
     assert.equal(await readFile(join(global, "skills/development-example/example.txt"), "utf8"), "asset content")
   } finally {
     await rm(root, { recursive: true, force: true })
