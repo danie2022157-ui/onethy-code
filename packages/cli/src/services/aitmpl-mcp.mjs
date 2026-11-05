@@ -24,7 +24,7 @@ function normalServer(input, id, warnings) {
   if (typeof input.url === "string") {
     let uri
     try { uri = new URL(input.url) } catch { return null }
-    if (!["https:", "http:"].includes(uri.protocol) || uri.username || uri.password) return null
+    if (!["https:", "http:"].includes(uri.protocol) || uri.username || uri.password || uri.search || uri.hash) return null
     if (input.headers && record(input.headers)) {
       warnings.push("MCP " + suffix + " requires externally configured authentication headers")
     }
@@ -37,6 +37,10 @@ function normalServer(input, id, warnings) {
       : []
   const args = Array.isArray(input.args) && input.args.every(x => typeof x === "string") ? input.args : []
   if (!command.length || !command[0].trim()) return null
+  if ([...command, ...args].some(x => /<your[-_ ]?|bearer\\s+\\S+|(?:api[_-]?key|token|password|secret)=/i.test(x))) {
+    warnings.push("MCP " + suffix + ": command contains placeholder or possible embedded credentials")
+    return null
+  }
   if (command.some(x => /\r|\n|\0/.test(x)) || args.some(x => /\r|\n|\0/.test(x))) return null
   // Avoid shell expansion: native MCP transport always receives argv, never "sh -c".
   if (["sh", "bash", "cmd", "powershell", "pwsh"].includes(command[0].toLowerCase())) {
