@@ -6,6 +6,7 @@ import { join, relative, resolve, dirname, basename, extname, sep } from "node:p
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { convertMcpTemplate, safeMcpId } from "./aitmpl-mcp.mjs"
+import { convertAITmplAgent } from "./aitmpl-agent.mjs"
 
 
 const CATALOG = "https://github.com/davila7/claude-code-templates.git"
@@ -97,7 +98,7 @@ async function record(type, name, sourceFile, out, convert, prepared) {
   if (!inside(base, out) || !(await safeAncestors(base, out))) { report.rejected++; return }
   if (await exists(out)) { report.existing++; return }
   const input = convert ? await readFile(sourceFile, "utf8") : undefined
-  const result = prepared !== undefined ? { body: prepared } : convert ? convertMarkdown(input, type, name) : undefined
+  const result = prepared !== undefined ? { body: prepared } : convert ? (type === "agents" ? convertAITmplAgent(input, name) : convertMarkdown(input, type, name)) : undefined
   if (result?.warning) {
     report.components[type].warnings.push({ name, warning: result.warning })
   }
