@@ -9,12 +9,12 @@ export default Runtime.handler(
   Effect.fn("cli.mcp.restore")((input) =>
     Effect.gen(function* () {
       const name = Option.getOrUndefined(input.name)
-      if (input.all && name) return yield* Effect.fail(new Error("Use um nome ou --all, não ambos."))
+      if (input.all && name) return yield* Effect.fail(new Error("Use either an MCP name or --all, not both."))
       if (!input.all && !name)
-        return yield* Effect.fail(new Error("Informe um MCP nativo ou use --all para restaurar os oito."))
+        return yield* Effect.fail(new Error("Provide a native MCP name or use --all to restore all eight."))
       if (input.all) {
         const allowed = yield* confirmAction(
-          "Restaurar os 8 MCPs nativos? Isto redefine definições nativas personalizadas e remove overrides nesse escopo.",
+          "Restore all 8 native MCPs? This resets customized native definitions and removes overrides in the selected scope.",
           input.yes,
         )
         if (!allowed) return
