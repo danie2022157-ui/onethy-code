@@ -44,9 +44,13 @@ function eligibleServer(input, name, warnings) {
   if (args.some(x => /[\r\n\0]/.test(x) || blocked.test(x) || /\$\{|%[A-Za-z_]+%/.test(x))) return null
   // No shell, package scripts, arbitrary URLs, or downloads from unknown vendors.
   const packages = args.filter(x => !x.startsWith("-"))
-  if (packages.length === 0 || !noAccountPackages.has(packages[0]) || packages.length > 1
-    && !packages[0].includes("filesystem")) return null
+  if (packages.length === 0 || !noAccountPackages.has(packages[0])) return null
+  // File access and database targets must be provided consciously, not imported
+  // from an untrusted catalog. No additional positional arguments are allowed.
+  if (packages.length !== 1) return null
   if (args.some(x => /^https?:\/\//i.test(x))) return null
+  if (args.some(x => x.startsWith("-") && !["-y", "--yes"].includes(x))) return null
+  if (args.filter(x => noAccountPackages.has(x)).length !== 1) return null
   if (blocked.test(name) && !/filesystem|sequential|thinking|memory|sqlite|fetch|time|everything/i.test(name))
     return null
   return { type: "stdio", command: program, args, disabled: true }
