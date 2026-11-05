@@ -7,10 +7,12 @@ import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { convertMcpTemplate, safeMcpId } from "./aitmpl-mcp.mjs"
 import { convertAITmplAgent } from "./aitmpl-agent.mjs"
+import { convertAITmplCommand } from "./aitmpl-command.mjs"
+import { convertAITmplHook, convertAITmplMod, safeCustomizationId } from "./aitmpl-hook-mod.mjs"
 
 
 const CATALOG = "https://github.com/davila7/claude-code-templates.git"
-export const types = ["skills", "agents", "settings", "hooks", "mcps", "plugins", "mods", "loops"]
+export const types = ["skills", "agents", "commands", "settings", "hooks", "mcps", "plugins", "mods", "loops"]
 export async function syncAITmpl(options = {}) {
 const install = options.install === true
 const verify = options.verify === true
@@ -98,7 +100,7 @@ async function record(type, name, sourceFile, out, convert, prepared) {
   if (!inside(base, out) || !(await safeAncestors(base, out))) { report.rejected++; return }
   if (await exists(out)) { report.existing++; return }
   const input = convert ? await readFile(sourceFile, "utf8") : undefined
-  const result = prepared !== undefined ? { body: prepared } : convert ? (type === "agents" ? convertAITmplAgent(input, name) : convertMarkdown(input, type, name)) : undefined
+  const result = prepared !== undefined ? { body: prepared } : convert ? (type === "agents" ? convertAITmplAgent(input, name) : type === "commands" ? convertAITmplCommand(input, name) : convertMarkdown(input, type, name)) : undefined
   if (result?.warning) {
     report.components[type].warnings.push({ name, warning: result.warning })
   }
@@ -142,9 +144,44 @@ try {
       }
       continue
     }
-    // Claude Code-specific event hooks, mods and settings cannot be made
-    // executable safely by renaming them. Inventory but do not activate.
-    if (!["skills", "agents"].includes(type)) {
+    if (type === "hooks") {
+      for await (const file of traverse(root)) {
+        const ext = extname(file).toLowerCase()
+        if (![".py", ".sh", ".js", ".ts", ".json", ".md"].includes(ext)) continue
+        const rel = relative(root, file).replaceAll(sep, "/")
+        const converted = convertAITmplHook(rel, await readFile(file, "utf8"))
+        const dest = join(destination, "hooks", "aitmpl", converted.id + ".json")
+        report.components[type].files++
+        await record("hooks", converted.id, file, dest, false, converted.file)
+        if (!converted.supported) report.pending++
+      }
+      continue
+    }
+    if (type === "mods") {
+      for (const category of await readdir(root, { withFileTypes: true })) {
+        if (!category.isDirectory()) continue
+        const categoryRoot = join(root, category.name)
+        for (const folder of await readdir(categoryRoot, { withFileTypes: true })) {
+          if (!folder.isDirectory()) continue
+          const dir = join(categoryRoot, folder.name)
+          const manifestFile = join(dir, ".claude-plugin", "plugin.json")
+          const readmeFile = join(dir, "README.md")
+          const manifest = await readFile(manifestFile, "utf8").catch(e => e.code === "ENOENT" ? "" : Promise.reject(e))
+          const readme = await readFile(readmeFile, "utf8").catch(e => e.code === "ENOENT" ? "" : Promise.reject(e))
+          if (!manifest && !readme) continue
+          const id = category.name + "/" + folder.name
+          const converted = convertAITmplMod(id, manifest, readme)
+          const dest = join(destination, "mods", "aitmpl", converted.id + ".json")
+          report.components[type].files++
+          await record("mods", converted.id, manifest ? manifestFile : readmeFile, dest, false, converted.file)
+          if (!converted.supported) report.pending++
+        }
+      }
+      continue
+    }
+    // Only file-based customizations are installed automatically. Settings
+    // and unrelated plugins remain inventoried because they may conflict.
+    if (!["skills", "agents", "commands"].includes(type)) {
       for await (const file of traverse(root)) report.components[type].files++
       report.pending += report.components[type].files
       continue
@@ -169,7 +206,7 @@ try {
       continue
     }
     for await (const file of traverse(root)) {
-      if (type !== "agents" || extname(file).toLowerCase() !== ".md") continue
+      if (!["agents", "commands"].includes(type) || extname(file).toLowerCase() !== ".md") continue
       const name = slug(relative(root, file).slice(0, -3).split(sep).join("-"))
       const out = join(destination, type, name + ".md")
       report.components[type].files++
