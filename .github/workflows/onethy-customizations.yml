@@ -4,6 +4,11 @@ on:
     paths:
       - 'packages/cli/src/services/onethy-customizations.*'
       - 'packages/cli/src/services/onethy-customizations-cleanup.mjs'
+      - 'packages/cli/src/services/onethy-mcp-manager.mjs'
+      - 'packages/cli/src/services/mcp-manager.ts'
+      - 'packages/cli/src/commands/handlers/mcp/**'
+      - 'packages/cli/src/commands/commands.ts'
+      - 'packages/cli/src/index.ts'
       - 'packages/cli/src/services/onethy-customizations-local-plugins.mjs'
       - 'packages/cli/src/services/onethy-customizations-local-mcp.mjs'
       - 'packages/cli/src/services/onethy-customizations-agent.mjs'
@@ -14,6 +19,8 @@ on:
       - 'package.json'
       - 'script/onethy-customizations-bootstrap.mjs'
       - 'script/onethy-customizations.test.mjs'
+      - 'script/onethy-mcp-management.test.mjs'
+      - 'packages/cli/test/mcp-management.test.ts'
       - '.github/workflows/onethy-customizations.yml'
   push:
     branches: [main]
@@ -27,6 +34,8 @@ on:
       - 'package.json'
       - 'script/onethy-customizations-bootstrap.mjs'
       - 'script/onethy-customizations.test.mjs'
+      - 'script/onethy-mcp-management.test.mjs'
+      - 'packages/cli/test/mcp-management.test.ts'
       - '.github/workflows/onethy-customizations.yml'
 jobs:
   personalization-test:
@@ -45,6 +54,7 @@ jobs:
           node-version: '22'
       - run: node --check packages/cli/src/services/onethy-customizations.mjs
       - run: node --check packages/cli/src/services/onethy-customizations-cleanup.mjs
+      - run: node --check packages/cli/src/services/onethy-mcp-manager.mjs
       - run: node --check packages/cli/src/services/onethy-customizations-local-plugins.mjs
       - run: node --check packages/cli/src/services/onethy-customizations-local-mcp.mjs
       - run: node --check packages/cli/src/services/onethy-customizations-agent.mjs
@@ -52,6 +62,7 @@ jobs:
       - run: node --check packages/cli/src/services/onethy-customizations-descriptors.mjs
       - run: node --check script/onethy-customizations-bootstrap.mjs
       - run: node --test script/onethy-customizations.test.mjs
+      - run: node --test script/onethy-mcp-management.test.mjs
       - name: Verify real catalog import preview (no writes)
         shell: bash
         run: |
