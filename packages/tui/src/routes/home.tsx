@@ -169,7 +169,6 @@ export function Home() {
   ]
   const quickRow2 = [
     { cmd: "/auto", desc: "Omni Fusion", fg: RGBA.fromHex("#A855F7") },
-    { cmd: "/auto-customizations", desc: "Capabilities", fg: RGBA.fromHex("#F59E0B") },
   ]
 
   return (

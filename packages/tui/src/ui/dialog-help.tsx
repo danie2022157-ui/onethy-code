@@ -51,7 +51,6 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { key: "/ulw", description: "UltraWork continuous turbo execution loop" },
       { key: "/arena", description: "Multi-model comparative benchmark" },
       { key: "/ralph", description: "Self-healing test and build runner" },
-      { key: "/auto-customizations", description: "Configure proactive skills, agents, MCPs & hooks" },
     ],
   },
 ]
