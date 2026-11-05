@@ -336,6 +336,16 @@ O instalador registra os atalhos do OnethyCode no ambiente do usuário. **Não a
 
 Recomenda-se utilizar uma janela de terminal atualizada e revisar eventuais avisos de compatibilidade da TUI. Se houver problemas na inicialização, obtenha a saída de `onethy --help` e os detalhes do terminal antes de modificar configurações.
 
+**Reparar um atalho do Windows com caminho antigo (`MODULE_NOT_FOUND`, `bin\\onethy.js`):** o comando `onethy` utiliza `%LOCALAPPDATA%\\Microsoft\\WindowsApps\\onethy-config.json`, que contém o caminho absoluto do checkout usado na instalação. Se o repositório for movido, o instalador corrigido tenta localizar o checkout nas pastas ancestrais do caminho salvo, atualizar o atalho e continuar. Se não conseguir, entre na pasta **real** do repositório (a que contém `bin\\onethy.js` e `install.ps1`) e execute novamente:
+
+```powershell
+bun install --frozen-lockfile
+.\\install.ps1
+onethy --help
+```
+
+O instalador agora recusa checkouts incompletos, em vez de salvar caminhos quebrados. Este reparo não exclui seus dados nem projetos. Não instale apontando para uma pasta acima ou abaixo do checkout real.
+
 ### Linux e macOS
 
 ```bash

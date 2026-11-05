@@ -77,6 +77,38 @@ jobs:
             Write-Host $output
             if ($exitCode -ne 0) { throw "onethy --help failed with exit code $exitCode" }
             if ($output -notmatch 'onethy') { throw "onethy --help did not show OnethyCode CLI" }
+
+            # Reproduce a stale checkout saved by an older installer/update:
+            # the launcher pointed at duplicated "onethy-code" directory names.
+            $actualRoot = (Get-Location).Path
+            $config.checkout = Join-Path (Join-Path $actualRoot "onethy-code") "onethy-code"
+            [System.IO.File]::WriteAllText(
+              (Join-Path $windowsApps "onethy-config.json"),
+              ($config | ConvertTo-Json -Compress),
+              [System.Text.UTF8Encoding]::new($false)
+            )
+            $elsewhere = Join-Path $sandbox "unrelated-project"
+            New-Item -ItemType Directory -Force -Path $elsewhere | Out-Null
+            Push-Location $elsewhere
+            try {
+              $fixedOutput = & onethy --help 2>&1 | Out-String
+              $fixedCode = $LASTEXITCODE
+            } finally {
+              Pop-Location
+            }
+            Write-Host $fixedOutput
+            if ($fixedCode -ne 0) { throw "Stale-checkout repair failed with exit code $fixedCode" }
+            # Console.WriteLine from a nested .cmd/.ps1 may go directly to the
+            # runner log rather than the PowerShell pipeline variable.
+            # Assert the durable repaired config instead of relying on capture.
+            $fixed = Get-Content -LiteralPath (Join-Path $windowsApps "onethy-config.json") -Raw | ConvertFrom-Json
+            if ([IO.Path]::GetFullPath($fixed.checkout) -ne [IO.Path]::GetFullPath($actualRoot)) {
+              throw "Launcher did not persist the repaired checkout root"
+            }
+            # Subsequent launches must not repeat the repair.
+            $secondOutput = & onethy --help 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) { throw "Second launch after repair failed" }
+            if ($secondOutput -match 'Repaired stale checkout path') { throw "Path repair repeated" }
           } finally {
             $env:LOCALAPPDATA = $originalLocalAppData
             $env:PATH = $originalPath
