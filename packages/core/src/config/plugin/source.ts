@@ -12,6 +12,7 @@ import { Config } from "../../config.js"
 import { Watcher } from "../../filesystem/watcher.js"
 import { Location } from "../../location.js"
 import { PluginSourceDirectory } from "../../plugin/source-directory.js"
+import { withNativeAntigravity } from "./antigravity-native.js"
 
 export type Operation =
   | {
@@ -74,7 +75,7 @@ export const layer = Layer.effect(
     return Service.of({
       operations: Effect.fn("ConfigPluginSource.operations")(function* () {
         const entries = yield* config.entries()
-        const operations = yield* scan(fs, location, entries)
+        const operations = withNativeAntigravity(yield* scan(fs, location, entries))
         yield* watchConfiguredSources(entries, operations)
         return operations
       }),
