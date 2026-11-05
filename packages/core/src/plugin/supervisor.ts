@@ -4,6 +4,7 @@ import { Event } from "@opencode/schema/config"
 import { Cause, Effect, Layer, Queue, Stream } from "effect"
 import path from "path"
 import { ConfigPluginSource } from "../config/plugin/source.js"
+import { ANTIGRAVITY_SPEC, antigravityEnabled } from "../config/plugin/antigravity-native.js"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Bus } from "../bus.js"
 import { Npm } from "@opencode/util/npm"
@@ -191,6 +192,20 @@ export const layer = Layer.effectDiscard(
         { concurrency: "unbounded" },
       ).pipe(
         Effect.flatMap((checked) => {
+          // OnethyCode's native plugin follows compatible 3.x releases while
+          // the host is online. npm's ^3.0.30 range prevents unattended 4.x
+          // account-store migrations. Failed updates keep the prior generation.
+          if (antigravityEnabled() && current === generation &&
+              checked.some(([target, available]) => target === ANTIGRAVITY_SPEC && available)) {
+            fork(
+              updates.update(ANTIGRAVITY_SPEC).pipe(
+                Effect.catchCause((cause) => Effect.logWarning(
+                  "Antigravity Auth compatible update failed; previous plugin retained",
+                  { cause },
+                )),
+              ),
+            )
+          }
           if (current !== generation) return Effect.void
           const next = new Set(checked.flatMap(([target, available]) => (available ? [target] : [])))
           if (next.size === outdated.size && [...next].every((target) => outdated.has(target))) return Effect.void
