@@ -4,7 +4,6 @@ import { DialogSelect } from "../ui/dialog-select"
 import { useDialog } from "../ui/dialog"
 import { useNewDesigns } from "../config"
 import { DialogFusionModels } from "./dialog-fusion-models"
-import { DialogAutoCustomizations } from "./dialog-auto-customizations"
 
 export function DialogVariant() {
   const local = useLocal()
@@ -76,15 +75,6 @@ export function DialogVariant() {
             : "Inactive: keeps fixed model reasoning budget. Click to enable",
           onSelect: () => {
             local.model.auto.toggleThinkingRouting()
-          },
-        },
-        {
-          value: "auto customizations",
-          title: `⚙️ Capabilities Auto-Usage: [${local.customizations.summary()}]`,
-          category: "Omni Fusion Settings",
-          description: "Configure which skills, agents, MCPs, hooks and mods the AI uses autonomously",
-          onSelect: () => {
-            dialog.push(() => <DialogAutoCustomizations />)
           },
         },
       ]
