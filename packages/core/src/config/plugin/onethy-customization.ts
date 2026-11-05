@@ -102,9 +102,11 @@ export const Plugin = define({
     yield* ctx.permission.hook("evaluate", (event) => Effect.sync(() => {
       if (active.plugins.has("local-sensitive-file-guard")) {
         const sensitive = event.resources.some(resource => {
-          const value = resource.replaceAll("\\\\", "/")
-          if (/(?:^|\\/)\\.env\\.(?:example|sample|template|dist)$/i.test(value)) return false
-          return /(?:^|\\/)(?:\\.env(?:\\.[^/]*)?|id_(?:rsa|ed25519)|[^/]+\\.(?:pem|key))$/i.test(value)
+          const name = resource.replaceAll(String.fromCharCode(92), "/").split("/").at(-1)?.toLowerCase() ?? ""
+          if ([".env.example", ".env.sample", ".env.template", ".env.dist"].includes(name)) return false
+          return name === ".env" || name.startsWith(".env.") ||
+            name === "id_rsa" || name === "id_ed25519" ||
+            name.endsWith(".pem") || name.endsWith(".key")
         })
         if (sensitive) {
           event.effect = "deny"
