@@ -169,7 +169,7 @@ export async function manageMcp(input: {
     if (!currentNative && !configured(target, name)) {
       if (inGlobalNative && !input.global)
         throw new Error("This MCP is installed globally. Use --global to delete it.")
-      throw new Error("MCP não encontrado in the selecionado: " + name)
+      throw new Error("MCP not found in the selected scope: " + name)
     }
     if (currentNative) await removeNativeMCP(root, name)
     const changes: Array<{ path: string[]; value: unknown }> = []
