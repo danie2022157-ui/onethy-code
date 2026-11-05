@@ -30,32 +30,32 @@ export default Runtime.handler(
       const item = items.find(entry => entry.name === name)!
       const actions: Array<{value: McpAction; label: string; hint: string}> = []
       if (item.present) {
-        actions.push({ value: "enable", label: "Enable", hint: "Permite iniciar o servidor" })
-        actions.push({ value: "disable", label: "Disable", hint: "Mantém configuração e arquivos" })
-        actions.push({ value: "remove", label: "Delete", hint: "Remove do escopo selecionado" })
+        actions.push({ value: "enable", label: "Enable", hint: "Allows the server to start" })
+        actions.push({ value: "disable", label: "Disable", hint: "Keeps settings and files" })
+        actions.push({ value: "remove", label: "Delete", hint: "Removes from the selected scope" })
       }
       if (item.kind === "native") actions.push({
-        value: "restore", label: "Restaurar configuração nativa", hint: "Reverte o modelo original, desativado",
+        value: "restore", label: "Restore native defaults", hint: "Restores the original disabled template",
       })
       const action = yield* prompt<McpAction>(() => select({
-        message: "O que deseja fazer?",
+        message: "What would you like to do?",
         options: actions,
       }))
       const actionGlobal = input.global || ((action === "remove" || action === "restore") && item.location === "global")
       if (action === "remove" || action === "restore") {
         const ok = yield* confirmAction(
           action === "remove"
-            ? `Excluir MCP "${name}" da configuração ${actionGlobal ? "global" : "do projeto"}?`
-            : `Restaurar configuração original de "${name}" e redefinir sua autorização nesse escopo?`,
+            ? `Delete MCP "${name}" from the ${actionGlobal ? "global" : "project"}?`
+            : `Restore original configuration for "${name}" and reset authorization in this scope?`,
           false,
         )
         if (!ok) {
-          outro("Nenhuma alteração realizada.")
+          outro("No changes were made.")
           return
         }
       }
       yield* perform({ action, name, global: actionGlobal })
-      outro("Configuração salva. Confira a conexão com: onethy mcp doctor")
+      outro("Configuration saved. Check connectivity with: onethy mcp doctor")
     }).pipe(handlePromptErrors),
   ),
 )
