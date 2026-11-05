@@ -39,10 +39,10 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
 
     const preview = await syncOnethyCustomizations({ sourceDir, cwd })
     assert.equal(preview.installed, 0)
-    assert.equal(preview.ready, 8)
+    assert.equal(preview.ready, 9)
     await assert.rejects(stat(join(cwd, ".opencode")))
     const first = await syncOnethyCustomizations({ sourceDir, cwd, install: true })
-    assert.equal(first.installed, 8)
+    assert.equal(first.installed, 9)
     assert.ok(first.pending >= 1)
 
     const config = join(cwd, ".opencode")
@@ -73,22 +73,23 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
     assert.equal(mod.enabled, false)
 
     const mcpFiles = await readdir(join(config, "mcp/onethy"))
-    assert.equal(mcpFiles.length, 2)
+    assert.deepEqual(mcpFiles, ["local-tools.json"])
     const localDefaults = JSON.parse(await readFile(join(config, "mcp/onethy/local-tools.json"), "utf8"))
-    assert.equal(Object.keys(localDefaults.mcpServers).length, 3)
-    assert.ok(Object.values(localDefaults.mcpServers).every(server => server.disabled === true))
-    assert.ok(Object.keys(localDefaults.mcpServers).includes("onethy-browser"))
-    const mcp = JSON.parse(await readFile(join(config, "mcp/onethy", mcpFiles.find(file => file !== "local-tools.json")), "utf8"))
-    const [name, definition] = Object.entries(mcp.mcpServers)[0]
-    assert.ok(name.startsWith("onethy-"))
-    assert.equal(definition.type, "stdio")
-    assert.equal(definition.disabled, true)
-    assert.ok(!JSON.stringify(mcp).includes("TOKEN"))
-    assert.ok(!JSON.stringify(mcp).includes("github"))
+    assert.deepEqual(Object.keys(localDefaults.mcpServers).toSorted(),
+      ["onethy-browser", "onethy-sequential-thinking", "onethy-time"])
+    assert.ok(Object.values(localDefaults.mcpServers).every(server =>
+      server.disabled === true && server.type === "stdio" && !("env" in server) && !("headers" in server)))
 
+    const pluginFiles = await readdir(join(config, "plugins/onethy"))
+    assert.equal(pluginFiles.length, 2)
+    const pluginDefinitions = await Promise.all(pluginFiles.map(async name =>
+      JSON.parse(await readFile(join(config, "plugins/onethy", name), "utf8"))))
+    assert.ok(pluginDefinitions.every(value => value.enabled === false && value.kind === "plugin"))
+    assert.deepEqual(pluginDefinitions.map(p => p.implementation).toSorted(),
+      ["local-sensitive-file-guard", "local-tool-preference"])
     const repeated = await syncOnethyCustomizations({ sourceDir, cwd, install: true })
     assert.equal(repeated.installed, 0)
-    assert.equal(repeated.existing, 8)
+    assert.equal(repeated.existing, 9)
     await assert.rejects(stat(join(cwd, "NOT_ALLOWED")))
 
     const another = join(base, "skills/development/escape/SKILL.md")
@@ -109,22 +110,41 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
   }
 })
 
-test("local MCP allowlist rejects all remote, authenticated and unknown providers", async () => {
-  const { convertMcpTemplate } = await import("../packages/cli/src/services/onethy-customization-mcp.mjs")
-  const source = JSON.stringify({ mcpServers: {
-    localMemory: { command: "npx", args: ["-y", "@modelcontextprotocol/server-memory"] },
-    localThinking: { command: "npx", args: ["-y", "@modelcontextprotocol/server-sequential-thinking"] },
-    needsKey: { command: "npx", args: ["-y", "@modelcontextprotocol/server-memory"], env: { API_KEY: "SECRET" } },
-    hosted: { url: "https://hosted.example.net/mcp" },
-    unknown: { command: "npx", args: ["-y", "unknown-provider-mcp"] },
-    unsafeArg: { command: "npx", args: ["-y", "@modelcontextprotocol/server-memory", "--token=SECRET"] },
-  } })
-  const converted = convertMcpTemplate(source, "local/no-account.json")
-  assert.equal(converted.count, 2)
-  assert.equal(Object.keys(JSON.parse(converted.json).mcpServers).length, 2)
-  assert.ok(!converted.json.includes("SECRET"))
-  assert.ok(!converted.json.includes("unknown-provider"))
-  assert.ok(converted.warnings.length >= 4)
+test("MCP-only synchronization never imports remote provider definitions and works without a catalog clone", async () => {
+  const root = await mkdtemp(join(tmpdir(), "onethy-mcp-only-"))
+  try {
+    const result = await syncOnethyCustomizations({
+      sourceDir: join(root, "no-catalog-needed"),
+      cwd: root,
+      type: "mcps",
+      install: true,
+    })
+    assert.equal(result.installed, 1)
+    const files = await readdir(join(root, ".opencode", "mcp", "onethy"))
+    assert.deepEqual(files, ["local-tools.json"])
+    const definitions = JSON.parse(await readFile(join(root, ".opencode", "mcp", "onethy", files[0]), "utf8"))
+    assert.ok(Object.values(definitions.mcpServers).every(server =>
+      server.disabled === true && !("url" in server) && !("environment" in server)))
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("plugins are first-party descriptors without third-party executable code", async () => {
+  const root = await mkdtemp(join(tmpdir(), "onethy-plugin-only-"))
+  try {
+    const result = await syncOnethyCustomizations({ sourceDir: join(root, "nonexistent"), cwd: root, type: "plugins", install: true })
+    assert.equal(result.installed, 2)
+    const files = await readdir(join(root, ".opencode", "plugins", "onethy"))
+    assert.equal(files.length, 2)
+    for (const file of files) {
+      const descriptor = JSON.parse(await readFile(join(root, ".opencode", "plugins", "onethy", file), "utf8"))
+      assert.equal(descriptor.enabled, false)
+      assert.equal(descriptor.kind, "plugin")
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test("obsolete generated MCP templates are pruned but user-customized ones are preserved", async () => {
@@ -146,6 +166,41 @@ test("obsolete generated MCP templates are pruned but user-customized ones are p
     await assert.rejects(stat(generated))
     assert.equal((await stat(configured)).isFile(), true)
     assert.equal(await cleanupObsoleteGeneratedMCPs(root), 0)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("obsolete generated MCP imports are removed without touching user-managed configs", async () => {
+  const { cleanupGeneratedOnethyMCPs } = await import("../packages/cli/src/services/onethy-customizations-cleanup.mjs")
+  const root = await mkdtemp(join(tmpdir(), "onethy-mcp-generated-"))
+  try {
+    const folder = join(root, "mcp", "onethy")
+    await mkdir(folder, { recursive: true })
+    const generated = join(folder, "integration-memory-1234abcd.json")
+    const enabled = join(folder, "integration-user-1234abcd.json")
+    const modified = join(folder, "integration-private-1234abcd.json")
+    await writeFile(generated, JSON.stringify({ mcpServers: {
+      "onethy-integration-memory-1234abcd": {
+        disabled: true, type: "stdio", command: "npx", args: ["-y", "external-mcp"],
+      },
+    } }))
+    await writeFile(enabled, JSON.stringify({ mcpServers: {
+      "onethy-integration-user-1234abcd": {
+        disabled: false, type: "stdio", command: "npx", args: ["-y", "my-mcp"],
+      },
+    } }))
+    await writeFile(modified, JSON.stringify({ mcpServers: {
+      "onethy-integration-private-1234abcd": {
+        disabled: true, type: "stdio", command: "npx", args: ["-y", "my-mcp"], environment: { MY_SETTING: "configured" },
+      },
+    } }))
+    await writeFile(join(folder, "local-tools.json"), JSON.stringify({ mcpServers: { "onethy-time": { disabled: true } } }))
+    assert.equal(await cleanupGeneratedOnethyMCPs(root), 1)
+    await assert.rejects(stat(generated))
+    assert.ok((await stat(enabled)).isFile())
+    assert.ok((await stat(modified)).isFile())
+    assert.ok((await stat(join(folder, "local-tools.json"))).isFile())
   } finally {
     await rm(root, { recursive: true, force: true })
   }
