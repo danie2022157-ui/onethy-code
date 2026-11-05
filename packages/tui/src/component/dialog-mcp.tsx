@@ -27,6 +27,7 @@ function Status(props: { status: McpServer["status"]; loading: boolean }) {
   if (props.status.status === "connected") {
     return <span style={{ attributes: TextAttributes.BOLD }}>Connected ✓</span>
   }
+  if (props.status.status === "standby") return <>Standby · connects on use</>
   if (props.status.status === "failed") {
     return <>Failed !</>
   }

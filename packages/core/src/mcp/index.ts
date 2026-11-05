@@ -18,6 +18,7 @@ import { KeyedMutex } from "../effect/keyed-mutex.js"
 import { Location } from "../location.js"
 import { waitForAbort } from "@opencode/util/process"
 import { State } from "../state.js"
+import { MCP_POLICY, retryDelay, retryAllowed, canIdle, shouldHealthCheck } from "./lifecycle.js"
 import type { McpClient } from "./client.js"
 
 export const ServerName = Schema.String.pipe(Schema.brand("MCP.ServerName"))
@@ -87,6 +88,12 @@ type ServerEntry = {
   // Set when a remote server is registered as an OAuth integration; the credential lives in the global store.
   integrationID?: Integration.ID
   registration?: State.Registration
+  lastUsedAt?: number
+  lastHealthAt?: number
+  healthFailures?: number
+  activeCalls?: number
+  failures?: number
+  retryAt?: number
 }
 
 // A client-hosted MCP server attached over a connection the client opened. Internal: never listed,
@@ -428,6 +435,8 @@ export const layer = (options?: Options) =>
         connection.onClose((reason) =>
           live(
             Effect.gen(function* () {
+              entry.failures = (entry.failures ?? 0) + 1
+              entry.retryAt = Date.now() + retryDelay(entry.failures)
               entry.status = { status: "failed", error: reason }
               yield* stopServer(name, entry)
               yield* bus.publish(McpEvent.StatusChanged, { server: name })
@@ -481,6 +490,11 @@ export const layer = (options?: Options) =>
             entry.tools = result.value.tools.map((tool) => toTool(name, entry, tool))
             entry.prompts = []
             entry.status = { status: "connected" }
+            entry.lastUsedAt = Date.now()
+            entry.lastHealthAt = Date.now()
+            entry.healthFailures = 0
+            entry.failures = 0
+            entry.retryAt = undefined
             watch(name, entry, result.value.connection)
             yield* Effect.logInfo("mcp connected", { server: name, tools: entry.tools.length })
             // The tool registry reads on this event; a late-connecting server has no other way to appear.
@@ -497,6 +511,10 @@ export const layer = (options?: Options) =>
             error instanceof McpClient.NeedsAuthError
               ? { status: "needs_auth", error: error.message }
               : { status: "failed", error: error instanceof Error ? error.message : String(error) }
+          if (entry.status.status === "failed") {
+            entry.failures = (entry.failures ?? 0) + 1
+            entry.retryAt = Date.now() + retryDelay(entry.failures)
+          }
           yield* Effect.logWarning("mcp connect failed", { server: name, status: entry.status })
           yield* bus.publish(McpEvent.StatusChanged, { server: name })
         }).pipe(
@@ -504,17 +522,21 @@ export const layer = (options?: Options) =>
           Effect.annotateLogs({ server: name, directory: location.directory, connectionID: crypto.randomUUID() }),
         )
 
-      const stopServer = Effect.fnUntraced(function* (name: ServerName, entry: ServerEntry) {
+      const stopServer = Effect.fnUntraced(function* (name: ServerName, entry: ServerEntry, preserveCatalog = false) {
         const scope = entry.scope
         if (!scope) return
         entry.scope = undefined
         entry.client = undefined
-        entry.tools = undefined
-        entry.prompts = undefined
+        if (!preserveCatalog) {
+          entry.tools = undefined
+          entry.prompts = undefined
+        }
         yield* Scope.close(scope, Exit.void)
-        yield* bus.publish(McpEvent.ToolsChanged, { server: name })
-        yield* bus.publish(McpEvent.ResourcesChanged, { server: name })
-        yield* bus.publish(PromptsChanged, { server: name })
+        if (!preserveCatalog) {
+          yield* bus.publish(McpEvent.ToolsChanged, { server: name })
+          yield* bus.publish(McpEvent.ResourcesChanged, { server: name })
+          yield* bus.publish(PromptsChanged, { server: name })
+        }
       })
 
       const disposeServer = Effect.fnUntraced(function* (name: ServerName, entry: ServerEntry) {
@@ -753,6 +775,76 @@ export const layer = (options?: Options) =>
         notify: () => State.reconcile(root, fork, () => reconcileLock.withPermit(reconcile())),
       })
 
+      // A single per-location pool serves many sessions; it never moves data
+      // between session IDs. Shared MCP connections are not security sandboxes.
+      const wake = Effect.fnUntraced(function* (name: ServerName, entry: ServerEntry) {
+        if (entry.status.status !== "standby") return
+        yield* Effect.gen(function* () {
+          if (entries.get(name) !== entry || entry.status.status !== "standby") return
+          yield* startServer(name, entry)
+        }).pipe(locks.withLock(name))
+      })
+
+      const maintainOne = (name: ServerName, entry: ServerEntry, now: number) =>
+        Effect.gen(function* () {
+          // The status and entry identity must be rechecked after waiting for
+          // the per-server lock: config updates, manual disconnects and starts win.
+          if (entries.get(name) !== entry) return
+          if (entry.config.disabled || entry.status.status === "disabled" || entry.status.status === "needs_auth")
+            return
+          if (retryAllowed(entry, now, entry.status.status, Boolean(entry.config.disabled))) {
+            yield* startServer(name, entry)
+            return
+          }
+          if (canIdle(entry, now, entry.status.status, Boolean(entry.config.disabled))) {
+            // Retain only the catalog of tool definitions. Calls wake the owning
+            // connection on demand; the local subprocess is actually stopped.
+            yield* stopServer(name, entry, true)
+            entry.status = { status: "standby" }
+            yield* bus.publish(McpEvent.StatusChanged, { server: name })
+            return
+          }
+          if (!shouldHealthCheck(entry, now, entry.status.status)) return
+          const connection = entry.client
+          if (!connection) return
+          entry.lastHealthAt = now
+          const healthy = yield* connection.tools().pipe(
+            Effect.timeout(MCP_POLICY.healthTimeout),
+            Effect.exit,
+          )
+          if (Exit.isSuccess(healthy)) {
+            entry.healthFailures = 0
+            return
+          }
+          entry.healthFailures = (entry.healthFailures ?? 0) + 1
+          if (entry.healthFailures < 2) return
+          yield* stopServer(name, entry)
+          entry.failures = (entry.failures ?? 0) + 1
+          entry.retryAt = Date.now() + retryDelay(entry.failures)
+          entry.status = { status: "failed", error: "MCP health check failed twice. Automatic recovery scheduled." }
+          yield* bus.publish(McpEvent.StatusChanged, { server: name })
+        }).pipe(
+          locks.withLock(name),
+          Effect.catchCause((cause) =>
+            Effect.logWarning("MCP maintenance failed", { server: name, cause }).pipe(Effect.asVoid),
+          ),
+        )
+
+      // Explicitly opt out for non-Onethy OpenCode hosts; attached transports
+      // belong to their owners and are never swept or disconnected by this job.
+      if (process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1") {
+        yield* Stream.fromEffectRepeat(Effect.sleep(MCP_POLICY.tickMs + " millis")).pipe(
+          Stream.runForEach(() =>
+            Effect.forEach(
+              [...entries],
+              ([name, entry]) => maintainOne(name, entry, Date.now()),
+              { concurrency: 4, discard: true },
+            ),
+          ),
+          Effect.forkScoped({ startImmediately: true }),
+        )
+      }
+
       return Service.of({
         transform: state.transform,
         reload: state.reload,
@@ -833,15 +925,22 @@ export const layer = (options?: Options) =>
           }
           const target = yield* requireServer(server)
           yield* target.entry.startup.await
+          yield* wake(target.name, target.entry)
           if (!target.entry.client)
             return yield* new ToolCallError({
               server: target.name,
               tool: input.name,
               message: unavailable(target.name, target.entry.status),
             })
+          target.entry.lastUsedAt = Date.now()
+          target.entry.activeCalls = (target.entry.activeCalls ?? 0) + 1
           const result = yield* recovering(target.name, target.entry, target.entry.client, (connection) =>
             connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID }),
           ).pipe(
+            Effect.ensuring(Effect.sync(() => {
+              target.entry.activeCalls = Math.max(0, (target.entry.activeCalls ?? 1) - 1)
+              target.entry.lastUsedAt = Date.now()
+            })),
             Effect.mapError(
               (error) =>
                 new ToolCallError({
@@ -870,6 +969,8 @@ export const layer = (options?: Options) =>
         prompt: Effect.fn("MCP.prompt")(function* (input) {
           const target = yield* requireServer(ServerName.make(input.server))
           yield* target.entry.startup.await
+          yield* wake(target.name, target.entry)
+          target.entry.lastUsedAt = Date.now()
           if (!target.entry.client) return undefined
           const result = yield* recovering(target.name, target.entry, target.entry.client, (connection) =>
             connection.prompt({ name: input.name, args: input.args }),
@@ -882,9 +983,12 @@ export const layer = (options?: Options) =>
           const catalogs = yield* Effect.forEach(
             Array.from(entries),
             ([name, entry]) =>
-              entry.client
-                ? loadCatalog(name, entry, entry.client).pipe(Effect.orElseSucceed(() => empty))
-                : Effect.succeed(empty),
+              Effect.gen(function* () {
+                yield* wake(name, entry)
+                if (!entry.client) return empty
+                entry.lastUsedAt = Date.now()
+                return yield* loadCatalog(name, entry, entry.client).pipe(Effect.orElseSucceed(() => empty))
+              }),
             { concurrency: "unbounded" },
           )
           return mergeCatalogs(catalogs)
@@ -892,12 +996,16 @@ export const layer = (options?: Options) =>
         resources: Effect.fn("MCP.resources")(function* (input) {
           const target = yield* requireServer(ServerName.make(input.server))
           yield* target.entry.startup.await
+          yield* wake(target.name, target.entry)
+          target.entry.lastUsedAt = Date.now()
           if (!target.entry.client) return ResourceCatalog.make({ resources: [], templates: [] })
           return mergeCatalogs([yield* loadCatalog(target.name, target.entry, target.entry.client)])
         }),
         readResource: Effect.fn("MCP.readResource")(function* (input) {
           const target = yield* requireServer(ServerName.make(input.server))
           yield* target.entry.startup.await
+          yield* wake(target.name, target.entry)
+          target.entry.lastUsedAt = Date.now()
           if (!target.entry.client) return undefined
           const result = yield* recovering(target.name, target.entry, target.entry.client, (connection) =>
             connection.readResource({ uri: input.uri }),
