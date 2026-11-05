@@ -43,7 +43,7 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
     await assert.rejects(stat(join(cwd, ".opencode")))
     const first = await syncOnethyCustomizations({ sourceDir, cwd, install: true })
     assert.equal(first.installed, 9)
-    assert.ok(first.pending >= 1)
+    assert.equal(first.pending, 0)
 
     const config = join(cwd, ".opencode")
     assert.equal(await readFile(join(config, "skills/development-example/extra.txt"), "utf8"), "supporting local asset")
