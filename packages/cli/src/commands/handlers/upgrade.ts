@@ -37,12 +37,29 @@ export default Runtime.handler(
           if (!bun || !fs.existsSync(bun)) throw new Error("Bun executable not found; update cancelled.")
           const result = git("pull", "--ff-only", "origin", "main")
           execFileSync(bun, ["install", "--frozen-lockfile"], { cwd: root, timeout: 180000, stdio: "pipe" })
-          return result
+          // Native AITmpl personalizations are imported automatically after the
+          // existing update. No new slash or terminal commands are added.
+          // Third-party hooks, MCPs and plugins remain disabled until reviewed.
+          try {
+            const { syncAITmpl } = await import("../../services/aitmpl-native.mjs")
+            const synced = await syncAITmpl({
+              install: true,
+              global: true,
+              globalDir: process.env.OPENCODE_CONFIG_DIR || process.env.OMNICODE_CONFIG_DIR,
+            })
+            return { result, personalizations: synced.installed, pending: synced.pending }
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error)
+            return { result, personalizations: 0, pending: 0, personalizationError: detail }
+          }
         }).pipe(Effect.option)
 
         if (Option.isSome(pullResult)) {
           s.stop("✓ OnethyCode atualizado!")
-          log.success(pullResult.value.trim())
+          log.success(pullResult.value.result.trim())
+          log.info(`Personalizações nativas importadas: ${pullResult.value.personalizations}`)
+          if ("personalizationError" in pullResult.value) log.warn(`Personalizações não importadas: ${pullResult.value.personalizationError}`)
+          if (pullResult.value.pending) log.info("Integrações externas do catálogo foram inventariadas, sem ativação automática.")
         } else {
           s.stop("Falha ao atualizar via git.")
           log.warn("Atualização recusada ou falhou. Verifique a instalação oficial, alterações locais e conectividade.")
