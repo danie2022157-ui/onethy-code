@@ -1,0 +1,64 @@
+name: OnethyCode native personalization tests
+on:
+  pull_request:
+    paths:
+      - 'packages/cli/src/services/onethy-customizations.*'
+      - 'packages/cli/src/services/onethy-customization-mcp.mjs'
+      - 'packages/cli/src/services/onethy-customizations-cleanup.mjs'
+      - 'packages/cli/src/services/onethy-customizations-agent.mjs'
+      - 'packages/cli/src/services/onethy-customizations-command.mjs'
+      - 'packages/cli/src/services/onethy-customizations-descriptors.mjs'
+      - 'packages/core/src/config/plugin/onethy-customization.ts'
+      - 'packages/core/src/plugin/internal.ts'
+      - 'package.json'
+      - 'script/onethy-customizations-bootstrap.mjs'
+      - 'script/onethy-customizations.test.mjs'
+      - '.github/workflows/onethy-customizations.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/cli/src/services/onethy-customizations.*'
+      - 'packages/cli/src/services/onethy-customization-mcp.mjs'
+      - 'packages/cli/src/services/onethy-customizations-agent.mjs'
+      - 'packages/cli/src/services/onethy-customizations-command.mjs'
+      - 'packages/cli/src/services/onethy-customizations-descriptors.mjs'
+      - 'packages/core/src/config/plugin/onethy-customization.ts'
+      - 'packages/core/src/plugin/internal.ts'
+      - 'package.json'
+      - 'script/onethy-customizations-bootstrap.mjs'
+      - 'script/onethy-customizations.test.mjs'
+      - '.github/workflows/onethy-customizations.yml'
+jobs:
+  personalization-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check packages/cli/src/services/onethy-customizations.mjs
+      - run: node --check packages/cli/src/services/onethy-customization-mcp.mjs
+      - run: node --check packages/cli/src/services/onethy-customizations-cleanup.mjs
+      - run: node --check packages/cli/src/services/onethy-customizations-agent.mjs
+      - run: node --check packages/cli/src/services/onethy-customizations-command.mjs
+      - run: node --check packages/cli/src/services/onethy-customizations-descriptors.mjs
+      - run: node --check script/onethy-customizations-bootstrap.mjs
+      - run: node --test script/onethy-customizations.test.mjs
+      - name: Verify real catalog import preview (no writes)
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { syncOnethyCustomizations } from './packages/cli/src/services/onethy-customizations.mjs'
+          const report = await syncOnethyCustomizations({ type: 'commands' })
+          if (report.ready < 1 || report.errors.length) {
+            throw new Error('Live OnethyCode command templates were not discovered')
+          }
+          console.log('Native personalization catalog preview verified:', report.ready, 'command templates')
+          NODE
