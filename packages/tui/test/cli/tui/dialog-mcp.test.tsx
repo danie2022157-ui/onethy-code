@@ -99,7 +99,7 @@ test("OnethyCode MCP dialog exposes persistent shortcuts and deletes only select
     expect(second.mcp.overrides.linear).toBe(false)
 
     fixture.app.mockInput.pressKey("x", { ctrl: true })
-    await fixture.app.waitForFrame(frame => frame.includes("Excluir linear?"))
+    await fixture.app.waitForFrame(frame => frame.includes("Delete linear?"))
     fixture.app.mockInput.pressArrow("down")
     fixture.app.mockInput.pressEnter()
     await eventually(async () => JSON.parse(await readFile(configuration, "utf8")).mcp.servers?.linear === undefined)
