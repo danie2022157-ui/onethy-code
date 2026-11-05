@@ -4,6 +4,8 @@
  * It must run on the same desktop as the application being controlled.
  */
 import { spawn } from "node:child_process"
+import fs from "node:fs"
+import path from "node:path"
 
 export const actions = [
   "status", "permissions", "version", "list-apps", "list-windows", "list-displays", "list-surfaces",
@@ -163,6 +165,31 @@ export function buildDesktopInvocation(input: DesktopRequest): DesktopInvocation
   }
 }
 
+/** The npm Windows shim is .cmd; spawn the verified native .exe instead of a shell. */
+export function resolveDesktopBinary(env: NodeJS.ProcessEnv = process.env, platform = process.platform, arch = process.arch): string {
+  if (env.ONETHY_AGENT_DESKTOP_BIN) return env.ONETHY_AGENT_DESKTOP_BIN
+  if (platform !== "win32") return "agent-desktop"
+  const executable = "agent-desktop-win32-" + arch + ".exe"
+  const roots = [
+    ...(env.APPDATA ? [path.join(env.APPDATA, "npm")] : []),
+    ...((env.PATH ?? env.Path ?? "").split(path.delimiter).filter(Boolean)),
+  ]
+  for (const root of roots) {
+    for (const candidate of [
+      path.join(root, "node_modules", "agent-desktop", "bin", executable),
+      path.join(root, executable),
+      path.join(root, "agent-desktop.exe"),
+    ]) {
+      try {
+        if (fs.statSync(candidate).isFile()) return candidate
+      } catch {
+        // Try the next known location. Do not invoke a .cmd shim from an agent.
+      }
+    }
+  }
+  return "agent-desktop"
+}
+
 const MAX_STDOUT = 128 * 1024
 const MAX_STDERR = 8 * 1024
 
@@ -171,7 +198,7 @@ export function runAgentDesktop(invocation: DesktopInvocation, options?: {
   binary?: string
   timeoutMs?: number
 }): Promise<DesktopResult> {
-  const binary = options?.binary ?? process.env.ONETHY_AGENT_DESKTOP_BIN ?? "agent-desktop"
+  const binary = options?.binary ?? resolveDesktopBinary()
   const timeoutMs = options?.timeoutMs ?? 25_000
   return new Promise((resolve, reject) => {
     let stdout = ""
