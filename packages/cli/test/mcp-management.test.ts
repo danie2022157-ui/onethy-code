@@ -68,6 +68,6 @@ test("removing manual MCP preserves other servers and JSONC comments", async () 
     expect(parsed.mcp.servers["my-two"]).toBeDefined()
     expect(parsed.mcp.overrides["my-two"]).toBe(false)
     await expect(manageMcp({ action: "remove", name: "my-one", cwd, globalRoot }))
-      .rejects.toThrow("não encontrado")
+      .rejects.toThrow("not found")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
