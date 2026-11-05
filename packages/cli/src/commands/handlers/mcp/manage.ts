@@ -11,12 +11,12 @@ export default Runtime.handler(
   Commands.commands.mcp.commands.manage,
   Effect.fn("cli.mcp.manage")((input) =>
     Effect.gen(function* () {
-      yield* requireInteractive("O menu MCP requer um terminal interativo. Use 'onethy mcp list' ou os comandos enable/disable/remove/restore.")
-      intro("OnethyCode • Gerenciamento de MCPs")
+      yield* requireInteractive("The MCP manager requires an interactive terminal. Use 'onethy mcp list' or the enable/disable/remove/restore commands.")
+      intro("OnethyCode • MCP Manager")
       const global = yield* Global.Service
       const items = yield* Effect.promise(() => managedMcpList(process.cwd(), global.config))
       const name = yield* prompt<string>(() => select({
-        message: "Qual MCP deseja gerenciar?",
+        message: "Which MCP server would you like to manage?",
         options: items.map(item => ({
           value: item.name,
           label: item.name,
