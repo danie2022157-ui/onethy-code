@@ -297,6 +297,16 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
             name: Argument.String("name").pipe(Argument.withDescription("Name of the MCP server"), Argument.optional),
           },
         }),
+        Spec.make("remove", {
+          description: "Remove an MCP server from the configuration",
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Name of the MCP server")),
+            global: Flag.Boolean("global").pipe(
+              Flag.withDescription("Write to the global config instead of the project config"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
         Spec.make("logout", {
           description: "Remove stored OAuth credentials for an MCP server",
           globalFlags: ServerFlags,
