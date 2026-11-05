@@ -1,81 +1,141 @@
 #!/usr/bin/env node
-/**
- * Synchronize file-based AITmpl customizations with the native OnethyCode config.
- * Requires Git. Never executes catalog components or overwrites user files.
- *
- * node script/aitmpl-sync.mjs                 # preview
- * node script/aitmpl-sync.mjs --install       # install compatible components
- * node script/aitmpl-sync.mjs --install --type skills
- * node script/aitmpl-sync.mjs --install --global
- */
+// AITmpl -> OnethyCode native file-based personalization importer.
+// Safe by default: dry-run, no script execution, no overwrites, no credentials.
 import { mkdtemp, readdir, mkdir, copyFile, lstat, readFile, writeFile, rm } from "node:fs/promises"
 import { tmpdir, homedir } from "node:os"
-import { join, relative, resolve, dirname, sep } from "node:path"
+import { join, relative, resolve, dirname, basename, extname, sep } from "node:path"
 import { spawnSync } from "node:child_process"
 
-const SOURCE = "https://github.com/davila7/claude-code-templates.git"
-const TYPES = ["skills", "agents", "commands"]
+const CATALOG = "https://github.com/davila7/claude-code-templates.git"
+const allowed = ["skills", "agents", "commands", "settings", "hooks", "mcps", "plugins", "mods", "loops"]
 const args = process.argv.slice(2)
+const option = (flag) => { const i = args.indexOf(flag); return i < 0 ? undefined : args[i + 1] }
 const install = args.includes("--install")
-const global = args.includes("--global")
-const selected = args.includes("--type") ? args[args.indexOf("--type") + 1] : "all"
-if (selected !== "all" && !TYPES.includes(selected)) {
-  console.error("Invalid --type. Use skills, agents, commands or all.")
+const verify = args.includes("--verify")
+const chosen = option("--type") || "all"
+const sourceDir = option("--source-dir")
+if (chosen !== "all" && !allowed.includes(chosen)) {
+  console.error("Unknown --type: " + chosen)
   process.exit(2)
 }
-const types = selected === "all" ? TYPES : [selected]
-const target = global ? join(homedir(), ".config", "opencode") : resolve(".opencode")
-const temporary = await mkdtemp(join(tmpdir(), "onethy-aitmpl-"))
-const source = join(temporary, "catalog")
-const report = { source: SOURCE, target, mode: install ? "install" : "preview", scanned: 0, copied: 0, existing: 0, ignored: 0, errors: [] }
+const kinds = chosen === "all" ? allowed : [chosen]
+const destination = args.includes("--global") ? join(homedir(), ".config", "opencode") : resolve(".opencode")
+const report = { mode: verify ? "verify" : install ? "install" : "preview", target: destination, ready: 0, installed: 0, existing: 0, rejected: 0, pending: 0, errors: [], components: {} }
+const staging = sourceDir ? undefined : await mkdtemp(join(tmpdir(), "onethy-aitmpl-"))
+const source = sourceDir ? resolve(sourceDir) : join(staging, "catalog")
 
 function git(...argv) {
-  const result = spawnSync("git", argv, { encoding: "utf8", timeout: 180000, maxBuffer: 1024 * 1024 * 8 })
-  if (result.error || result.status !== 0) throw new Error(result.error?.message ?? result.stderr?.trim() ?? "git failed")
+  const p = spawnSync("git", argv, { encoding: "utf8", timeout: 240000, maxBuffer: 10_000_000 })
+  if (p.error || p.status !== 0) throw new Error(p.error?.message || p.stderr?.trim() || "git failed")
 }
-async function* walk(directory) {
+async function* traverse(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name)
-    // Skip symlinks and special entries from downloaded content.
-    if (entry.isDirectory()) yield* walk(path)
-    else if (entry.isFile()) yield path
+    const f = join(directory, entry.name)
+    if (entry.isDirectory() && entry.name !== ".git" && entry.name !== "node_modules") yield* traverse(f)
+    else if (entry.isFile()) yield f // no symlinks
   }
 }
-function validPath(root, file) {
-  const r = relative(root, file)
-  return r && r !== ".." && !r.startsWith(".." + sep) && !resolve(file).includes("\0")
+const exists = async (path) => { try { await lstat(path); return true } catch (e) { if (e.code === "ENOENT") return false; throw e } }
+const slug = (s) => s.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase()
+const inside = (root, file) => { const p = relative(root, file); return p && p !== ".." && !p.startsWith(".." + sep) && !p.startsWith(sep) }
+const toolkit = { Read: "read", Write: "write", Edit: "edit", Bash: "bash", Glob: "glob", Grep: "grep", WebFetch: "webfetch", WebSearch: "websearch", Task: "task", NotebookEdit: "edit" }
+function convertMarkdown(contents, kind, name) {
+  if (!contents.startsWith("---\n")) return { body: contents, warning: "Missing YAML frontmatter" }
+  const end = contents.indexOf("\n---\n", 4)
+  if (end < 0) return { body: contents, warning: "Invalid YAML frontmatter" }
+  const header = contents.slice(4, end)
+  const body = contents.slice(end + 5)
+  // Do not use a YAML parser on untrusted source. Modify only the known tools field.
+  const line = header.match(/^tools:\s*(.+)$/m)
+  let updated = header
+  let warning
+  if (line) {
+    let unknown = []
+    const converted = line[1].split(",").map(x => x.trim()).filter(Boolean).map(x => {
+      const val = toolkit[x]
+      if (!val) unknown.push(x)
+      return val
+    }).filter(Boolean)
+    updated = header.replace(/^tools:.*$/m, "tools:\n" + [...new Set(converted)].map(x => "  " + x + ": true").join("\n"))
+    if (unknown.length) warning = "Unknown tool names: " + unknown.join(", ")
+  }
+  if (!/^name:\s*/m.test(updated)) updated = "name: " + name + "\n" + updated
+  if (!/^description:\s*/m.test(updated) && kind !== "skills") {
+    updated = 'description: "Imported AITmpl ' + kind + ' component"\n' + updated
+  }
+  if (/\b(?:mcp__|context-manager|claude -p|Claude Code CLI)\b/i.test(body))
+    warning = [warning, "Runtime-specific references may require manual changes"].filter(Boolean).join("; ")
+  return { body: "---\n" + updated + "\n---\n" + body, warning }
+}
+async function record(type, name, sourceFile, out, convert) {
+  const base = join(destination, type)
+  if (!inside(base, out)) { report.rejected++; return }
+  if (await exists(out)) { report.existing++; return }
+  const input = convert ? await readFile(sourceFile, "utf8") : undefined
+  const result = convert ? convertMarkdown(input, type, name) : undefined
+  if (result?.warning) {
+    report.components[type].warnings.push({ name, warning: result.warning })
+  }
+  report.ready++
+  if (!install || verify) return
+  await mkdir(dirname(out), { recursive: true })
+  try {
+    if (convert) await writeFile(out, result.body, { flag: "wx" })
+    else await copyFile(sourceFile, out, 1)
+    report.installed++
+  } catch (e) {
+    if (e.code === "EEXIST") report.existing++
+    else throw e
+  }
 }
 try {
-  git("clone", "--depth", "1", "--filter=blob:none", "--sparse", SOURCE, source)
-  git("-C", source, "sparse-checkout", "set", ...types.map((t) => "cli-tool/components/" + t))
-  for (const type of types) {
+  if (!sourceDir) {
+    git("clone", "--depth", "1", "--filter=blob:none", "--sparse", CATALOG, source)
+    git("-C", source, "sparse-checkout", "set", ...kinds.map(t => "cli-tool/components/" + (t === "mcps" ? "mcps" : t)))
+  }
+  for (const type of kinds) {
     const root = join(source, "cli-tool", "components", type)
-    let found = 0
-    try { await lstat(root) } catch { report.errors.push("Missing source directory: " + type); continue }
-    for await (const file of walk(root)) {
-      if (!validPath(root, file)) continue
-      const rel = relative(root, file)
-      const extension = file.split(".").pop()?.toLowerCase()
-      // Agents and commands in native OpenCode format are Markdown definitions.
-      if (type !== "skills" && extension !== "md") { report.ignored++; continue }
-      if (type === "skills" && /(^|[\\/])(?:node_modules|\.git)([\\/]|$)/.test(rel)) { report.ignored++; continue }
-      const dest = join(target, type, rel)
-      if (!validPath(join(target, type), dest)) { report.ignored++; continue }
-      report.scanned++; found++
-      try { await lstat(dest); report.existing++; continue } catch (e) { if (e.code !== "ENOENT") throw e }
-      if (install) {
-        await mkdir(dirname(dest), { recursive: true })
-        await copyFile(file, dest, 1 /* COPYFILE_EXCL */)
-        report.copied++
-      }
+    report.components[type] = { files: 0, warnings: [] }
+    if (!(await exists(root))) { report.components[type].missing = true; continue }
+    // Dangerous or Claude-runtime specific categories need explicit adapters; inventory only.
+    if (!["skills", "agents", "commands"].includes(type)) {
+      for await (const file of traverse(root)) report.components[type].files++
+      report.pending += report.components[type].files
+      continue
     }
-    console.log(type + ": " + found + " compatible files examined")
+    if (type === "skills") {
+      // Flatten category/name into a stable native name; include all skill assets.
+      const categories = await readdir(root, { withFileTypes: true })
+      for (const category of categories.filter(x => x.isDirectory())) {
+        const folders = await readdir(join(root, category.name), { withFileTypes: true })
+        for (const folder of folders.filter(x => x.isDirectory())) {
+          const skillDir = join(root, category.name, folder.name)
+          if (!(await exists(join(skillDir, "SKILL.md")))) continue
+          const name = slug(category.name + "-" + folder.name)
+          for await (const file of traverse(skillDir)) {
+            const rel = relative(skillDir, file)
+            const out = join(destination, "skills", name, rel)
+            report.components[type].files++
+            await record(type, name, file, out, basename(file) === "SKILL.md")
+          }
+        }
+      }
+      continue
+    }
+    for await (const file of traverse(root)) {
+      if (extname(file).toLowerCase() !== ".md") continue
+      const name = slug(relative(root, file).slice(0, -3).split(sep).join("-"))
+      const out = join(destination, type, name + ".md")
+      report.components[type].files++
+      await record(type, name, file, out, true)
+    }
   }
   console.log(JSON.stringify(report, null, 2))
-  console.log("Note: MCPs, hooks, settings, plugins, mods and loops need Onethy-specific adapters; none are executed or activated by this importer.")
-} catch (error) {
-  console.error("AITmpl import failed:", error.message)
+  if (report.pending) console.log("NOTE: settings/hooks/MCP/plugins/mods/loops inventoried, not activated; each needs runtime-specific adaptation.")
+  if (report.errors.length) process.exitCode = 1
+} catch (e) {
+  console.error("AITmpl sync failed:", e.message)
   process.exitCode = 1
 } finally {
-  await rm(temporary, { recursive: true, force: true })
+  if (staging) await rm(staging, { recursive: true, force: true })
 }
