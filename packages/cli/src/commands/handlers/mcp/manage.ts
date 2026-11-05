@@ -41,10 +41,11 @@ export default Runtime.handler(
         message: "O que deseja fazer?",
         options: actions,
       }))
+      const actionGlobal = input.global || ((action === "remove" || action === "restore") && item.location === "global")
       if (action === "remove" || action === "restore") {
         const ok = yield* confirmAction(
           action === "remove"
-            ? `Excluir MCP "${name}" da configuração ${input.global ? "global" : "do projeto"}?`
+            ? `Excluir MCP "${name}" da configuração ${actionGlobal ? "global" : "do projeto"}?`
             : `Restaurar configuração original de "${name}" e redefinir sua autorização nesse escopo?`,
           false,
         )
@@ -53,7 +54,7 @@ export default Runtime.handler(
           return
         }
       }
-      yield* perform({ action, name, global: input.global })
+      yield* perform({ action, name, global: actionGlobal })
       outro("Configuração salva. Confira a conexão com: onethy mcp doctor")
     }).pipe(handlePromptErrors),
   ),
