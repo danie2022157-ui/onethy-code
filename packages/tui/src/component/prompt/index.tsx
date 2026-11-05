@@ -1741,7 +1741,7 @@ export function Prompt(props: PromptProps) {
                           when={!failed()}
                           fallback={
                             <box width="100%" height="100%" alignItems="center" justifyContent="center">
-                              <text fg={theme.text.muted}>Sem prévia</text>
+                              <text fg={theme.text.muted}>No preview</text>
                             </box>
                           }
                         >
