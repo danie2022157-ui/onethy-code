@@ -1141,7 +1141,7 @@ function App() {
               suggested: true,
               slash: { name: "keep", aliases: ["accept"] },
               run: () => {
-                ReviewBarSignals.dismiss(route.data.type === "session" ? route.data.sessionID : undefined)
+                if (route.data.type === "session") ReviewBarSignals.dismiss(route.data.sessionID)
               },
             },
             {
