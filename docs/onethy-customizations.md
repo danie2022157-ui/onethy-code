@@ -11,19 +11,21 @@ O OnethyCode disponibiliza um catálogo de personalizações **interno à experi
 | Comandos personalizados | Arquivos `commands/*.md` | A interpolação de shell de templates externos é removida; os comandos só rodam quando invocados |
 | Hooks | Descritores em `hooks/onethy/*.json` | Não executam scripts externos; apenas adaptadores internos suportados podem ser habilitados |
 | Mods | Descritores em `mods/onethy/*.json` | Não executam código externo; adaptadores internos ficam desativados até habilitação explícita |
-| MCPs | Descoberta nativa em `mcp/onethy/*.json` | Apenas modelos locais selecionados, sem cadastro ou chave de provedor; todos começam desativados |
+| MCPs | Arquivo nativo `mcp/onethy/local-tools.json` | Exatamente três modelos locais: navegador, raciocínio e horário; desativados por padrão |
 
 ## Preferência por MCPs locais
 
-A importação aceita apenas MCPs locais selecionados. Também inclui três modelos desativados por padrão: Playwright (navegador), Sequential Thinking (raciocínio) e Time (fusos horários). Os modelos são rejeitados quando têm:
+O OnethyCode fornece somente três modelos próprios desativados por padrão: Playwright (navegador), Sequential Thinking (raciocínio) e Time (fusos horários). **Não importa mais definições MCP de catálogos externos** — independentemente de exigirem ou não uma chave de API.
 
-- URLs para serviços MCP hospedados, credenciais, login, OAuth, cabeçalhos de autorização ou variáveis de ambiente usadas para autenticação;
-- pacotes fora da lista restrita, scripts de shell, argumentos arbitrários e parâmetros com tokens;
-- indicação de conta em provedor externo.
+Durante a atualização são retirados os arquivos MCP gerados pela importação anterior quando ainda desativados e intactos. Não são apagados MCPs configurados, habilitados ou modificados pelo usuário.
 
 Pacotes locais executados com `npx` ou `uvx` podem precisar de internet **na instalação do pacote**, mas não dependem de uma chave de API de provedor para funcionar. Nenhum MCP importado é executado ou habilitado automaticamente.
 
-O importador também faz a limpeza de definições MCP antigas geradas automaticamente, quando **ainda desativadas e não personalizadas**. MCPs cadastrados ou habilitados pelo usuário são preservados.
+Os modelos usam serviços locais, não precisam de login ou chave de API de provedor, mas a primeira instalação dos pacotes pode exigir internet.
+
+## Plugins nativos
+
+Existem dois plugins do próprio OnethyCode em `plugins/onethy/`: **Proteção de arquivos sensíveis** (bloqueia o uso de arquivos `.env`, chaves e certificados quando ativado) e **Preferência por ferramentas locais** (inclui orientação na sessão para priorizar ferramentas do computador). São adaptadores internos reais, sem execução de JavaScript de plugins de terceiros. Ficam desativados inicialmente e podem ser habilitados no descritor JSON com `enabled: true`, mantendo a decisão com o usuário.
 
 ## Hooks e mods nativos
 
@@ -37,6 +39,6 @@ A sincronização é integrada ao processo de instalação/atualização da dist
 
 ## Verificação
 
-Os testes automatizados cobrem Windows e Linux, prévia sem gravação, importação idempotente, rejeição de MCPs que exigem autenticação, preservação de configurações pessoais, remoção segura de registros antigos e importação segura de comandos, hooks e mods.
+Os testes automatizados cobrem Windows e Linux, prévia sem gravação, importação idempotente, rejeição de MCPs que exigem autenticação, preservação de configurações pessoais, remoção segura de registros antigos, somente três MCPs nativos e adaptadores internos de plugins, além da importação segura de comandos, hooks e mods.
 
 A aprovação desses testes não garante que todos os componentes do catálogo funcionem em todo ambiente: scripts, permissões e dependências precisam ser avaliados caso a caso.

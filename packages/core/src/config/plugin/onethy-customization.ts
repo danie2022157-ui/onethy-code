@@ -1,6 +1,7 @@
 export * as OnethyCustomizationPlugin from "./onethy-customization.js"
 
 import path from "node:path"
+import { SystemPart } from "@opencode/ai/effect"
 import { readdir, readFile, lstat } from "node:fs/promises"
 import { define } from "@opencode/plugin/effect/plugin"
 import { Effect, Stream } from "effect"
@@ -18,7 +19,7 @@ type Descriptor = {
   readonly kind?: string
 }
 
-async function readEnabled(root: string, kind: "hooks" | "mods") {
+async function readEnabled(root: string, kind: "hooks" | "mods" | "plugins") {
   const directory = path.join(root, kind, "onethy")
   const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return []
@@ -33,11 +34,14 @@ async function readEnabled(root: string, kind: "hooks" | "mods") {
       const content = await readFile(filepath, "utf8")
       if (content.length > 12_000) continue
       const value: Descriptor = JSON.parse(content)
-      if (value?.enabled !== true || value.kind !== (kind === "hooks" ? "hook" : "mod")) continue
+      if (value?.enabled !== true || value.kind !== (kind === "hooks" ? "hook" : kind === "mods" ? "mod" : "plugin")) continue
       if (kind === "hooks" && ["protected-push", "conventional-commits"].includes(value.implementation ?? "")) {
         active.add(value.implementation!)
       }
       if (kind === "mods" && value.implementation === "secret-redactor") active.add("secret-redactor")
+      if (kind === "plugins" && ["local-sensitive-file-guard", "local-tool-preference"].includes(value.implementation ?? "")) {
+        active.add(value.implementation!)
+      }
     } catch {
       // Invalid or incomplete third-party metadata is ignored, not executed.
     }
@@ -76,16 +80,19 @@ export const Plugin = define({
     const global = yield* Global.Service
     const location = yield* Location.Service
     const roots = [...new Set([global.config, path.join(location.project.directory, ".opencode")])]
-    const active = { hooks: new Set<string>(), mods: new Set<string>() }
+    const active = { hooks: new Set<string>(), mods: new Set<string>(), plugins: new Set<string>() }
     const refresh = Effect.promise(async () => {
       const hooks = new Set<string>()
       const mods = new Set<string>()
+      const plugins = new Set<string>()
       for (const root of roots) {
         for (const name of await readEnabled(root, "hooks")) hooks.add(name)
         for (const name of await readEnabled(root, "mods")) mods.add(name)
+        for (const name of await readEnabled(root, "plugins")) plugins.add(name)
       }
       active.hooks = hooks
       active.mods = mods
+      active.plugins = plugins
     }).pipe(Effect.catch((error) => Effect.logWarning("OnethyCode native descriptors unavailable", { error })))
     yield* refresh
     yield* ctx.event.subscribe({ types: ["config.updated"] }).pipe(
@@ -93,6 +100,20 @@ export const Plugin = define({
       Effect.forkScoped({ startImmediately: true }),
     )
     yield* ctx.permission.hook("evaluate", (event) => Effect.sync(() => {
+      if (active.plugins.has("local-sensitive-file-guard")) {
+        const sensitive = event.resources.some(resource => {
+          const name = resource.replaceAll(String.fromCharCode(92), "/").split("/").at(-1)?.toLowerCase() ?? ""
+          if ([".env.example", ".env.sample", ".env.template", ".env.dist"].includes(name)) return false
+          return name === ".env" || name.startsWith(".env.") ||
+            name === "id_rsa" || name === "id_ed25519" ||
+            name.endsWith(".pem") || name.endsWith(".key")
+        })
+        if (sensitive) {
+          event.effect = "deny"
+          event.message = "OnethyCode: arquivo de credenciais protegido pelo plugin local"
+          return
+        }
+      }
       if (event.action !== "bash" && event.action !== "shell") return
       for (const resource of event.resources) {
         const reason = hookViolation(resource, active.hooks)
@@ -101,6 +122,14 @@ export const Plugin = define({
         event.message = reason
         return
       }
+    }))
+    yield* ctx.session.hook("context", (event) => Effect.sync(() => {
+      if (!active.plugins.has("local-tool-preference")) return
+      event.system.push(SystemPart.make(
+        "OnethyCode local-first policy: prefer tools installed on this machine. " +
+        "Do not assume a service account or provider API key is available. " +
+        "Follow existing user permissions before accessing files or running commands."
+      ))
     }))
     yield* ctx.tool.hook("execute.after", (event) => Effect.sync(() => {
       if (event.status !== "completed" || !active.mods.has("secret-redactor")) return

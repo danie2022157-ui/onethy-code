@@ -3,8 +3,8 @@ on:
   pull_request:
     paths:
       - 'packages/cli/src/services/onethy-customizations.*'
-      - 'packages/cli/src/services/onethy-customization-mcp.mjs'
       - 'packages/cli/src/services/onethy-customizations-cleanup.mjs'
+      - 'packages/cli/src/services/onethy-customizations-local-plugins.mjs'
       - 'packages/cli/src/services/onethy-customizations-local-mcp.mjs'
       - 'packages/cli/src/services/onethy-customizations-agent.mjs'
       - 'packages/cli/src/services/onethy-customizations-command.mjs'
@@ -19,7 +19,6 @@ on:
     branches: [main]
     paths:
       - 'packages/cli/src/services/onethy-customizations.*'
-      - 'packages/cli/src/services/onethy-customization-mcp.mjs'
       - 'packages/cli/src/services/onethy-customizations-agent.mjs'
       - 'packages/cli/src/services/onethy-customizations-command.mjs'
       - 'packages/cli/src/services/onethy-customizations-descriptors.mjs'
@@ -45,8 +44,8 @@ jobs:
         with:
           node-version: '22'
       - run: node --check packages/cli/src/services/onethy-customizations.mjs
-      - run: node --check packages/cli/src/services/onethy-customization-mcp.mjs
       - run: node --check packages/cli/src/services/onethy-customizations-cleanup.mjs
+      - run: node --check packages/cli/src/services/onethy-customizations-local-plugins.mjs
       - run: node --check packages/cli/src/services/onethy-customizations-local-mcp.mjs
       - run: node --check packages/cli/src/services/onethy-customizations-agent.mjs
       - run: node --check packages/cli/src/services/onethy-customizations-command.mjs
