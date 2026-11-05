@@ -76,7 +76,6 @@ import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogAgent } from "./component/dialog-agent"
 import { DialogCustomizations } from "./component/dialog-customizations"
-import { DialogAutoCustomizations } from "./component/dialog-auto-customizations"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogOpen, DialogOpenKey, moveOpenSession } from "./component/dialog-open"
 import { SessionTabs } from "./component/session-tabs"
@@ -296,7 +295,9 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
             }),
         )
       })
-      renderer.setMaxListeners(15)
+      // TUI panels each listen for resize; 15 is below normal layout usage.
+      // Keep a bounded 64-listener budget instead of flooding the terminal with Node warnings.
+      renderer.setMaxListeners(64)
       const clipboard = yield* Effect.acquireRelease(
         Effect.sync(() => createTuiClipboard(renderer)),
         (clipboard) =>
@@ -1084,17 +1085,6 @@ function App() {
               slash: { name: "commands", aliases: ["loops"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="commands" />)
-              },
-            },
-            {
-              name: "omnicode.auto_customizations",
-              title: "Auto-Resource Management (Skills, Agents, MCPs, Hooks, Mods & Settings)",
-              description: "Configure which customizations the AI automatically activates per task",
-              category: "OmniCode",
-              suggested: true,
-              slash: { name: "auto-customizations", aliases: ["customizations-auto", "auto-skills"] },
-              run: () => {
-                dialog.replace(() => <DialogAutoCustomizations />)
               },
             },
             {
