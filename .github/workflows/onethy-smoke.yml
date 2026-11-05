@@ -93,7 +93,7 @@ jobs:
         run: bun --cwd packages/core test test/tool-subagent.test.ts
 
       - name: TUI regression tests
-        run: bun --cwd packages/tui test test/cli/tui/dialog-mcp.test.tsx test/cli/tui/plugins-dialog.test.tsx test/component/dialog-omni-update.test.tsx test/component/dialog-memory-bank.test.tsx test/util/onethy-update.test.ts test/util/onethy-projects.test.ts test/component/dialog-projects.test.tsx
+        run: bun --cwd packages/tui test test/cli/tui/dialog-mcp.test.tsx test/cli/tui/plugins-dialog.test.tsx test/component/dialog-omni-update.test.tsx test/component/dialog-memory-bank.test.tsx test/util/onethy-update.test.ts test/util/onethy-projects.test.ts test/util/mcp-diagnostics.test.ts test/component/dialog-projects.test.tsx
 
       - name: Core TypeScript check
         if: runner.os == 'Linux'
