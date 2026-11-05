@@ -8,6 +8,7 @@ import { useTheme } from "../context/theme"
 import { useToast } from "../ui/toast"
 import { DialogMcp } from "./dialog-mcp"
 import { DialogAutoCustomizations } from "./dialog-auto-customizations"
+import { DialogAitmpl } from "./dialog-aitmpl"
 
 export type CustomizationFilter =
   | "all"
@@ -52,6 +53,17 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
         description: `Status: ${local.customizations.summary()} · Choose which skills, agents, MCPs, hooks and mods the AI uses automatically`,
         category: "⚡ Auto-Orchestration",
         footer: "[Configure]",
+      })
+    }
+
+    if (filter === "all") {
+      items.push({
+        id: "cfg:aitmpl",
+        kind: "setting",
+        title: "📚 AI Templates — Catálogo de componentes (revisão)",
+        description: "Consultar templates offline; baixar arquivos verificados sem ativá-los",
+        category: "Catálogos adicionais",
+        footer: "[Abrir catálogo]",
       })
     }
 
@@ -193,6 +205,10 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
             if (!found) return
             if (found.id === "cfg:auto-customizations") {
               dialog.replace(() => <DialogAutoCustomizations />)
+              return
+            }
+            if (found.id === "cfg:aitmpl") {
+              dialog.replace(() => <DialogAitmpl />)
               return
             }
             if (found.kind === "agent") {
