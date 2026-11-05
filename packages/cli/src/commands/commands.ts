@@ -12,14 +12,14 @@ export const PrintLogs = GlobalFlag.Setting("print-logs")({
 
 export const Standalone = GlobalFlag.Setting("standalone")({
   flag: Flag.Boolean("standalone").pipe(
-    Flag.withDescription("Executar com servidor privado em vez do serviço em segundo plano"),
+    Flag.withDescription("Run with a private server instead of the background service"),
     Flag.withDefault(false),
   ),
 })
 
 export const Server = GlobalFlag.Setting("server")({
   flag: Flag.String("server").pipe(
-    Flag.withDescription("Conectar a uma URL de servidor em vez do serviço em segundo plano"),
+    Flag.withDescription("Connect to a server URL instead of the background service"),
     Flag.optional,
   ),
 })
@@ -35,7 +35,7 @@ const ServerParams = {
 
 const PermissionParams = {
   auto: Flag.Boolean("auto").pipe(
-    Flag.withDescription("Aprovar automaticamente permissões que não foram explicitamente negadas"),
+    Flag.withDescription("Automatically approve permissions that were not explicitly denied"),
     Flag.withDefault(false),
   ),
   yolo: Flag.Boolean("yolo").pipe(Flag.withDefault(false), Flag.withHidden),
@@ -47,29 +47,29 @@ const PermissionParams = {
 
 const isOmni = process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1";
 const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME : (isOmni ? "onethy" : "opencode"), {
-  description: "Interface de linha de comando do OnethyCode",
+  description: "OnethyCode command-line interface",
   params: {
     ...ServerParams,
     ...PermissionParams,
     directory: Argument.String("directory").pipe(
-      Argument.withDescription("Diretório para iniciar o OnethyCode"),
+      Argument.withDescription("Directory in which to start OnethyCode"),
       Argument.optional,
     ),
     continue: Flag.Boolean("continue").pipe(
       Flag.withAlias("c"),
-      Flag.withDescription("Continuar a última sessão"),
+      Flag.withDescription("Continue the previous session"),
       Flag.withDefault(false),
     ),
     session: Flag.String("session").pipe(
       Flag.withAlias("s"),
-      Flag.withDescription("ID da sessão para continuar, ou criar caso não exista"),
+      Flag.withDescription("Session ID to continue, or create if it does not exist"),
       Flag.optional,
     ),
     prompt: Flag.String("prompt").pipe(Flag.withDescription("Prompt a ser executado"), Flag.optional),
   },
   commands: [
     Spec.make("upgrade", {
-      description: "Atualizar o OnethyCode para a versão mais recente ou específica",
+      description: "Update OnethyCode to the latest or a specified version",
       aliases: ["update"],
       params: {
         target: Argument.String("target").pipe(
@@ -84,7 +84,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       },
     }),
     Spec.make("acp", {
-      description: "Iniciar um servidor Agent Client Protocol",
+      description: "Start an Agent Client Protocol server",
       params: {
         login: Flag.Boolean("login").pipe(
           Flag.withDescription("Run auth login instead of starting the server"),
@@ -93,7 +93,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       },
     }),
     Spec.make("api", {
-      description: "Fazer uma requisição ao servidor em execução",
+      description: "Send a request to the running server",
       globalFlags: ServerFlags,
       params: {
         request: Argument.String("operation | method path").pipe(
@@ -110,10 +110,10 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       },
     }),
     Spec.make("debug", {
-      description: "Ferramentas de depuração e diagnóstico",
+      description: "Debugging and diagnostic tools",
       commands: [
         Spec.make("agents", { description: "Listar todos os agentes", globalFlags: ServerFlags }),
-        Spec.make("config", { description: "Listar fontes de configuração", globalFlags: ServerFlags }),
+        Spec.make("config", { description: "List configuration sources", globalFlags: ServerFlags }),
         Spec.make("heap-dump", {
           description: "Write a heap snapshot of the running server and print its path",
           globalFlags: [Server],
@@ -125,7 +125,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           },
         }),
         Spec.make("paths", {
-          description: "Exibir caminhos globais (dados, configurações, cache, estado)",
+          description: "Show global paths (data, configuration, cache, state)",
           params: {
             name: Argument.Literals("name", [
               "db",
@@ -149,11 +149,11 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       ],
     }),
     Spec.make("auth", {
-      description: "Gerenciar integrações e credenciais de provedores",
+      description: "Manage integrations and provider credentials",
       globalFlags: ServerFlags,
       commands: [
         Spec.make("list", {
-          description: "Listar integrações e credenciais salvas",
+          description: "List saved integrations and credentials",
           params: {
             format: Flag.Literals("format", ["default", "json"]).pipe(
               Flag.withDescription("Output format"),
@@ -162,7 +162,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           },
         }),
         Spec.make("login", {
-          description: "Conectar uma integração / provedor",
+          description: "Connect an integration or provider",
           params: {
             target: Argument.String("target").pipe(
               Argument.withDescription("Integration ID, name, or well-known provider URL"),
@@ -222,14 +222,14 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       ],
     }),
     Spec.make("mcp", {
-      description: "Gerenciar servidores MCP (Model Context Protocol)",
+      description: "Manage MCP (Model Context Protocol) servers",
       commands: [
         Spec.make("list", {
           description: "Listar servidores MCP configurados e seus status",
           globalFlags: ServerFlags,
         }),
         Spec.make("doctor", {
-          description: "Diagnosticar MCPs desconectados e opcionalmente repetir conexões com falha",
+          description: "Diagnose disconnected MCPs and optionally retry failed connections",
           globalFlags: ServerFlags,
           params: {
             retry: Flag.Boolean("retry").pipe(
@@ -243,7 +243,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           },
         }),
         Spec.make("add", {
-          description: "Adicionar um servidor MCP à configuração",
+          description: "Add an MCP server to the configuration",
           params: {
             name: Argument.String("name").pipe(Argument.withDescription("Name of the MCP server")),
             command: Argument.String("command").pipe(
@@ -266,50 +266,50 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           },
         }),
         Spec.make("manage", {
-          description: "Abrir menu interativo para gerenciar MCPs nativos e personalizados",
+          description: "Open the interactive manager for native and custom MCPs",
           params: {
             global: Flag.Boolean("global").pipe(
-              Flag.withDescription("Gerenciar os servidores da configuração global"),
+              Flag.withDescription("Manage servers in the global configuration"),
               Flag.withDefault(false),
             ),
           },
         }),
         Spec.make("enable", {
-          description: "Ativar um MCP persistindo a autorização no escopo selecionado",
+          description: "Enable an MCP and save authorization in the selected scope",
           params: {
-            name: Argument.String("name").pipe(Argument.withDescription("Nome do servidor MCP")),
+            name: Argument.String("name").pipe(Argument.withDescription("MCP server name")),
             global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
           },
         }),
         Spec.make("disable", {
-          description: "Desativar um MCP sem excluir sua configuração",
+          description: "Disable an MCP without deleting its configuration",
           params: {
-            name: Argument.String("name").pipe(Argument.withDescription("Nome do servidor MCP")),
+            name: Argument.String("name").pipe(Argument.withDescription("MCP server name")),
             global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
           },
         }),
         Spec.make("remove", {
-          description: "Excluir um MCP no escopo do projeto ou global (com confirmação)",
+          description: "Delete an MCP from the project or global scope (with confirmation)",
           aliases: ["delete"],
           params: {
-            name: Argument.String("name").pipe(Argument.withDescription("Nome do servidor MCP")),
+            name: Argument.String("name").pipe(Argument.withDescription("MCP server name")),
             global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
             yes: Flag.Boolean("yes").pipe(
               Flag.withAlias("y"),
-              Flag.withDescription("Confirmar exclusão em execução não interativa"),
+              Flag.withDescription("Confirm deletion in a non-interactive session"),
               Flag.withDefault(false),
             ),
           },
         }),
         Spec.make("restore", {
-          description: "Restaurar um MCP nativo, ou todos os oito com --all",
+          description: "Restore one native MCP, or all eight with --all",
           params: {
-            name: Argument.String("name").pipe(Argument.withDescription("Nome do MCP nativo"), Argument.optional),
+            name: Argument.String("name").pipe(Argument.withDescription("Native MCP name"), Argument.optional),
             all: Flag.Boolean("all").pipe(Flag.withDefault(false)),
             global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
             yes: Flag.Boolean("yes").pipe(
               Flag.withAlias("y"),
-              Flag.withDescription("Confirmar redefinição de todos os MCPs"),
+              Flag.withDescription("Confirm reset of all MCPs"),
               Flag.withDefault(false),
             ),
           },
@@ -329,7 +329,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       ],
     }),
     Spec.make("plugin", {
-      description: "Gerenciar plugins",
+      description: "Manage plugins",
       commands: [
         Spec.make("list", {
           description: "Listar plugins instalados",
@@ -342,7 +342,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           },
         }),
         Spec.make("add", {
-          description: "Instalar um plugin e adicioná-lo à configuração global",
+          description: "Install a plugin and add it to the global configuration",
           params: {
             package: Argument.String("package").pipe(Argument.withDescription("npm registry or Git package specifier")),
           },
@@ -368,7 +368,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           },
         }),
         Spec.make("remove", {
-          description: "Remover um plugin da configuração global",
+          description: "Remove a plugin from the global configuration",
           params: {
             package: Argument.String("package").pipe(Argument.withDescription("configured package specifier")),
           },
@@ -376,11 +376,11 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       ],
     }),
     Spec.make("models", {
-      description: "Listar todos os modelos disponíveis",
+      description: "List all available models",
       globalFlags: ServerFlags,
     }),
     Spec.make("stats", {
-      description: "Exibir estatísticas de uso",
+      description: "Show usage statistics",
       globalFlags: ServerFlags,
       params: {
         days: Flag.Int("days").pipe(
@@ -416,12 +416,12 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       params: {
         continue: Flag.Boolean("continue").pipe(
           Flag.withAlias("c"),
-          Flag.withDescription("Continuar a última sessão"),
+          Flag.withDescription("Continue the previous session"),
           Flag.withDefault(false),
         ),
         session: Flag.String("session").pipe(
           Flag.withAlias("s"),
-          Flag.withDescription("ID da sessão para continuar, ou criar caso não exista"),
+          Flag.withDescription("Session ID to continue, or create if it does not exist"),
           Flag.optional,
         ),
         fork: Flag.Boolean("fork").pipe(
@@ -456,12 +456,12 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         ),
         continue: Flag.Boolean("continue").pipe(
           Flag.withAlias("c"),
-          Flag.withDescription("Continuar a última sessão"),
+          Flag.withDescription("Continue the previous session"),
           Flag.withDefault(false),
         ),
         session: Flag.String("session").pipe(
           Flag.withAlias("s"),
-          Flag.withDescription("ID da sessão para continuar, ou criar caso não exista"),
+          Flag.withDescription("Session ID to continue, or create if it does not exist"),
           Flag.optional,
         ),
         fork: Flag.Boolean("fork").pipe(
@@ -489,7 +489,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       },
     }),
     Spec.make("session", {
-      description: "Gerenciar sessões",
+      description: "Manage sessions",
       globalFlags: ServerFlags,
       commands: [
         Spec.make("list", {
@@ -539,7 +539,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       ],
     }),
     Spec.make("service", {
-      description: "Gerenciar o servidor em segundo plano",
+      description: "Manage the background server",
       commands: [
         Spec.make("start", { description: "Start the background server" }),
         Spec.make("restart", { description: "Restart the background server" }),
@@ -581,7 +581,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       ],
     }),
     Spec.make("reload", {
-      description: "Recarregar configurações",
+      description: "Reload configuration",
       globalFlags: ServerFlags,
     }),
     Spec.make("pair", {
@@ -616,7 +616,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       },
     }),
     Spec.make("serve", {
-      description: "Iniciar o servidor v2 da API e web",
+      description: "Start the v2 API and web server",
       params: {
         hostname: Flag.String("hostname").pipe(Flag.optional),
         port: Flag.Int("port").pipe(Flag.optional),
