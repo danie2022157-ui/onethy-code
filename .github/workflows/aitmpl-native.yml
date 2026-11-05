@@ -3,14 +3,16 @@ on:
   pull_request:
     paths:
       - 'packages/cli/src/services/aitmpl-native.*'
-      - 'packages/cli/src/commands/handlers/upgrade.ts'
+      - 'package.json'
+      - 'script/aitmpl-personalizations-bootstrap.mjs'
       - 'script/aitmpl-sync.test.mjs'
       - '.github/workflows/aitmpl-native.yml'
   push:
     branches: [main]
     paths:
       - 'packages/cli/src/services/aitmpl-native.*'
-      - 'packages/cli/src/commands/handlers/upgrade.ts'
+      - 'package.json'
+      - 'script/aitmpl-personalizations-bootstrap.mjs'
       - 'script/aitmpl-sync.test.mjs'
       - '.github/workflows/aitmpl-native.yml'
 jobs:
@@ -24,4 +26,5 @@ jobs:
         with:
           node-version: '22'
       - run: node --check packages/cli/src/services/aitmpl-native.mjs
+      - run: node --check script/aitmpl-personalizations-bootstrap.mjs
       - run: node --test script/aitmpl-sync.test.mjs
