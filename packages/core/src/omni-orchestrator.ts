@@ -45,57 +45,21 @@ export const DEFAULT_AUTO_CUSTOMIZATIONS: AutoCustomizationsConfig = {
   useSettings: true,
 }
 
+/**
+ * In OnethyCode, all seven automatic resource *selection categories* are
+ * always available to every agent. This does NOT enable MCP processes, bypass
+ * permissions, or execute untrusted hooks and plugins.
+ *
+ * Ignore retired user toggles in both the persisted file and environment,
+ * so an old "disabled" profile cannot silently turn off agent capabilities.
+ */
 export function getAutoCustomizationsConfig(): AutoCustomizationsConfig {
-  if (process.env.OMNICODE_AUTO_CUSTOMIZATIONS) {
-    try {
-      const parsed = JSON.parse(process.env.OMNICODE_AUTO_CUSTOMIZATIONS)
-      if (parsed && typeof parsed === "object") {
-        return {
-          enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : true,
-          useSkills: typeof parsed.useSkills === "boolean" ? parsed.useSkills : true,
-          useAgents: typeof parsed.useAgents === "boolean" ? parsed.useAgents : true,
-          useMcps: typeof parsed.useMcps === "boolean" ? parsed.useMcps : true,
-          useHooks: typeof parsed.useHooks === "boolean" ? parsed.useHooks : true,
-          useMods: typeof parsed.useMods === "boolean" ? parsed.useMods : true,
-          useCommands: typeof parsed.useCommands === "boolean" ? parsed.useCommands : true,
-          useSettings: typeof parsed.useSettings === "boolean" ? parsed.useSettings : true,
-        }
-      }
-    } catch {}
-  }
-  try {
-    const file = getAutoModelFilePath()
-    if (fs.existsSync(file)) {
-      const parsed = JSON.parse(fs.readFileSync(file, "utf8"))
-      if (parsed && typeof parsed.autoCustomizations === "object" && parsed.autoCustomizations) {
-        const c = parsed.autoCustomizations
-        return {
-          enabled: typeof c.enabled === "boolean" ? c.enabled : true,
-          useSkills: typeof c.useSkills === "boolean" ? c.useSkills : true,
-          useAgents: typeof c.useAgents === "boolean" ? c.useAgents : true,
-          useMcps: typeof c.useMcps === "boolean" ? c.useMcps : true,
-          useHooks: typeof c.useHooks === "boolean" ? c.useHooks : true,
-          useMods: typeof c.useMods === "boolean" ? c.useMods : true,
-          useCommands: typeof c.useCommands === "boolean" ? c.useCommands : true,
-          useSettings: typeof c.useSettings === "boolean" ? c.useSettings : true,
-        }
-      }
-    }
-  } catch {}
-  return DEFAULT_AUTO_CUSTOMIZATIONS
+  return { ...DEFAULT_AUTO_CUSTOMIZATIONS }
 }
 
-export function setAutoCustomizationsConfig(config: Partial<AutoCustomizationsConfig>): AutoCustomizationsConfig {
-  const current = getAutoCustomizationsConfig()
-  const updated: AutoCustomizationsConfig = { ...current, ...config }
-  try {
-    const file = getAutoModelFilePath()
-    const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {}
-    fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(file, JSON.stringify({ ...existing, autoCustomizations: updated }, null, 2), "utf8")
-    process.env.OMNICODE_AUTO_CUSTOMIZATIONS = JSON.stringify(updated)
-  } catch {}
-  return updated
+/** Retained for callers using the old API; the OnethyCode policy is fixed. */
+export function setAutoCustomizationsConfig(_config: Partial<AutoCustomizationsConfig>): AutoCustomizationsConfig {
+  return getAutoCustomizationsConfig()
 }
 
 export type TaskCategory =
