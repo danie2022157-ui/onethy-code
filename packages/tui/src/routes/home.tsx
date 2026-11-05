@@ -19,6 +19,7 @@ import { useDialog } from "../ui/dialog"
 import { DialogAgent } from "../component/dialog-agent"
 import { DialogCustomizations } from "../component/dialog-customizations"
 import { DialogMcp } from "../component/dialog-mcp"
+import { DialogDesktop } from "../component/dialog-desktop"
 import { DialogModel } from "../component/dialog-model"
 import { tint } from "../theme/color"
 import { RGBA, TextAttributes } from "@opentui/core"
@@ -151,6 +152,15 @@ export function Home() {
         colorHex: "#06B6D4",
         onClick: () => dialog.replace(() => <DialogMcp />),
       },
+      ...((process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1")
+        ? [{
+            icon: "▣",
+            label: "Desktop",
+            count: "Native",
+            colorHex: "#38BDF8",
+            onClick: () => dialog.replace(() => <DialogDesktop />),
+          }]
+        : []),
       {
         icon: "⚡",
         label: local.model.auto.modeName(),
@@ -169,6 +179,9 @@ export function Home() {
   ]
   const quickRow2 = [
     { cmd: "/auto", desc: "Omni Fusion", fg: RGBA.fromHex("#A855F7") },
+    ...((process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1")
+      ? [{ cmd: "/desktop", desc: "Computer Use", fg: RGBA.fromHex("#38BDF8") }]
+      : []),
   ]
 
   return (
@@ -317,6 +330,11 @@ export function Home() {
                     {(chip) => {
                       const [hovered, setHovered] = createSignal(false)
                       const apply = () => {
+                        // Open the manager directly, without requiring a typed slash command.
+                        if (chip.cmd === "/desktop") {
+                          dialog.replace(() => <DialogDesktop />)
+                          return
+                        }
                         const composer = ref()
                         if (!composer) return
                         composer.set({ text: `${chip.cmd} `, files: [], agents: [], pasted: [] })
