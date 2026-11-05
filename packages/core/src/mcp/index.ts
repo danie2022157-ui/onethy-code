@@ -775,6 +775,76 @@ export const layer = (options?: Options) =>
         notify: () => State.reconcile(root, fork, () => reconcileLock.withPermit(reconcile())),
       })
 
+      // A single per-location pool serves many sessions; it never moves data
+      // between session IDs. Shared MCP connections are not security sandboxes.
+      const wake = Effect.fnUntraced(function* (name: ServerName, entry: ServerEntry) {
+        if (entry.status.status !== "standby") return
+        yield* Effect.gen(function* () {
+          if (entries.get(name) !== entry || entry.status.status !== "standby") return
+          yield* startServer(name, entry)
+        }).pipe(locks.withLock(name))
+      })
+
+      const maintainOne = (name: ServerName, entry: ServerEntry, now: number) =>
+        Effect.gen(function* () {
+          // The status and entry identity must be rechecked after waiting for
+          // the per-server lock: config updates, manual disconnects and starts win.
+          if (entries.get(name) !== entry) return
+          if (entry.config.disabled || entry.status.status === "disabled" || entry.status.status === "needs_auth")
+            return
+          if (retryAllowed(entry, now, entry.status.status, Boolean(entry.config.disabled))) {
+            yield* startServer(name, entry)
+            return
+          }
+          if (canIdle(entry, now, entry.status.status, Boolean(entry.config.disabled))) {
+            // Retain only the catalog of tool definitions. Calls wake the owning
+            // connection on demand; the local subprocess is actually stopped.
+            yield* stopServer(name, entry, true)
+            entry.status = { status: "standby" }
+            yield* bus.publish(McpEvent.StatusChanged, { server: name })
+            return
+          }
+          if (!shouldHealthCheck(entry, now, entry.status.status)) return
+          const connection = entry.client
+          if (!connection) return
+          entry.lastHealthAt = now
+          const healthy = yield* connection.tools().pipe(
+            Effect.timeout(MCP_POLICY.healthTimeout),
+            Effect.exit,
+          )
+          if (Exit.isSuccess(healthy)) {
+            entry.healthFailures = 0
+            return
+          }
+          entry.healthFailures = (entry.healthFailures ?? 0) + 1
+          if (entry.healthFailures < 2) return
+          yield* stopServer(name, entry)
+          entry.failures = (entry.failures ?? 0) + 1
+          entry.retryAt = Date.now() + retryDelay(entry.failures)
+          entry.status = { status: "failed", error: "MCP health check failed twice. Automatic recovery scheduled." }
+          yield* bus.publish(McpEvent.StatusChanged, { server: name })
+        }).pipe(
+          locks.withLock(name),
+          Effect.catchCause((cause) =>
+            Effect.logWarning("MCP maintenance failed", { server: name, cause }).pipe(Effect.asVoid),
+          ),
+        )
+
+      // Explicitly opt out for non-Onethy OpenCode hosts; attached transports
+      // belong to their owners and are never swept or disconnected by this job.
+      if (process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1") {
+        yield* Stream.fromEffectRepeat(Effect.sleep(MCP_POLICY.tickMs + " millis")).pipe(
+          Stream.runForEach(() =>
+            Effect.forEach(
+              [...entries],
+              ([name, entry]) => maintainOne(name, entry, Date.now()),
+              { concurrency: 4, discard: true },
+            ),
+          ),
+          Effect.forkScoped({ startImmediately: true }),
+        )
+      }
+
       return Service.of({
         transform: state.transform,
         reload: state.reload,
