@@ -3,16 +3,16 @@ import path from "node:path"
 
 export function resolveProjectDirectory(input: string, cwd: string): string {
   const trimmed = input.trim()
-  if (!trimmed || trimmed === "." || trimmed === "..") throw new Error("Informe uma pasta de projeto válida.")
+  if (!trimmed || trimmed === "." || trimmed === "..") throw new Error("Enter a valid project folder.")
   const directory = path.resolve(cwd, trimmed)
-  if (directory === path.parse(directory).root) throw new Error("A raiz do disco não pode ser um projeto.")
+  if (directory === path.parse(directory).root) throw new Error("The filesystem root cannot be a project.")
   return directory
 }
 
 export function requireExistingProject(directory: string) {
   const stat = fs.lstatSync(directory)
   if (!stat.isDirectory() || stat.isSymbolicLink()) {
-    throw new Error("O projeto deve ser uma pasta real, não um link simbólico.")
+    throw new Error("The project must be a real directory, not a symbolic link.")
   }
   return directory
 }

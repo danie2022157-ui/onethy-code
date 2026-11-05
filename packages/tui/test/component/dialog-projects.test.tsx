@@ -10,13 +10,13 @@ test("/projects renders project-management actions and opens the create form", a
   await using setup = await renderLocal()
   setup.dialog.replace(() => <DialogProjects />)
   await setup.waitForFrame((frame) =>
-    frame.includes("Gerenciar projetos") &&
-    frame.includes("Criar novo projeto") &&
-    frame.includes("Adicionar pasta existente"),
+    frame.includes("Manage projects") &&
+    frame.includes("Create new project") &&
+    frame.includes("Add existing folder"),
   )
   setup.mockInput.pressEnter()
-  await setup.waitForFrame((frame) => frame.includes("Criar novo projeto") && frame.includes("Nome ou caminho"))
-  expect(setup.captureCharFrame()).toContain("Criar novo projeto")
+  await setup.waitForFrame((frame) => frame.includes("Create new project") && frame.includes("New folder name or path"))
+  expect(setup.captureCharFrame()).toContain("Create new project")
 })
 
 test("/projects can create a real project folder without deleting files", async () => {
@@ -24,9 +24,9 @@ test("/projects can create a real project folder without deleting files", async 
   await using setup = await renderLocal()
   const target = path.join(temp.path, "new-app")
   setup.dialog.replace(() => <DialogProjects />)
-  await setup.waitForFrame((frame) => frame.includes("Criar novo projeto"))
+  await setup.waitForFrame((frame) => frame.includes("Create new project"))
   setup.mockInput.pressEnter()
-  await setup.waitForFrame((frame) => frame.includes("Nome ou caminho"))
+  await setup.waitForFrame((frame) => frame.includes("New folder name or path"))
   await setup.mockInput.typeText(target)
   setup.mockInput.pressEnter()
   await setup.waitFor(() => fs.existsSync(target))

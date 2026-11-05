@@ -59,18 +59,18 @@ export function DialogProjects() {
       route.navigate({ type: "home", location: target })
       location.set(target)
     } catch (error) {
-      showError("Não foi possível abrir o projeto", error)
+      showError("Could not open project", error)
     }
   }
 
   function promptCreate(existingFolder: boolean) {
     dialog.push(() => (
       <DialogPrompt
-        title={existingFolder ? "Adicionar projeto existente" : "Criar novo projeto"}
-        placeholder={existingFolder ? "Caminho da pasta existente" : "Nome ou caminho da nova pasta"}
+        title={existingFolder ? "Add existing project" : "Create new project"}
+        placeholder={existingFolder ? "Path to existing folder" : "New folder name or path"}
         subtitle={existingFolder
-          ? "A pasta precisa existir. Nenhum arquivo será alterado."
-          : "Cria uma pasta vazia dentro do diretório indicado; não sobrescreve projetos."}
+          ? "The folder must already exist. No files will be changed."
+          : "Creates an empty folder at the specified path; existing projects will not be overwritten."}
         onCancel={() => dialog.pop()}
         onConfirm={(input) => {
           void (async () => {
@@ -79,10 +79,10 @@ export function DialogProjects() {
                 ? addProjectDirectory(input, paths.cwd)
                 : createProjectDirectory(input, paths.cwd)
               await change((draft) => rememberProject(draft, directory))
-              toast.show({ variant: "success", title: existingFolder ? "Projeto adicionado" : "Projeto criado", message: directory })
+              toast.show({ variant: "success", title: existingFolder ? "Project added" : "Project created", message: directory })
               open(directory)
             } catch (error) {
-              showError("Falha no gerenciamento de projetos", error)
+              showError("Project management failed", error)
             }
           })()
         }}
@@ -93,22 +93,22 @@ export function DialogProjects() {
   function rename(directory: string) {
     dialog.push(() => (
       <DialogPrompt
-        title="Renomear projeto na lista"
-        subtitle="Altera apenas o nome exibido no Onethy Code; a pasta permanece igual."
+        title="Rename project in list"
+        subtitle="Only changes the display name in OnethyCode; the folder remains unchanged."
         value={registry.names[directory] ?? existing().find((item) => item.canonical === directory)?.name ?? path.basename(directory)}
         onCancel={() => dialog.pop()}
         onConfirm={(input) => {
           void (async () => {
             try {
               const name = input.trim()
-              if (!name || name.length > 80) throw new Error("Informe um nome de até 80 caracteres.")
+              if (!name || name.length > 80) throw new Error("Enter a name with no more than 80 characters.")
               await change((draft) => {
                 draft.names[directory] = name
               })
               dialog.pop()
-              toast.show({ variant: "success", title: "Projeto renomeado na lista", message: name })
+              toast.show({ variant: "success", title: "Project renamed in list", message: name })
             } catch (error) {
-              showError("Não foi possível renomear", error)
+              showError("Could not rename project", error)
             }
           })()
         }}
@@ -119,28 +119,28 @@ export function DialogProjects() {
   function remove(directory: string) {
     dialog.push(() => (
       <DialogSelect
-        title="Remover projeto da lista?"
-        description={"Apenas a entrada será removida. Os arquivos e as sessões serão preservados: " + directory}
+        title="Remove project from list?"
+        description={"Only the list entry will be removed. Files and sessions will be preserved: " + directory}
         skipFilter
         options={[
-          { value: "cancel", title: "Cancelar", onSelect: () => dialog.pop() },
+          { value: "cancel", title: "Cancel", onSelect: () => dialog.pop() },
           {
             value: "confirm",
-            title: "Confirmar remoção da lista",
+            title: "Confirm removal from list",
             onSelect: () => {
               void (async () => {
                 try {
                   await change((draft) => forgetProject(draft, directory))
                   dialog.pop()
-                  toast.show({ variant: "success", title: "Projeto removido da lista", message: "Nenhum arquivo foi apagado." })
+                  toast.show({ variant: "success", title: "Project removed from list", message: "No files were deleted." })
                 } catch (error) {
-                  showError("Não foi possível remover", error)
+                  showError("Could not remove project", error)
                 }
               })()
             },
           },
         ]}
-        footerHints={[{ title: "selecionar", label: "enter" }, { title: "voltar", label: "esc" }]}
+        footerHints={[{ title: "select", label: "enter" }, { title: "back", label: "esc" }]}
       />
     ))
   }
@@ -148,16 +148,16 @@ export function DialogProjects() {
   const options = createMemo<DialogSelectOption<string>[]>(() => [
     {
       value: "__create",
-      title: "＋ Criar novo projeto",
-      description: "Criar pasta e abrir como projeto no Onethy Code",
-      category: "Gerenciamento",
+      title: "＋ Create new project",
+      description: "Create a folder and open it as a project in OnethyCode",
+      category: "Management",
       onSelect: () => promptCreate(false),
     },
     {
       value: "__add",
-      title: "＋ Adicionar pasta existente",
-      description: "Registrar e abrir uma pasta do computador",
-      category: "Gerenciamento",
+      title: "＋ Add existing folder",
+      description: "Register and open a local folder",
+      category: "Management",
       onSelect: () => promptCreate(true),
     },
     ...directories().map((directory) => {
@@ -168,8 +168,8 @@ export function DialogProjects() {
         value: directory,
         title: (exists ? "📁 " : "⚠ ") + name,
         description: directory,
-        category: "Projetos",
-        footer: exists ? "Enter: abrir" : "Pasta não encontrada · Ctrl+D para remover da lista",
+        category: "Projects",
+        footer: exists ? "Enter: open" : "Folder not found · Ctrl+D to remove from list",
         onSelect: () => open(directory),
       }
     }),
@@ -179,24 +179,24 @@ export function DialogProjects() {
 
   return (
     <DialogSelect
-      title="📁 Onethy Code — Gerenciar projetos"
-      placeholder="Buscar projetos..."
+      title="📁 Onethy Code — Manage projects"
+      placeholder="Search projects..."
       options={options()}
       actions={[
         {
           command: "session.rename",
-          title: "renomear",
+          title: "rename",
           disabled: (option) => !isProject(option?.value),
           onTrigger: (option) => rename(option.value),
         },
         {
           command: "session.delete",
-          title: "remover da lista",
+          title: "remove from list",
           disabled: (option) => !isProject(option?.value),
           onTrigger: (option) => remove(option.value),
         },
       ]}
-      footerHints={[{ title: "abrir / criar", label: "enter" }]}
+      footerHints={[{ title: "open / create", label: "enter" }]}
     />
   )
 }

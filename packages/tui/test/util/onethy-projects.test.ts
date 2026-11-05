@@ -62,7 +62,7 @@ describe("Onethy project management", () => {
       const target = createProjectDirectory("target", root)
       try {
         fs.symlinkSync(target, path.join(root, "linked"), process.platform === "win32" ? "junction" : "dir")
-        expect(() => addProjectDirectory("linked", root)).toThrow("link simbólico")
+        expect(() => addProjectDirectory("linked", root)).toThrow("symbolic link")
       } catch (error) {
         if (process.platform !== "win32" || (error as NodeJS.ErrnoException).code !== "EPERM") throw error
       }

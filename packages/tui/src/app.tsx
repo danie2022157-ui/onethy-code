@@ -835,8 +835,8 @@ function App() {
       ...((process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1")
         ? [{
             name: "onethy.projects",
-            title: "Gerenciar projetos — criar, abrir, renomear e remover da lista",
-            description: "Crie ou adicione pastas e organize projetos sem apagar arquivos.",
+            title: "Manage projects — create, open, rename, and remove from the list",
+            description: "Create or add folders and organize projects without deleting files.",
             category: "OmniCode",
             slash: { name: "projects", aliases: ["project", "projetos"] },
             run: () => dialog.replace(() => <DialogProjects />),

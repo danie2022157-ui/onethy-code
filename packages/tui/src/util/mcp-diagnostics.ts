@@ -5,27 +5,27 @@
 export function mcpFailureHelp(error: string): string {
   const text = error.toLowerCase()
   if (/enoent|executable not found|command not found|is not recognized|failed to spawn|spawn .*not found/.test(text)) {
-    return "Comando local não encontrado. Verifique npx/uvx no PATH e reinicie o OnethyCode após instalar."
+    return "Local command not found. Check that npx/uvx is in your PATH and restart OnethyCode after installing it."
   }
   if (/not a git repository|no git repository|not inside a git work tree/.test(text)) {
-    return "Abra o OnethyCode dentro de um repositório Git; o MCP Git usa o diretório do projeto."
+    return "Open OnethyCode inside a Git repository; the Git MCP uses the project directory."
   }
   if (/no module named|modulenotfounderror|python.*not found/.test(text)) {
-    return "Dependência Python ausente; verifique o uvx e a instalação inicial do servidor."
+    return "Python dependency missing; check uvx and the server's initial setup."
   }
   if (/npm err|404 not found|package.*not found/.test(text)) {
-    return "Pacote MCP indisponível; verifique nome do pacote, internet e cache do npm."
+    return "MCP package unavailable; check the package name, internet connection, and npm cache."
   }
   if (/timed? out|timeout|deadline exceeded/.test(text)) {
-    return "A inicialização ultrapassou o tempo permitido. Verifique rede, dependências e logs de execução."
+    return "Startup timed out. Check network access, dependencies, and runtime logs."
   }
   if (/permission denied|eacces|eperm/.test(text)) {
-    return "Acesso negado pelo sistema. Verifique permissões do diretório ou do executável."
+    return "System access denied. Check directory and executable permissions."
   }
-  return "Falha de inicialização. Pressione Enter para visualizar e copiar o erro completo."
+  return "Startup failed. Press Enter to view and copy the full error."
 }
 
 export function mcpFailurePreview(error: string): string {
   const reason = mcpFailureHelp(error)
-  return reason + "  [Enter: detalhes]"
+  return reason + "  [Enter: details]"
 }

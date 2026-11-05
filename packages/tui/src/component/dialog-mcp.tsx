@@ -145,7 +145,7 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
   const manage = async (action: McpAction, name: string) => {
     if (saving()) return
     if (current().workspaceID) {
-      toast.show({ variant: "warning", message: "Gerenciamento local indisponível em workspace remoto." })
+      toast.show({ variant: "warning", message: "Local MCP management is unavailable in a remote workspace." })
       return
     }
     setSaving(true)
@@ -184,16 +184,16 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
   }
 
   const confirmManage = (action: "remove" | "restore", name: string) => {
-    const title = action === "remove" ? `Excluir ${name}?` : "Restaurar os 8 MCPs nativos?"
+    const title = action === "remove" ? `Delete ${name}?` : "Restore all 8 built-in MCPs?"
     dialog.push(() => (
       <DialogSelect
         title={title}
         description={action === "remove"
-          ? "A configuração será excluída permanentemente. Outros MCPs serão preservados."
-          : "As configurações dos 8 MCPs nativos serão redefinidas e desativadas."}
+          ? "This MCP configuration will be permanently deleted. Other MCPs will be preserved."
+          : "All 8 built-in MCP configurations will be reset and disabled."}
         options={[
-          { value: "cancel", title: "Cancelar", category: "Confirmação" },
-          { value: "confirm", title: action === "remove" ? "Sim, excluir" : "Sim, restaurar", category: "Confirmação" },
+          { value: "cancel", title: "Cancel", category: "Confirmation" },
+          { value: "confirm", title: action === "remove" ? "Yes, delete" : "Yes, restore", category: "Confirmation" },
         ]}
         onSelect={(option) => {
           dialog.pop()
@@ -232,25 +232,25 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
               },
               ...(process.env.OMNICODE_ACTIVE === "1" ? [
                 {
-                  title: "ativar",
+                  title: "enable",
                   command: "onethy.mcp.enable",
                   bind: "ctrl+e",
                   onTrigger: (option: { value: string }) => void manage("enable", option.value),
                 },
                 {
-                  title: "desativar",
+                  title: "disable",
                   command: "onethy.mcp.disable",
                   bind: "ctrl+d",
                   onTrigger: (option: { value: string }) => void manage("disable", option.value),
                 },
                 {
-                  title: "excluir",
+                  title: "delete",
                   command: "onethy.mcp.delete",
                   bind: "ctrl+x",
                   onTrigger: (option: { value: string }) => confirmManage("remove", option.value),
                 },
                 {
-                  title: "restaurar os 8",
+                  title: "restore all 8",
                   command: "onethy.mcp.restore",
                   bind: "ctrl+r",
                   selection: "none" as const,
