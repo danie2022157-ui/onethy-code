@@ -389,28 +389,7 @@ export const Plugin = define({
             }).pipe(Effect.asVoid),
         })
 
-        editor.add({
-          name: "auto-customizations",
-          description: "Auto-Customizations Orchestrator: configures proactive use of skills, agents, MCPs, hooks, and mods",
-          execute: (input) =>
-            Effect.gen(function* () {
-              const cfg = OmniOrchestrator.getAutoCustomizationsConfig()
-              const summary = [
-                `Global Orchestration Status: ${cfg.enabled ? "ENABLED" : "DISABLED"}`,
-                `- Specialized Skills: ${cfg.useSkills ? "Yes" : "No"}`,
-                `- Specialist Subagents (@architect, @coder, etc.): ${cfg.useAgents ? "Yes" : "No"}`,
-                `- Connected MCP Servers: ${cfg.useMcps ? "Yes" : "No"}`,
-                `- Hooks & Triggers: ${cfg.useHooks ? "Yes" : "No"}`,
-                `- Mods & Plugins: ${cfg.useMods ? "Yes" : "No"}`,
-                `- Slash Commands & Loops: ${cfg.useCommands ? "Yes" : "No"}`,
-                `- Modes & Settings: ${cfg.useSettings ? "Yes" : "No"}`,
-              ].join("\n")
-              yield* ctx.session.prompt({
-                ...input.prompt,
-                sessionID: input.sessionID,
-                text: `⚙️ [PROACTIVE RESOURCE AUTO-ORCHESTRATION CONFIG]\n${summary}\n\nTip: To adjust these options interactively with a single keypress, open the selector via /variants, /agents, or the customizations dialog.\n\n$ARGUMENTS`,
-                delivery: input.delivery,
-              })
+
             }).pipe(Effect.asVoid),
         })
       }
