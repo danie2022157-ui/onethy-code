@@ -17,12 +17,12 @@ Os arquivos são instalados em `skills/` e `agents/`, preservando os arquivos ex
 | Componente do catálogo | Tratamento |
 | --- | --- |
 | Skills | Importadas como skills nativas, com seus arquivos auxiliares e metadados normalizados. |
-| Agentes | Arquivos Markdown importados como agentes nativos; os nomes conhecidos de ferramentas Claude são convertidos. |
+| Agentes | Importados como subagentes nativos, herdando o modelo e as permissões atuais; campos e ferramentas exclusivos do Claude Code não ganham execução automática. |
 | Comandos e comandos slash | **Não importados.** |
-| Configurações, hooks, MCPs, plugins, mods e loops | Apenas inventariados. Não são instalados, executados nem conectados automaticamente sem adaptação e aprovação específicas. |
+| MCPs | Definições JSON compatíveis importadas em `mcp/aitmpl/`, descobertas **desativadas por padrão** pelo mecanismo nativo; chaves e tokens de exemplo são removidos. |\n| Configurações, hooks, plugins, mods e loops | Inventariados, sem ativação automática. Perfis de configuração podem se contradizer e os hooks/mods exigem runtime do Claude Code. |
 
-**Limites reais:** importação não equivale à garantia de compatibilidade e execução de cada skill. Algumas skills requerem dependências externas. Agentes podem conter instruções específicas de Claude Code que são sinalizadas para revisão. Ferramentas MCP dependem de credenciais e conexões que esta rotina não gerencia. Conteúdo do catálogo deve ser tratado como fonte de terceiros.
+**Limites reais:** importação não equivale à garantia de compatibilidade e execução de cada skill. Algumas skills requerem dependências externas. Não é possível garantir execução de 100% das personalizações de outro runtime sem validar cada dependência. Agentes podem conter instruções específicas de Claude Code que são sinalizadas para revisão. Ferramentas MCP dependem de credenciais e conexões que esta rotina não gerencia. Conteúdo do catálogo deve ser tratado como fonte de terceiros.
 
 ## Qualidade
 
-A suíte de testes nativa valida prévia sem escrita, instalação em diretório de projeto e global, idempotência, normalização de skill/agent, a ausência de comandos slash e a não execução de hooks do catálogo. A integração é executada somente durante uma atualização bem-sucedida; falhas na sincronização não são declaradas como atualização concluída do catálogo.
+A suíte de testes nativa valida prévia sem escrita, instalação em diretório de projeto e global, idempotência, normalização de skill/agent, sanitização e descoberta MCP desativada, ausência de comandos slash e a não execução de hooks do catálogo. Os testes de CI também inspecionam o catálogo real de MCPs em modo somente leitura. A integração é executada somente durante uma atualização bem-sucedida; falhas na sincronização não são declaradas como atualização concluída do catálogo.
