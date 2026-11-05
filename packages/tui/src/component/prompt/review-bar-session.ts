@@ -51,3 +51,15 @@ export function isCurrentSessionDiff(
 ): boolean {
   return requestedSessionID === currentSessionID && requestID === latestRequestID
 }
+
+/** Fetch only the requested session's captured turn. Absence/errors must not leak repo-wide changes. */
+export async function loadSessionReview(
+  sessionID: string,
+  fetchTurn: (id: string) => Promise<unknown>,
+): Promise<ChangedFile[]> {
+  try {
+    return sessionReviewFiles(await fetchTurn(sessionID))
+  } catch {
+    return []
+  }
+}
