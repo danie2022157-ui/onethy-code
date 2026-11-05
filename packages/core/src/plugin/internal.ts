@@ -15,6 +15,7 @@ import { Config } from "../config.js"
 import { Credential } from "../credential.js"
 import { llmClient } from "../effect/app-node-platform.js"
 import { ConfigAgentPlugin } from "../config/plugin/agent.js"
+import { OnethyCustomizationPlugin } from "../config/plugin/onethy-customization.js"
 import { ConfigCommandPlugin } from "../config/plugin/command.js"
 import { ConfigCompactionPlugin } from "../config/plugin/compaction.js"
 import { ConfigFormatterPlugin } from "../config/plugin/formatter.js"
@@ -313,6 +314,7 @@ const post = [
   ConfigProviderPlugin.Plugin,
   ConfigWebSearchPlugin.Plugin,
   ConfigPolicyPlugin.Plugin,
+  OnethyCustomizationPlugin.Plugin,
 ] as const satisfies readonly InternalPlugin[]
 
 // Repository config must not switch off policy enforcement or the Console connection that delivers

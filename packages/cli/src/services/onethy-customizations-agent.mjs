@@ -1,14 +1,14 @@
-// AITmpl Claude Code agent markdown -> native OnethyCode subagent markdown.
+// OnethyCode Claude Code agent markdown -> native OnethyCode subagent markdown.
 // Keeps the task instructions, but does not implicitly grant permissions or
 // assign a provider/model that the user might not have configured.
 function description(frontmatter, name) {
   const match = frontmatter.match(/^description:\s*(.*)$/m)
-  if (!match || !match[1].trim()) return "Imported AITmpl agent: " + name
+  if (!match || !match[1].trim()) return "Imported OnethyCode agent: " + name
   const first = match[1].trim()
   if (first === "|" || first === ">") {
     const after = frontmatter.slice(match.index + match[0].length).split("\n")
     const joined = after.filter(x => /^\s+\S/.test(x)).map(x => x.trim()).join(" ")
-    return (joined || "Imported AITmpl agent: " + name).slice(0, 500)
+    return (joined || "Imported OnethyCode agent: " + name).slice(0, 500)
   }
   let value = first
   if (first[0] === '"' && first.endsWith('"')) {
@@ -16,9 +16,9 @@ function description(frontmatter, name) {
   } else if (first[0] === "'" && first.endsWith("'")) {
     value = first.slice(1, -1).replace(/''/g, "'")
   }
-  return String(value).replace(/\s+/g, " ").slice(0, 500) || "Imported AITmpl agent: " + name
+  return String(value).replace(/\s+/g, " ").slice(0, 500) || "Imported OnethyCode agent: " + name
 }
-export function convertAITmplAgent(content, name) {
+export function convertOnethyCodeAgent(content, name) {
   let head = ""
   let body = content
   const warnings = []

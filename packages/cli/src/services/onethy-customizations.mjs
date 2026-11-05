@@ -1,17 +1,21 @@
-// AITmpl -> OnethyCode native file-based personalization importer.
+// OnethyCode -> OnethyCode native file-based personalization importer.
 // Safe by default: dry-run, no script execution, no overwrites, no credentials.
 import { mkdtemp, readdir, mkdir, copyFile, lstat, readFile, writeFile, rm } from "node:fs/promises"
 import { tmpdir, homedir } from "node:os"
 import { join, relative, resolve, dirname, basename, extname, sep } from "node:path"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { convertMcpTemplate, safeMcpId } from "./aitmpl-mcp.mjs"
-import { convertAITmplAgent } from "./aitmpl-agent.mjs"
+import { cleanupObsoleteGeneratedMCPs } from "./onethy-customizations-cleanup.mjs"
+import { convertMcpTemplate, safeMcpId } from "./onethy-customization-mcp.mjs"
+import { curatedLocalMCPs } from "./onethy-customizations-local-mcp.mjs"
+import { convertOnethyCodeAgent } from "./onethy-customizations-agent.mjs"
+import { convertOnethyCodeCommand } from "./onethy-customizations-command.mjs"
+import { convertOnethyCodeHook, convertOnethyCodeMod } from "./onethy-customizations-descriptors.mjs"
 
 
 const CATALOG = "https://github.com/davila7/claude-code-templates.git"
-export const types = ["skills", "agents", "settings", "hooks", "mcps", "plugins", "mods", "loops"]
-export async function syncAITmpl(options = {}) {
+export const types = ["skills", "agents", "commands", "settings", "hooks", "mcps", "plugins", "mods", "loops"]
+export async function syncOnethyCustomizations(options = {}) {
 const install = options.install === true
 const verify = options.verify === true
 const chosen = options.type || "all"
@@ -25,8 +29,9 @@ const destination = options.global
         : join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omnicode")))
   : resolve(options.cwd || process.cwd(), ".opencode")
 const report = { mode: verify ? "verify" : install ? "install" : "preview", target: destination, ready: 0, installed: 0, existing: 0, rejected: 0, pending: 0, errors: [], components: {} }
-const staging = sourceDir ? undefined : await mkdtemp(join(tmpdir(), "onethy-aitmpl-"))
+const staging = sourceDir ? undefined : await mkdtemp(join(tmpdir(), "onethy-onethy-"))
 const source = sourceDir ? resolve(sourceDir) : join(staging, "catalog")
+if (install && !verify) report.obsoleteGeneratedMcpRemoved = await cleanupObsoleteGeneratedMCPs(destination)
 
 function git(...argv) {
   const p = spawnSync("git", argv, { encoding: "utf8", timeout: 240000, maxBuffer: 10_000_000 })
@@ -50,9 +55,9 @@ const slug = (value) => {
 const inside = (root, file) => { const p = relative(root, file); return p && p !== ".." && !p.startsWith(".." + sep) && !p.startsWith(sep) }
 const toolkit = { Read: "read", Write: "write", Edit: "edit", Bash: "bash", Glob: "glob", Grep: "grep", WebFetch: "webfetch", WebSearch: "websearch", Task: "task", NotebookEdit: "edit" }
 function convertMarkdown(contents, kind, name) {
-  if (!contents.startsWith("---\n")) return { body: "---\nname: " + name + "\ndescription: Imported AITmpl " + kind + " component\n---\n\n" + contents, warning: "Synthesized missing YAML frontmatter" }
+  if (!contents.startsWith("---\n")) return { body: "---\nname: " + name + "\ndescription: Imported OnethyCode " + kind + " component\n---\n\n" + contents, warning: "Synthesized missing YAML frontmatter" }
   const end = contents.indexOf("\n---\n", 4)
-  if (end < 0) return { body: "---\nname: " + name + "\ndescription: Imported AITmpl " + kind + " component\n---\n\n" + contents, warning: "Synthesized invalid YAML frontmatter" }
+  if (end < 0) return { body: "---\nname: " + name + "\ndescription: Imported OnethyCode " + kind + " component\n---\n\n" + contents, warning: "Synthesized invalid YAML frontmatter" }
   const header = contents.slice(4, end)
   const body = contents.slice(end + 5)
   // Do not use a YAML parser on untrusted source. Modify only the known tools field.
@@ -72,7 +77,7 @@ function convertMarkdown(contents, kind, name) {
   if (kind === "skills") updated = /^name:\s*.*$/m.test(updated) ? updated.replace(/^name:\s*.*$/m, "name: " + name) : "name: " + name + "\n" + updated
   else if (!/^name:\s*/m.test(updated)) updated = "name: " + name + "\n" + updated
   if (!/^description:\s*/m.test(updated)) {
-    updated = 'description: "Imported AITmpl ' + kind + ' component"\n' + updated
+    updated = 'description: "Imported OnethyCode ' + kind + ' component"\n' + updated
   }
   if (/\b(?:mcp__|context-manager|claude -p|Claude Code CLI)\b/i.test(body))
     warning = [warning, "Runtime-specific references may require manual changes"].filter(Boolean).join("; ")
@@ -80,7 +85,7 @@ function convertMarkdown(contents, kind, name) {
 }
 async function safeAncestors(base, out) {
   // Imported content must never follow a preexisting symlink outside the native config.
-  const chain = [base]
+  const chain = [destination, base]
   const parts = relative(base, dirname(out)).split(sep).filter(Boolean)
   for (const part of parts) chain.push(join(chain.at(-1), part))
   for (const candidate of chain) {
@@ -98,7 +103,7 @@ async function record(type, name, sourceFile, out, convert, prepared) {
   if (!inside(base, out) || !(await safeAncestors(base, out))) { report.rejected++; return }
   if (await exists(out)) { report.existing++; return }
   const input = convert ? await readFile(sourceFile, "utf8") : undefined
-  const result = prepared !== undefined ? { body: prepared } : convert ? (type === "agents" ? convertAITmplAgent(input, name) : convertMarkdown(input, type, name)) : undefined
+  const result = prepared !== undefined ? { body: prepared } : convert ? (type === "agents" ? convertOnethyCodeAgent(input, name) : type === "commands" ? convertOnethyCodeCommand(input, name) : convertMarkdown(input, type, name)) : undefined
   if (result?.warning) {
     report.components[type].warnings.push({ name, warning: result.warning })
   }
@@ -126,6 +131,8 @@ try {
     // OnethyCode already discovers mcp/**/*.json and always disables discovered
     // servers by default. Import only sanitized definitions, never credentials.
     if (type === "mcps") {
+      const curated = curatedLocalMCPs()
+      await record("mcp", "local-tools", root, join(destination, "mcp", "onethy", "local-tools.json"), false, curated)
       for await (const file of traverse(root)) {
         if (extname(file).toLowerCase() !== ".json") continue
         report.components[type].files++
@@ -137,14 +144,50 @@ try {
         }
         if (!converted.json) { report.pending++; continue }
         const name = safeMcpId(relativeId)
-        const dest = join(destination, "mcp", "aitmpl", name + ".json")
+        const dest = join(destination, "mcp", "onethy", name + ".json")
         await record("mcp", name, file, dest, false, converted.json)
       }
       continue
     }
-    // Claude Code-specific event hooks, mods and settings cannot be made
-    // executable safely by renaming them. Inventory but do not activate.
-    if (!["skills", "agents"].includes(type)) {
+    if (type === "hooks") {
+      for await (const file of traverse(root)) {
+        const ext = extname(file).toLowerCase()
+        if (![".py", ".sh", ".js", ".ts", ".json", ".md"].includes(ext)) continue
+        const rel = relative(root, file).replaceAll(sep, "/")
+        const converted = convertOnethyCodeHook(rel, await readFile(file, "utf8"))
+        const dest = join(destination, "hooks", "onethy", converted.id + ".json")
+        report.components[type].files++
+        await record("hooks", converted.id, file, dest, false, converted.file)
+        if (!converted.supported) report.pending++
+      }
+      continue
+    }
+    if (type === "mods") {
+      for (const category of await readdir(root, { withFileTypes: true })) {
+        if (!category.isDirectory()) continue
+        const categoryRoot = join(root, category.name)
+        for (const folder of await readdir(categoryRoot, { withFileTypes: true })) {
+          if (!folder.isDirectory()) continue
+          const dir = join(categoryRoot, folder.name)
+          const manifestFile = join(dir, ".claude-plugin", "plugin.json")
+          const readmeFile = join(dir, "README.md")
+          const manifest = await readFile(manifestFile, "utf8").catch(e => e.code === "ENOENT" ? "" : Promise.reject(e))
+          const readme = await readFile(readmeFile, "utf8").catch(e => e.code === "ENOENT" ? "" : Promise.reject(e))
+          if (!manifest && !readme) continue
+          const id = category.name + "/" + folder.name
+          if (/tmpl|marketplace|catalog/i.test(id)) { report.pending++; continue }
+          const converted = convertOnethyCodeMod(id, manifest, readme)
+          const dest = join(destination, "mods", "onethy", converted.id + ".json")
+          report.components[type].files++
+          await record("mods", converted.id, manifest ? manifestFile : readmeFile, dest, false, converted.file)
+          if (!converted.supported) report.pending++
+        }
+      }
+      continue
+    }
+    // Only file-based customizations are installed automatically. Settings
+    // and unrelated plugins remain inventoried because they may conflict.
+    if (!["skills", "agents", "commands"].includes(type)) {
       for await (const file of traverse(root)) report.components[type].files++
       report.pending += report.components[type].files
       continue
@@ -169,7 +212,7 @@ try {
       continue
     }
     for await (const file of traverse(root)) {
-      if (type !== "agents" || extname(file).toLowerCase() !== ".md") continue
+      if (!["agents", "commands"].includes(type) || extname(file).toLowerCase() !== ".md") continue
       const name = slug(relative(root, file).slice(0, -3).split(sep).join("-"))
       const out = join(destination, type, name + ".md")
       report.components[type].files++
