@@ -5,9 +5,9 @@ import { tmpdir, homedir } from "node:os"
 import { join, relative, resolve, dirname, basename, extname, sep } from "node:path"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { cleanupObsoleteGeneratedMCPs } from "./onethy-customizations-cleanup.mjs"
-import { convertMcpTemplate, safeMcpId } from "./onethy-customization-mcp.mjs"
+import { cleanupObsoleteGeneratedMCPs, cleanupGeneratedOnethyMCPs } from "./onethy-customizations-cleanup.mjs"
 import { curatedLocalMCPs } from "./onethy-customizations-local-mcp.mjs"
+import { curatedNativePlugins } from "./onethy-customizations-local-plugins.mjs"
 import { convertOnethyCodeAgent } from "./onethy-customizations-agent.mjs"
 import { convertOnethyCodeCommand } from "./onethy-customizations-command.mjs"
 import { convertOnethyCodeHook, convertOnethyCodeMod } from "./onethy-customizations-descriptors.mjs"
@@ -31,7 +31,9 @@ const destination = options.global
 const report = { mode: verify ? "verify" : install ? "install" : "preview", target: destination, ready: 0, installed: 0, existing: 0, rejected: 0, pending: 0, errors: [], components: {} }
 const staging = sourceDir ? undefined : await mkdtemp(join(tmpdir(), "onethy-onethy-"))
 const source = sourceDir ? resolve(sourceDir) : join(staging, "catalog")
-if (install && !verify) report.obsoleteGeneratedMcpRemoved = await cleanupObsoleteGeneratedMCPs(destination)
+if (install && !verify) {
+  report.obsoleteGeneratedMcpRemoved = (await cleanupObsoleteGeneratedMCPs(destination)) + (await cleanupGeneratedOnethyMCPs(destination))
+}
 
 function git(...argv) {
   const p = spawnSync("git", argv, { encoding: "utf8", timeout: 240000, maxBuffer: 10_000_000 })
@@ -120,35 +122,30 @@ async function record(type, name, sourceFile, out, convert, prepared) {
   }
 }
 try {
-  if (!sourceDir) {
+  const remoteKinds = kinds.filter(type => !["mcps", "plugins"].includes(type))
+  if (!sourceDir && remoteKinds.length) {
     git("clone", "--depth", "1", "--filter=blob:none", "--sparse", CATALOG, source)
-    git("-C", source, "sparse-checkout", "set", ...kinds.map(t => "cli-tool/components/" + (t === "mcps" ? "mcps" : t)))
+    git("-C", source, "sparse-checkout", "set", ...remoteKinds.map(t => "cli-tool/components/" + t))
   }
   for (const type of kinds) {
     const root = join(source, "cli-tool", "components", type)
     report.components[type] = { files: 0, warnings: [] }
-    if (!(await exists(root))) { report.components[type].missing = true; continue }
-    // OnethyCode already discovers mcp/**/*.json and always disables discovered
-    // servers by default. Import only sanitized definitions, never credentials.
     if (type === "mcps") {
-      const curated = curatedLocalMCPs()
-      await record("mcp", "local-tools", root, join(destination, "mcp", "onethy", "local-tools.json"), false, curated)
-      for await (const file of traverse(root)) {
-        if (extname(file).toLowerCase() !== ".json") continue
+      const output = join(destination, "mcp", "onethy", "local-tools.json")
+      report.components[type].files = 1
+      await record("mcp", "local-tools", source, output, false, curatedLocalMCPs())
+      continue
+    }
+    if (type === "plugins") {
+      const plugins = curatedNativePlugins()
+      for (const plugin of plugins) {
         report.components[type].files++
-        const relativeId = relative(root, file).replaceAll(sep, "/")
-        const input = await readFile(file, "utf8")
-        const converted = convertMcpTemplate(input, relativeId)
-        for (const warning of converted.warnings) {
-          report.components[type].warnings.push({ name: relativeId, warning })
-        }
-        if (!converted.json) { report.pending++; continue }
-        const name = safeMcpId(relativeId)
-        const dest = join(destination, "mcp", "onethy", name + ".json")
-        await record("mcp", name, file, dest, false, converted.json)
+        const output = join(destination, "plugins", "onethy", plugin.file)
+        await record("plugins", plugin.id, source, output, false, JSON.stringify(plugin, null, 2) + "\\n")
       }
       continue
     }
+    if (!(await exists(root))) { report.components[type].missing = true; continue }
     if (type === "hooks") {
       for await (const file of traverse(root)) {
         const ext = extname(file).toLowerCase()
