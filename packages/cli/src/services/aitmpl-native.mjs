@@ -4,6 +4,7 @@ import { mkdtemp, readdir, mkdir, copyFile, lstat, readFile, writeFile, rm } fro
 import { tmpdir, homedir } from "node:os"
 import { join, relative, resolve, dirname, basename, extname, sep } from "node:path"
 import { spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 
 
 const CATALOG = "https://github.com/davila7/claude-code-templates.git"
@@ -32,13 +33,19 @@ async function* traverse(directory) {
   }
 }
 const exists = async (path) => { try { await lstat(path); return true } catch (e) { if (e.code === "ENOENT") return false; throw e } }
-const slug = (s) => s.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase()
+const slug = (value) => {
+  const clean = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+  const name = clean || "component"
+  if (name.length <= 64) return name
+  const digest = createHash("sha256").update(value).digest("hex").slice(0, 8)
+  return name.slice(0, 55).replace(/-+$/g, "") + "-" + digest
+}
 const inside = (root, file) => { const p = relative(root, file); return p && p !== ".." && !p.startsWith(".." + sep) && !p.startsWith(sep) }
 const toolkit = { Read: "read", Write: "write", Edit: "edit", Bash: "bash", Glob: "glob", Grep: "grep", WebFetch: "webfetch", WebSearch: "websearch", Task: "task", NotebookEdit: "edit" }
 function convertMarkdown(contents, kind, name) {
-  if (!contents.startsWith("---\n")) return { body: contents, warning: "Missing YAML frontmatter" }
+  if (!contents.startsWith("---\n")) return { body: "---\nname: " + name + "\ndescription: Imported AITmpl " + kind + " component\n---\n\n" + contents, warning: "Synthesized missing YAML frontmatter" }
   const end = contents.indexOf("\n---\n", 4)
-  if (end < 0) return { body: contents, warning: "Invalid YAML frontmatter" }
+  if (end < 0) return { body: "---\nname: " + name + "\ndescription: Imported AITmpl " + kind + " component\n---\n\n" + contents, warning: "Synthesized invalid YAML frontmatter" }
   const header = contents.slice(4, end)
   const body = contents.slice(end + 5)
   // Do not use a YAML parser on untrusted source. Modify only the known tools field.
@@ -57,7 +64,7 @@ function convertMarkdown(contents, kind, name) {
   }
   if (kind === "skills") updated = /^name:\s*.*$/m.test(updated) ? updated.replace(/^name:\s*.*$/m, "name: " + name) : "name: " + name + "\n" + updated
   else if (!/^name:\s*/m.test(updated)) updated = "name: " + name + "\n" + updated
-  if (!/^description:\s*/m.test(updated) && kind !== "skills") {
+  if (!/^description:\s*/m.test(updated)) {
     updated = 'description: "Imported AITmpl ' + kind + ' component"\n' + updated
   }
   if (/\b(?:mcp__|context-manager|claude -p|Claude Code CLI)\b/i.test(body))
