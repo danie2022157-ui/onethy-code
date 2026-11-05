@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { cleanupObsoleteGeneratedMCPs } from "./onethy-customizations-cleanup.mjs"
 import { convertMcpTemplate, safeMcpId } from "./onethy-customization-mcp.mjs"
+import { curatedLocalMCPs } from "./onethy-customizations-local-mcp.mjs"
 import { convertOnethyCodeAgent } from "./onethy-customizations-agent.mjs"
 import { convertOnethyCodeCommand } from "./onethy-customizations-command.mjs"
 import { convertOnethyCodeHook, convertOnethyCodeMod } from "./onethy-customizations-descriptors.mjs"
@@ -130,6 +131,8 @@ try {
     // OnethyCode already discovers mcp/**/*.json and always disables discovered
     // servers by default. Import only sanitized definitions, never credentials.
     if (type === "mcps") {
+      const curated = curatedLocalMCPs()
+      await record("mcp", "local-tools", root, join(destination, "mcp", "onethy", "local-tools.json"), false, curated)
       for await (const file of traverse(root)) {
         if (extname(file).toLowerCase() !== ".json") continue
         report.components[type].files++
