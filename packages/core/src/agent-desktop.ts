@@ -63,7 +63,7 @@ const READ_ONLY = new Set<DesktopAction>([
 
 function required(value: string | undefined, field: string, max = 256) {
   if (!value?.trim() || value.length > max || value.includes("\0")) {
-    throw new Error(field + " must be a non-empty string of at most " + max + " characters.")
+    throw new Error(field + " must be a non-empty string of at most " + max.toLocaleString("en-US") + " characters.")
   }
   return value
 }
