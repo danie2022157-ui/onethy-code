@@ -65,7 +65,7 @@ export async function cleanupGeneratedOnethyMCPs(configRoot) {
   }
   let removed = 0
   for (const item of await readDir(directory)) {
-    if (!item.isFile() || !/^[a-z0-9-]+-[a-f0-9]{8}\\.json$/.test(item.name)) continue
+    if (!item.isFile() || !/^[a-z0-9-]+-[a-f0-9]{8}\.json$/.test(item.name)) continue
     const file = join(directory, item.name)
     if (!(await lstat(file)).isFile()) continue
     let raw
