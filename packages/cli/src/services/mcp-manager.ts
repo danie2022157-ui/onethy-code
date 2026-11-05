@@ -155,7 +155,9 @@ export async function manageMcp(input: {
   const inProjectNative = projectNative.some(item => item.name === name && item.installed)
   const inGlobalNative = globalNative.some(item => item.name === name && item.installed)
   const currentNative = input.global ? inGlobalNative : inProjectNative
-  const available = inProjectNative || inGlobalNative || configured(localConfig, name) || configured(globalConfig, name)
+  const available = input.global
+    ? inGlobalNative || configured(globalConfig, name)
+    : inProjectNative || inGlobalNative || configured(localConfig, name) || configured(globalConfig, name)
   if (!available) throw new Error("MCP não encontrado: " + name + ". Use 'onethy mcp restore' para MCPs nativos.")
 
   if (action === "enable" || action === "disable") {
