@@ -44,7 +44,7 @@ test("Agent Desktop runtime and permission reports have visible diagnostic rows"
 test("desktop report handles unavailable data without inventing permission state", () => {
   const rows = desktopReportRows({ ok: true })
   expect(rows).toEqual([
-    expect.objectContaining({ label: "Native runtime", value: "Connected" }),
+    expect.objectContaining({ label: "Native command", value: "Responding" }),
     expect.objectContaining({ label: "Report", value: "No detailed data returned" }),
   ])
   const oversized = Object.fromEntries(Array.from({ length: 70 }, (_, index) => ["field_" + index, "x".repeat(500)]))
