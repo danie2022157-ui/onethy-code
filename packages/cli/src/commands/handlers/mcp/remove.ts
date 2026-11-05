@@ -9,7 +9,7 @@ export default Runtime.handler(
   Effect.fn("cli.mcp.remove")((input) =>
     Effect.gen(function* () {
       const allowed = yield* confirmAction(
-        `Excluir MCP "${input.name}" da configuração ${input.global ? "global" : "do projeto"}?`,
+        `Delete MCP "${input.name}" from the ${input.global ? "global" : "project"}?`,
         input.yes,
       )
       if (!allowed) return
