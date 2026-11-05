@@ -36,6 +36,27 @@ Na atualização, a lista anterior de três MCPs é trocada pela de oito **apena
 
 Para ligar um MCP, habilite o servidor pela configuração canônica do OnethyCode (por exemplo, em `mcp.overrides`); o campo `disabled` no arquivo descoberto não concede permissão para inicializar um servidor sozinho.
 
+## Gerenciamento dos MCPs no terminal
+
+O OnethyCode tem comandos diretos e um menu interativo, sem depender de um provedor:
+
+| Operação | Comando |
+| --- | --- |
+| Listar servidores e seus status reais | `onethy mcp list` |
+| Abrir gerenciador com seleção interativa | `onethy mcp manage` |
+| Ativar um servidor no projeto | `onethy mcp enable onethy-playwright` |
+| Desativar sem apagar | `onethy mcp disable onethy-playwright` |
+| Excluir uma configuração do projeto | `onethy mcp remove onethy-playwright` |
+| Restaurar um MCP nativo removido | `onethy mcp restore onethy-playwright` |
+| Restaurar todos os 8 nativos | `onethy mcp restore --all` |
+| Diagnosticar erros de inicialização | `onethy mcp doctor` |
+
+A flag `--global` em `manage`, `enable`, `disable`, `remove` e `restore` aplica a operação à configuração global em vez da configuração do projeto. A opção `--yes` confirma exclusão ou restauração completa em terminais não interativos.
+
+**Excluir** remove somente a definição MCP selecionada no escopo indicado, além da autorização correspondente nesse escopo. Outros MCPs e personalizações não são alterados. Se a definição estiver na configuração global, o comando exige `--global` para excluí-la. Para arquivos descobertos em outras ferramentas (como Cursor ou VS Code), a exclusão não altera esses programas.
+
+**Restaurar** reconstitui a definição original do MCP nativo com `disabled: true`; a opção `--all` recria as oito definições e limpa as autorizações explícitas dos MCPs restaurados no escopo selecionado. A restauração não apaga MCPs personalizados que tenham nomes diferentes. O gerenciador mantém as alterações entre sessões e atualizações; um MCP removido não reaparece automaticamente na próxima sincronização.
+
 ## Plugins nativos
 
 Existem dois plugins do próprio OnethyCode em `plugins/onethy/`: **Proteção de arquivos sensíveis** (bloqueia o uso de arquivos `.env`, chaves e certificados quando ativado) e **Preferência por ferramentas locais** (inclui orientação na sessão para priorizar ferramentas do computador). São adaptadores internos reais, sem execução de JavaScript de plugins de terceiros. Ficam desativados inicialmente e podem ser habilitados no descritor JSON com `enabled: true`, mantendo a decisão com o usuário.
