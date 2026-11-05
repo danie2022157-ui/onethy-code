@@ -59,10 +59,6 @@ function readMemoryBank(directory: string): string {
 
 function renderAutoCustomizationsDirective(_directory: string): string {
   const config = OmniOrchestrator.getAutoCustomizationsConfig()
-  if (!config.enabled) {
-    return ""
-  }
-
   const activeFeatures: string[] = []
   if (config.useSkills) {
     activeFeatures.push(
@@ -76,7 +72,7 @@ function renderAutoCustomizationsDirective(_directory: string): string {
   }
   if (config.useMcps) {
     activeFeatures.push(
-      "- [SERVIDORES MCP]: Utilize ativamente as ferramentas dos servidores MCP conectados (serviços externos, navegadores, análise, bases de dados) de acordo com o trabalho solicitado.",
+      "- [SERVIDORES MCP]: Utilize os servidores MCP locais que estiverem habilitados e conectados de acordo com a tarefa; não tente iniciar servidores desativados sem aprovação.",
     )
   }
   if (config.useHooks) {
@@ -102,10 +98,10 @@ function renderAutoCustomizationsDirective(_directory: string): string {
 
   return [
     "<auto_customizations_orchestrator>",
-    "  Status: ATIVO (Configuração do Usuário: sempre usar recursos de acordo com a tarefa)",
+    "  Status: ATIVO PARA TODOS OS AGENTES (categorias disponíveis permanentemente)",
     "  Diretrizes de Execução Proativa:",
     ...activeFeatures.map((f) => `  ${f}`),
-    "  Instrução Geral: Como assistente proativo da OnethyCode, não aguarde passivamente. Selecione e aplique os recursos acima de acordo com o que o usuário estiver construindo ou reparando.",
+    "  Instrução Geral: Cada agente e subagente deve selecionar recursos pertinentes à tarefa; usar apenas MCPs conectados, plugins e hooks explicitamente habilitados. Respeitar permissões, confirmações, escopo do projeto e disponibilidade real. Nunca interpretar a seleção automática como autorização para ativar servidores ou executar scripts não confiáveis.",
     "</auto_customizations_orchestrator>",
   ].join("\n")
 }
