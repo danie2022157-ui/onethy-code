@@ -37,7 +37,7 @@ function normalServer(input, id, warnings) {
       : []
   const args = Array.isArray(input.args) && input.args.every(x => typeof x === "string") ? input.args : []
   if (!command.length || !command[0].trim()) return null
-  if ([...command, ...args].some(x => /<your[-_ ]?|bearer\\s+\\S+|(?:api[_-]?key|token|password|secret)=/i.test(x))) {
+  if ([...command, ...args].some(x => /<your[-_ ]?|bearer\s+\S+|(?:api[_-]?key|token|password|secret)=/i.test(x))) {
     warnings.push("MCP " + suffix + ": command contains placeholder or possible embedded credentials")
     return null
   }
