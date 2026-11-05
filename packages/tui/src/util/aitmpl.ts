@@ -95,3 +95,35 @@ export async function stageTemplate(entry: TemplateEntry, directory: string): Pr
   }
   return target
 }
+
+
+/**
+ * After manually reviewing a staged file, a user may explicitly activate
+ * single-file Markdown agents/commands/loops in the project's native config.
+ * Do not activate MCPs, hooks, mods or settings: their semantics differ from
+ * Claude Code and some of them execute arbitrary programs.
+ * Skills can depend on additional files and must be adapted separately.
+ */
+export function activeTemplateTarget(entry: TemplateEntry, directory: string): string {
+  if (!["agents", "commands", "loops"].includes(entry.type))
+    throw new Error("Esta categoria exige adaptação manual antes de ser ativada")
+  const relative = sourceRelative(entry)
+  const categoryPath = relative.slice(entry.type.length + 1)
+  const root = path.resolve(directory)
+  return path.join(root, ".opencode", entry.type, "aitmpl", ...categoryPath.split("/"))
+}
+
+export async function activateReviewedTemplate(entry: TemplateEntry, directory: string): Promise<string> {
+  const staging = reviewTarget(entry, directory)
+  const target = activeTemplateTarget(entry, directory)
+  const root = path.resolve(directory)
+  await assertNoSymlink(path.dirname(staging), root)
+  await assertNoSymlink(path.dirname(target), root)
+  const contents = await fs.readFile(staging)
+  const sha = createHash("sha1").update("blob " + contents.length + "\0").update(contents).digest("hex")
+  if (sha !== entry.sha) throw new Error("A cópia de revisão foi alterada ou está incompleta")
+  await fs.mkdir(path.dirname(target), { recursive: true })
+  await assertNoSymlink(path.dirname(target), root)
+  await fs.writeFile(target, contents, { flag: "wx" })
+  return target
+}
