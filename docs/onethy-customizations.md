@@ -76,3 +76,15 @@ A sincronização é integrada ao processo de instalação/atualização da dist
 Os testes automatizados cobrem Windows e Linux, prévia sem gravação, importação idempotente, rejeição de MCPs que exigem autenticação, preservação de configurações pessoais, remoção segura de registros antigos, somente três MCPs nativos e adaptadores internos de plugins, além da importação segura de comandos, hooks e mods.
 
 A aprovação desses testes não garante que todos os componentes do catálogo funcionem em todo ambiente: scripts, permissões e dependências precisam ser avaliados caso a caso.
+
+## Seleção automática para todos os agentes
+
+As **sete categorias de seleção** (skills, agentes, MCPs, hooks, mods/plugins, comandos e modos/configurações) agora estão sempre disponíveis no OnethyCode. Não existe mais a tela `Proactive Capabilities Auto-Usage — OmniCode` nem alternâncias por categoria: escolhas antigas desativadas são ignoradas pelo orquestrador. A política é apresentada aos agentes e subagentes no contexto de cada tarefa.
+
+**Estar disponível não significa executar sem permissão.** O agente pode identificar a skill, o subagente ou o comando útil para a tarefa, mas servidores MCP só ficam utilizáveis depois de habilitados e conectados; hooks e plugins só executam implementações nativas previamente habilitadas. O OnethyCode continua respeitando as confirmações, o escopo de arquivos e as permissões das ferramentas. Não há executor autônomo em segundo plano.
+
+## Diagnóstico dos MCPs no terminal
+
+A janela **MCP servers** mostra orientações curtas para falhas de inicialização como executáveis `npx`/`uvx` ausentes no PATH, diretório Git incorreto, dependências Python, problemas de rede/permissões e timeout. Selecione o servidor que falhou e pressione **Enter** para ver o erro completo e copiá-lo.
+
+O renderizador também reserva um número compatível de listeners de redimensionamento, reduzindo os avisos `MaxListenersExceededWarning` que antes apareciam sobre a janela. Isso não instala dependências externas: uma falha em `uvx`, `npx` ou em pacotes individuais ainda deve ser corrigida de acordo com o erro exibido.
