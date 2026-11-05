@@ -89,6 +89,7 @@ import { OmniMemoryTool } from "../tool/plugin/omni-memory.js"
 import { OmniCheckpointTool } from "../tool/plugin/omni-checkpoint.js"
 import { OmniHealTool } from "../tool/plugin/omni-heal.js"
 import { OmniIntelligenceTool } from "../tool/plugin/omni-intelligence.js"
+import { DesktopControlTool } from "../tool/plugin/desktop-control.js"
 import { OmniCommitTool } from "../tool/plugin/omni-commit.js"
 import { OpenCodeTools } from "../tool/plugin/opencode.js"
 import { QuestionTool } from "../tool/plugin/question.js"
@@ -280,6 +281,7 @@ const pre = [
   OmniCheckpointTool.Plugin,
   OmniHealTool.Plugin,
   OmniIntelligenceTool.Plugin,
+  DesktopControlTool.Plugin,
   OmniCommitTool.Plugin,
   OpenCodeTools.Plugin,
   McpResourceTools.Plugin,

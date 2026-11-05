@@ -108,6 +108,7 @@ import { DialogVariant } from "./component/dialog-variant"
 import { DialogFusionModels } from "./component/dialog-fusion-models"
 import { DialogOmniUpdate } from "./component/dialog-omni-update"
 import { DialogProjects } from "./component/dialog-projects"
+import { DialogDesktop } from "./component/dialog-desktop"
 import { DialogMemoryBank } from "./component/dialog-memory-bank"
 import { ReviewBarSignals } from "./component/prompt/review-bar"
 import { destroyRenderer, setTerminalTitle } from "./util/renderer"
@@ -840,6 +841,16 @@ function App() {
             category: "OmniCode",
             slash: { name: "projects", aliases: ["project", "projetos"] },
             run: () => dialog.replace(() => <DialogProjects />),
+          }]
+        : []),
+      ...((process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1")
+        ? [{
+            name: "onethy.desktop",
+            title: "Manage desktop computer use",
+            description: "Inspect accessibility permissions and install the Agent Desktop runtime",
+            category: "OnethyCode",
+            slash: { name: "desktop" },
+            run: () => dialog.replace(() => <DialogDesktop />),
           }]
         : []),
       {

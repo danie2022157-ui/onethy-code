@@ -84,7 +84,7 @@ jobs:
           }
 
       - name: Core regression tests
-        run: bun --cwd packages/core test test/omni-config.test.ts test/omni-memory-bank.test.ts test/omni-session.test.ts test/omni-model-selection.test.ts test/omni-orchestrator.test.ts test/omni-mission-control.test.ts test/omni-intelligence.test.ts test/omni-task-graph.test.ts test/omni-embeddings.test.ts test/instructions/builtins.test.ts
+        run: bun --cwd packages/core test test/omni-config.test.ts test/omni-memory-bank.test.ts test/omni-session.test.ts test/omni-model-selection.test.ts test/omni-orchestrator.test.ts test/omni-mission-control.test.ts test/omni-intelligence.test.ts test/agent-desktop.test.ts test/omni-task-graph.test.ts test/omni-embeddings.test.ts test/instructions/builtins.test.ts
 
       - name: MCP configuration and connectivity regressions
         run: bun --cwd packages/core test test/config/normalization.test.ts test/mcp.test.ts
@@ -93,7 +93,7 @@ jobs:
         run: bun --cwd packages/core test test/tool-subagent.test.ts
 
       - name: TUI regression tests
-        run: bun --cwd packages/tui test test/cli/tui/dialog-mcp.test.tsx test/cli/tui/plugins-dialog.test.tsx test/component/dialog-omni-update.test.tsx test/component/dialog-memory-bank.test.tsx test/util/onethy-update.test.ts test/util/onethy-projects.test.ts test/util/mcp-diagnostics.test.ts test/component/dialog-projects.test.tsx
+        run: bun --cwd packages/tui test test/cli/tui/dialog-mcp.test.tsx test/cli/tui/plugins-dialog.test.tsx test/component/dialog-omni-update.test.tsx test/component/dialog-memory-bank.test.tsx test/util/onethy-update.test.ts test/util/onethy-projects.test.ts test/util/mcp-diagnostics.test.ts test/component/dialog-projects.test.tsx test/component/dialog-desktop.test.tsx
 
       - name: Core TypeScript check
         if: runner.os == 'Linux'
