@@ -43,6 +43,7 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
   const toast = useToast()
   const theme = useTheme().surface("dialog")
   const current = () => location.ref ?? data.location.default()
+  const [hidden, setHidden] = createSignal<ReadonlySet<string>>(new Set())
   const servers = createMemo(() =>
     pipe(
       (data.location.mcp.server.list(current()) ?? []).filter((server) => !hidden().has(server.name)),
@@ -56,7 +57,6 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
   )
   const [loading, setLoading] = createSignal<ReadonlySet<string>>(new Set())
   const [saving, setSaving] = createSignal(false)
-  const [hidden, setHidden] = createSignal<ReadonlySet<string>>(new Set())
 
   const statusColor = (status: McpServer["status"]) => {
     if (status.status === "connected") return theme.text.feedback.success.base
