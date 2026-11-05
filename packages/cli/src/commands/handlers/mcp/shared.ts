@@ -21,6 +21,6 @@ export const perform = Effect.fn("cli.mcp.perform")(function* (input: {
 
 export const confirmAction = Effect.fn("cli.mcp.confirm")(function* (message: string, yes: boolean) {
   if (yes) return true
-  yield* requireInteractive("Confirmação necessária. Use --yes em um terminal não interativo.")
+  yield* requireInteractive("Confirmation required. Use --yes in a non-interactive terminal.")
   return yield* prompt<boolean>(() => confirm({ message }))
 })
