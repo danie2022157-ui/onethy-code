@@ -27,6 +27,13 @@ import { usePermission } from "./permission"
 import { useLocation } from "./location"
 import { parse } from "../util/model"
 
+// Runtime policy for every OnethyCode agent. Individual MCPs, hooks and plugins
+// still require their own explicit activation and normal tool permissions.
+const ALWAYS_ON_CUSTOMIZATIONS = {
+  enabled: true, useSkills: true, useAgents: true, useMcps: true,
+  useHooks: true, useMods: true, useCommands: true, useSettings: true,
+} as const
+
 export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
   name: "Local",
   init: () => {
@@ -217,7 +224,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         }
         process.env.OMNICODE_THINKING_ROUTING = autoStore.thinkingRouting ? "1" : "0"
         process.env.OMNICODE_OPTIMIZE_TIER = autoStore.explicitTier ?? autoStore.managedDefaultTier
-        process.env.OMNICODE_AUTO_CUSTOMIZATIONS = JSON.stringify(autoStore.autoCustomizations)
+        process.env.OMNICODE_AUTO_CUSTOMIZATIONS = JSON.stringify(ALWAYS_ON_CUSTOMIZATIONS)
       }
 
       function saveAutoStore() {
@@ -227,7 +234,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           selectedModels: autoStore.selectedModels,
           thinkingRouting: autoStore.thinkingRouting,
           cooldowns: autoStore.cooldowns,
-          autoCustomizations: autoStore.autoCustomizations,
+          autoCustomizations: ALWAYS_ON_CUSTOMIZATIONS,
         }).catch(() => undefined)
         syncAllowedModelsEnv()
       }
@@ -262,19 +269,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               }
               setAutoStore("cooldowns", active)
             }
-            if (saved.autoCustomizations && typeof saved.autoCustomizations === "object") {
-              const c = saved.autoCustomizations as Record<string, unknown>
-              setAutoStore("autoCustomizations", {
-                enabled: typeof c.enabled === "boolean" ? c.enabled : true,
-                useSkills: typeof c.useSkills === "boolean" ? c.useSkills : true,
-                useAgents: typeof c.useAgents === "boolean" ? c.useAgents : true,
-                useMcps: typeof c.useMcps === "boolean" ? c.useMcps : true,
-                useHooks: typeof c.useHooks === "boolean" ? c.useHooks : true,
-                useMods: typeof c.useMods === "boolean" ? c.useMods : true,
-                useCommands: typeof c.useCommands === "boolean" ? c.useCommands : true,
-                useSettings: typeof c.useSettings === "boolean" ? c.useSettings : true,
-              })
-            }
+            // Retired per-category auto-usage flags are intentionally ignored.
           })
           syncAllowedModelsEnv()
         })
@@ -1070,52 +1065,13 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           },
         },
         customizations: {
-          config() {
-            return autoStore.autoCustomizations
-          },
-          enabled() {
-            return autoStore.autoCustomizations.enabled
-          },
-          toggleEnabled() {
-            batch(() => {
-              setAutoStore("autoCustomizations", "enabled", !autoStore.autoCustomizations.enabled)
-              saveAutoStore()
-            })
-          },
-          toggle(key: "useSkills" | "useAgents" | "useMcps" | "useHooks" | "useMods" | "useCommands" | "useSettings") {
-            batch(() => {
-              setAutoStore("autoCustomizations", key, !autoStore.autoCustomizations[key])
-              saveAutoStore()
-            })
-          },
-          setAll(value: boolean) {
-            batch(() => {
-              setAutoStore("autoCustomizations", {
-                enabled: value,
-                useSkills: value,
-                useAgents: value,
-                useMcps: value,
-                useHooks: value,
-                useMods: value,
-                useCommands: value,
-                useSettings: value,
-              })
-              saveAutoStore()
-            })
-          },
-          summary() {
-            if (!autoStore.autoCustomizations.enabled) return "Desativado"
-            const count = [
-              autoStore.autoCustomizations.useSkills,
-              autoStore.autoCustomizations.useAgents,
-              autoStore.autoCustomizations.useMcps,
-              autoStore.autoCustomizations.useHooks,
-              autoStore.autoCustomizations.useMods,
-              autoStore.autoCustomizations.useCommands,
-              autoStore.autoCustomizations.useSettings,
-            ].filter(Boolean).length
-            return `Ativo (${count}/7 recursos)`
-          },
+          config() { return ALWAYS_ON_CUSTOMIZATIONS },
+          enabled() { return true },
+          // Backward compatible no-ops; the old toggle UI has been removed.
+          toggleEnabled() {},
+          toggle(_key: "useSkills" | "useAgents" | "useMcps" | "useHooks" | "useMods" | "useCommands" | "useSettings") {},
+          setAll(_value: boolean) {},
+          summary() { return "Ativo (7/7 recursos)" },
         },
       }
     }
