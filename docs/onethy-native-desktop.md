@@ -6,7 +6,7 @@ The integration uses the upstream native accessibility binary for **Windows**, *
 
 ## Setup in the TUI
 
-Open `/desktop` (or find **Manage desktop computer use** in the command palette). The manager has English-language actions to:
+Open `/desktop`, select **Native Desktop** on the OnethyCode Home screen, click the `/desktop Computer Use` quick action, or select **Manage desktop computer use** in the main command palette (`Ctrl+P`). The manager has English-language actions to:
 
 - Check the native runtime status.
 - Check accessibility permissions.
