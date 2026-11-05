@@ -83,6 +83,26 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         ),
       },
     }),
+    Spec.make("aitmpl", {
+      description: "Importar personalizações do catálogo AITmpl para o OnethyCode nativamente",
+      params: {
+        install: Flag.Boolean("install").pipe(
+          Flag.withDescription("Instalar skills, agents e commands; sem esta opção apenas prévia"),
+          Flag.withDefault(false),
+        ),
+        global: Flag.Boolean("global").pipe(
+          Flag.withDescription("Instalar globalmente para todas as sessões"),
+          Flag.withDefault(false),
+        ),
+        type: Flag.Literals("type", [
+          "all", "skills", "agents", "commands", "settings", "hooks", "mcps", "plugins", "mods", "loops",
+        ]).pipe(Flag.withDefault("all")),
+        sourceDir: Flag.String("source-dir").pipe(
+          Flag.withDescription("Checkout local do catálogo AITmpl para uso offline"),
+          Flag.optional,
+        ),
+      },
+    }),
     Spec.make("acp", {
       description: "Iniciar um servidor Agent Client Protocol",
       params: {
