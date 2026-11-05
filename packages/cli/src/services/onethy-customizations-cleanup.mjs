@@ -15,6 +15,9 @@ const readDir = async (directory) => readdir(directory, { withFileTypes: true })
 export async function cleanupObsoleteGeneratedMCPs(configRoot) {
   let removed = 0
   const root = join(configRoot, "mcp")
+  // User-owned MCP roots can be links to shared directories; never mutate those.
+  try { const meta = await lstat(root); if (!meta.isDirectory() || meta.isSymbolicLink()) return removed }
+  catch (error) { if (error.code === "ENOENT") return removed; throw error }
   for (const directory of await readDir(root)) {
     if (!directory.isDirectory() || digest(directory.name) !== retiredFingerprint) continue
     const folder = join(root, directory.name)
