@@ -1,12 +1,11 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { mkdtemp, mkdir, readFile, writeFile, rm, stat } from "node:fs/promises"
-import { join, resolve, dirname } from "node:path"
+import { join, dirname } from "node:path"
 import { tmpdir } from "node:os"
-import { spawnSync } from "node:child_process"
+import { syncAITmpl } from "../packages/cli/src/services/aitmpl-native.mjs"
 
-const script = resolve("script/aitmpl-sync.mjs")
-test("AITmpl imports native files without executing catalog scripts or overwriting existing files", async () => {
+test("AITmpl imports only native personalizations; never imports slash commands or executes hooks", async () => {
   const root = await mkdtemp(join(tmpdir(), "onethy-aitmpl-test-"))
   try {
     const catalog = join(root, "catalog")
@@ -23,26 +22,29 @@ test("AITmpl imports native files without executing catalog scripts or overwriti
     await writeFile(agent, "---\nname: frontend\ntools: Read, Write, Edit, Bash\n---\nAgent body")
     await writeFile(command, "---\ndescription: Generate tests\n---\nCommand body")
     await writeFile(hook, "touch should-not-exist")
-    const run = (...opts) => {
-      const proc = spawnSync(process.execPath, [script, "--source-dir", catalog, ...opts], { cwd: project, encoding: "utf8" })
-      assert.equal(proc.status, 0, proc.stderr)
-      return JSON.parse(proc.stdout.slice(0, proc.stdout.indexOf("\nNOTE:") >= 0 ? proc.stdout.indexOf("\nNOTE:") : undefined))
-    }
-    const preview = run()
+    const run = (install) => syncAITmpl({ sourceDir: catalog, cwd: project, install })
+    const preview = await run(false)
     assert.equal(preview.installed, 0)
-    assert.ok(preview.ready >= 4)
+    assert.equal(preview.ready, 3)
     await assert.rejects(stat(join(project, ".opencode")))
-    const installed = run("--install")
-    assert.equal(installed.installed, 4)
+    const installed = await run(true)
+    assert.equal(installed.installed, 3)
     const converted = await readFile(join(project, ".opencode/agents/development-team-frontend.md"), "utf8")
     assert.match(converted, /read: true/)
     assert.match(converted, /bash: true/)
     assert.ok(!converted.includes("tools: Read, Write"))
+    const skillText = await readFile(join(project, ".opencode/skills/development-example/SKILL.md"), "utf8")
+    assert.match(skillText, /name: development-example/)
     assert.equal(await readFile(join(project, ".opencode/skills/development-example/example.txt"), "utf8"), "asset content")
-    const repeat = run("--install")
+    const repeat = await run(true)
     assert.equal(repeat.installed, 0)
-    assert.equal(repeat.existing, 4)
+    assert.equal(repeat.existing, 3)
+    await assert.rejects(stat(join(project, ".opencode/commands")))
     await assert.rejects(stat(join(project, "should-not-exist")))
+    const global = join(root, "native-global")
+    const globally = await syncAITmpl({ sourceDir: catalog, global: true, globalDir: global, install: true, type: "skills" })
+    assert.equal(globally.installed, 2)
+    assert.equal(await readFile(join(global, "skills/development-example/example.txt"), "utf8"), "asset content")
   } finally {
     await rm(root, { recursive: true, force: true })
   }
