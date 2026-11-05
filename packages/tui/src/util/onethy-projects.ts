@@ -29,7 +29,8 @@ export function cleanProjectPath(input: string): string {
 
 export function resolveProjectDirectory(input: string, cwd: string, platform: NodeJS.Platform = process.platform): string {
   const cleaned = cleanProjectPath(input)
-  const windowsAbsolute = path.win32.isAbsolute(cleaned)
+  // win32.isAbsolute("/tmp/dir") is also true, so recognize only genuine drive/UNC paths.
+  const windowsAbsolute = /^[a-zA-Z]:[\\/]/.test(cleaned) || /^\\\\[^\\]+\\[^\\]+/.test(cleaned)
   if (platform !== "win32" && windowsAbsolute) {
     throw new Error(
       "This is a Windows path, but the OnethyCode process is running on another OS. " +
