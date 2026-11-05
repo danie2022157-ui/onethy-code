@@ -15,11 +15,11 @@ test("memory manager can switch to global scope and initialize its own documents
   fs.mkdirSync(config)
 
   setup.dialog.replace(() => <DialogMemoryBank projectDir={project} configDir={config} />)
-  await setup.waitForFrame((frame) => frame.includes("Memória Onethy") && frame.includes("Alternar para memória GLOBAL"))
+  await setup.waitForFrame((frame) => frame.includes("Onethy Memory") && frame.includes("Switch to GLOBAL memory"))
   expect(setup.captureCharFrame()).toContain("active-context.md")
 
   setup.mockInput.pressEnter()
-  await setup.waitForFrame((frame) => frame.includes("Alternar para memória do PROJETO"))
+  await setup.waitForFrame((frame) => frame.includes("Switch to PROJECT memory"))
   setup.mockInput.pressArrow("down")
   setup.mockInput.pressEnter()
 
@@ -38,7 +38,7 @@ test("memory manager initializes and labels project notes separately from global
   fs.mkdirSync(config)
 
   setup.dialog.replace(() => <DialogMemoryBank projectDir={project} configDir={config} />)
-  await setup.waitForFrame((frame) => frame.includes("Memória Onethy") && frame.includes("active-context.md"))
+  await setup.waitForFrame((frame) => frame.includes("Onethy Memory") && frame.includes("active-context.md"))
   setup.mockInput.pressArrow("down")
   setup.mockInput.pressEnter()
   await setup.waitFor(() => fs.existsSync(path.join(project, ".omnicode", "memory.md")))
@@ -59,9 +59,9 @@ test("memory manager requires confirmation and never clears the other scope", as
   fs.writeFileSync(projectNotes, "Projeto privado")
 
   setup.dialog.replace(() => <DialogMemoryBank projectDir={project} configDir={config} />)
-  await setup.waitForFrame((frame) => frame.includes("Alternar para memória GLOBAL"))
+  await setup.waitForFrame((frame) => frame.includes("Switch to GLOBAL memory"))
   setup.mockInput.pressEnter()
-  await setup.waitForFrame((frame) => frame.includes("Alternar para memória do PROJETO"))
+  await setup.waitForFrame((frame) => frame.includes("Switch to PROJECT memory"))
   setup.mockInput.pressArrow("down")
   setup.mockInput.pressEnter()
   const globalFile = path.join(config, "memory-bank", "preferences.md")
@@ -69,7 +69,7 @@ test("memory manager requires confirmation and never clears the other scope", as
 
   setup.mockInput.pressArrow("down")
   setup.mockInput.pressEnter()
-  await setup.waitForFrame((frame) => frame.includes("Confirmar exclusão"))
+  await setup.waitForFrame((frame) => frame.includes("Confirm deletion"))
   // Cancel is selected by default: an accidental Enter must NOT delete memories.
   setup.mockInput.pressEnter()
   expect(fs.existsSync(globalFile)).toBe(true)
@@ -89,9 +89,9 @@ test("confirmed global clear removes only global memory", async () => {
   fs.writeFileSync(notes, "Não apagar notas de projeto")
 
   setup.dialog.replace(() => <DialogMemoryBank projectDir={project} configDir={config} />)
-  await setup.waitForFrame((frame) => frame.includes("Alternar para memória GLOBAL"))
+  await setup.waitForFrame((frame) => frame.includes("Switch to GLOBAL memory"))
   setup.mockInput.pressEnter()
-  await setup.waitForFrame((frame) => frame.includes("Alternar para memória do PROJETO"))
+  await setup.waitForFrame((frame) => frame.includes("Switch to PROJECT memory"))
   setup.mockInput.pressArrow("down")
   setup.mockInput.pressEnter()
   const globalFile = path.join(config, "memory-bank", "preferences.md")
@@ -99,7 +99,7 @@ test("confirmed global clear removes only global memory", async () => {
 
   setup.mockInput.pressArrow("down")
   setup.mockInput.pressEnter()
-  await setup.waitForFrame((frame) => frame.includes("Confirmar exclusão"))
+  await setup.waitForFrame((frame) => frame.includes("Confirm deletion"))
   setup.mockInput.pressArrow("down")
   setup.mockInput.pressEnter()
   await setup.waitFor(() => !fs.existsSync(globalFile))
