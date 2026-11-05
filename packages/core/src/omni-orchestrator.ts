@@ -1,9 +1,6 @@
 export * as OmniOrchestrator from "./omni-orchestrator.js"
 
 import crypto from "node:crypto"
-import fs from "node:fs"
-import os from "node:os"
-import path from "node:path"
 import { Clock, Context, Effect, Layer } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Model } from "./model.js"
@@ -13,15 +10,6 @@ import { OmniBus } from "./omni-bus.js"
 import { OmniConfig } from "./omni-config.js"
 import { OmniSession } from "./omni-session.js"
 import { OmniTaskGraph } from "./omni-task-graph.js"
-
-function getAutoModelFilePath(): string {
-  const stateDir =
-    process.env.OMNICODE_STATE_DIR ||
-    (process.platform === "win32"
-      ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "omnicode", "state")
-      : path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"), "omnicode"))
-  return path.join(stateDir, "auto-model.json")
-}
 
 export interface AutoCustomizationsConfig {
   enabled: boolean
