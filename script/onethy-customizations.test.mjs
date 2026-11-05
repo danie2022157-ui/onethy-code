@@ -39,10 +39,10 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
 
     const preview = await syncOnethyCustomizations({ sourceDir, cwd })
     assert.equal(preview.installed, 0)
-    assert.equal(preview.ready, 7)
+    assert.equal(preview.ready, 8)
     await assert.rejects(stat(join(cwd, ".opencode")))
     const first = await syncOnethyCustomizations({ sourceDir, cwd, install: true })
-    assert.equal(first.installed, 7)
+    assert.equal(first.installed, 8)
     assert.ok(first.pending >= 1)
 
     const config = join(cwd, ".opencode")
@@ -73,8 +73,12 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
     assert.equal(mod.enabled, false)
 
     const mcpFiles = await readdir(join(config, "mcp/onethy"))
-    assert.equal(mcpFiles.length, 1)
-    const mcp = JSON.parse(await readFile(join(config, "mcp/onethy", mcpFiles[0]), "utf8"))
+    assert.equal(mcpFiles.length, 2)
+    const localDefaults = JSON.parse(await readFile(join(config, "mcp/onethy/local-tools.json"), "utf8"))
+    assert.equal(Object.keys(localDefaults.mcpServers).length, 3)
+    assert.ok(Object.values(localDefaults.mcpServers).every(server => server.disabled === true))
+    assert.ok(Object.keys(localDefaults.mcpServers).includes("onethy-browser"))
+    const mcp = JSON.parse(await readFile(join(config, "mcp/onethy", mcpFiles.find(file => file !== "local-tools.json")), "utf8"))
     const [name, definition] = Object.entries(mcp.mcpServers)[0]
     assert.ok(name.startsWith("onethy-"))
     assert.equal(definition.type, "stdio")
@@ -84,7 +88,7 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
 
     const repeated = await syncOnethyCustomizations({ sourceDir, cwd, install: true })
     assert.equal(repeated.installed, 0)
-    assert.equal(repeated.existing, 7)
+    assert.equal(repeated.existing, 8)
     await assert.rejects(stat(join(cwd, "NOT_ALLOWED")))
 
     const another = join(base, "skills/development/escape/SKILL.md")
