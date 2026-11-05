@@ -59,7 +59,8 @@ function convertMarkdown(contents, kind, name) {
     updated = header.replace(/^tools:.*$/m, "tools:\n" + [...new Set(converted)].map(x => "  " + x + ": true").join("\n"))
     if (unknown.length) warning = "Unknown tool names: " + unknown.join(", ")
   }
-  if (!/^name:\s*/m.test(updated)) updated = "name: " + name + "\n" + updated
+  if (kind === "skills") updated = /^name:\s*.*$/m.test(updated) ? updated.replace(/^name:\s*.*$/m, "name: " + name) : "name: " + name + "\n" + updated
+  else if (!/^name:\s*/m.test(updated)) updated = "name: " + name + "\n" + updated
   if (!/^description:\s*/m.test(updated) && kind !== "skills") {
     updated = 'description: "Imported AITmpl ' + kind + ' component"\n' + updated
   }
