@@ -388,10 +388,6 @@ export const Plugin = define({
               })
             }).pipe(Effect.asVoid),
         })
-
-
-            }).pipe(Effect.asVoid),
-        })
       }
 
       editor.add({
