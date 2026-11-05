@@ -5,8 +5,25 @@ if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
   Write-Error "Este instalador precisa ser executado do checkout local. Use git clone, bun install --frozen-lockfile e depois .\\install.ps1."
   exit 1
 }
-$currentDir = $PSScriptRoot
+$currentDir = [System.IO.Path]::GetFullPath($PSScriptRoot)
 $targetDir = "$env:LOCALAPPDATA\Microsoft\WindowsApps"
+
+# Do not save an invalid checkout into the global launcher. A relocated or
+# copied install.ps1 may otherwise create a shortcut that can never start.
+$requiredFiles = @(
+  "bin\onethy.js",
+  "bin\omni-runtime.js",
+  "packages\cli\src\index.ts",
+  "package.json"
+)
+foreach ($relative in $requiredFiles) {
+  $required = Join-Path $currentDir $relative
+  if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
+    Write-Host "[ERROR] This is not a complete OnethyCode source checkout: $currentDir" -ForegroundColor Red
+    Write-Host "[ERROR] Missing $relative. Run install.ps1 from the repository containing bin\onethy.js." -ForegroundColor Red
+    exit 1
+  }
+}
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "  Instalando OnethyCode CLI (onethy / onethy-code) no Windows" -ForegroundColor Cyan
@@ -74,8 +91,89 @@ exit /b %ERRORLEVEL%
 "@
 $launcherContent = @'
 $ErrorActionPreference = "Stop"
-$config = Get-Content -LiteralPath (Join-Path $PSScriptRoot "onethy-config.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-& $config.nodePath (Join-Path $config.checkout "bin\onethy.js") @args
+$configPath = Join-Path $PSScriptRoot "onethy-config.json"
+
+function Test-OnethyCheckout([string]$directory) {
+  if ([string]::IsNullOrWhiteSpace($directory)) { return $false }
+  try {
+    $directory = [System.IO.Path]::GetFullPath($directory)
+    foreach ($relative in @("bin\onethy.js", "bin\omni-runtime.js", "packages\cli\src\index.ts", "install.ps1")) {
+      if (-not (Test-Path -LiteralPath (Join-Path $directory $relative) -PathType Leaf)) {
+        return $false
+      }
+    }
+    return $true
+  } catch {
+    return $false
+  }
+}
+
+function Find-OnethyCheckout([string]$savedPath) {
+  if ([string]::IsNullOrWhiteSpace($savedPath)) { return $null }
+  try {
+    $current = [System.IO.Path]::GetFullPath($savedPath)
+  } catch {
+    return $null
+  }
+  # Repair historical paths such as <root>\onethy-code\onethy-code.
+  # Only search around the original configured path; never execute a random
+  # onethy-code directory found in the user's current working directory.
+  for ($depth = 0; $depth -lt 8; $depth++) {
+    foreach ($candidate in @($current, (Join-Path $current "onethy-code"))) {
+      if (Test-OnethyCheckout $candidate) {
+        return [System.IO.Path]::GetFullPath($candidate)
+      }
+    }
+    $parent = [System.IO.Directory]::GetParent($current)
+    if ($null -eq $parent) { break }
+    $current = $parent.FullName
+  }
+  return $null
+}
+
+if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
+  [Console]::Error.WriteLine("[OnethyCode] Missing global launcher configuration. Re-run install.ps1 from the OnethyCode source folder.")
+  exit 1
+}
+
+try {
+  $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
+} catch {
+  [Console]::Error.WriteLine("[OnethyCode] Launcher configuration is unreadable. Re-run install.ps1 from the OnethyCode source folder.")
+  exit 1
+}
+
+$checkout = [string]$config.checkout
+if (-not (Test-OnethyCheckout $checkout)) {
+  $checkout = Find-OnethyCheckout $checkout
+  if (-not $checkout) {
+    [Console]::Error.WriteLine("[OnethyCode] The saved checkout path is no longer valid. Open the folder containing bin\onethy.js and run .\install.ps1 again.")
+    exit 1
+  }
+  [Console]::Error.WriteLine("[OnethyCode] Repaired stale checkout path: $checkout")
+  $config.checkout = $checkout
+  $temporary = "$configPath.$PID.tmp"
+  try {
+    $serialized = ConvertTo-Json -InputObject $config -Depth 8 -Compress
+    [System.IO.File]::WriteAllText($temporary, $serialized, (New-Object System.Text.UTF8Encoding($false)))
+    Move-Item -LiteralPath $temporary -Destination $configPath -Force
+  } catch {
+    [Console]::Error.WriteLine("[OnethyCode] Warning: path repaired for this launch only; re-run install.ps1 to persist it.")
+  } finally {
+    if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force }
+  }
+}
+
+$nodePath = [string]$config.nodePath
+if (-not $nodePath -or -not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
+  $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+  if (-not $nodeCommand) {
+    [Console]::Error.WriteLine("[OnethyCode] Node.js was not found. Reinstall Node.js, then run install.ps1 again.")
+    exit 1
+  }
+  $nodePath = $nodeCommand.Source
+}
+& $nodePath (Join-Path $checkout "bin\onethy.js") @args
 exit $LASTEXITCODE
 '@
 $configContent = [ordered]@{ nodePath = $nodePath; checkout = $currentDir } | ConvertTo-Json -Compress
