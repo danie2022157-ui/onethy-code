@@ -98,9 +98,9 @@ jobs:
             }
             Write-Host $fixedOutput
             if ($fixedCode -ne 0) { throw "Stale-checkout repair failed with exit code $fixedCode" }
-            if ($fixedOutput -notmatch 'Repaired stale checkout path') {
-              throw "Launcher did not report stale-checkout repair"
-            }
+            # Console.WriteLine from a nested .cmd/.ps1 may go directly to the
+            # runner log rather than the PowerShell pipeline variable.
+            # Assert the durable repaired config instead of relying on capture.
             $fixed = Get-Content -LiteralPath (Join-Path $windowsApps "onethy-config.json") -Raw | ConvertFrom-Json
             if ([IO.Path]::GetFullPath($fixed.checkout) -ne [IO.Path]::GetFullPath($actualRoot)) {
               throw "Launcher did not persist the repaired checkout root"
