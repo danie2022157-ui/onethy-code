@@ -33,6 +33,7 @@ export default Runtime.handler(
           "Check onethy.json/onethy.jsonc or opencode.json/opencode.jsonc in the project or global config.",
           "Recognized formats: mcp.<name>, mcp.servers.<name>, .mcp.json, mcp.json and .cursor/.vscode MCP files.",
           "Auto-discovered servers stay disabled until explicitly approved: onethy mcp doctor --enable <name>.",
+          "Built-in MCP definitions missing? Run onethy mcp restore --all to restore the eight disabled templates (explicit confirmation required).",
         ].join(EOL) + EOL,
       )
       return
