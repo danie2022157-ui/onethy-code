@@ -61,7 +61,10 @@ export function summarize(inventory: Inventory, options: Options = {}): Summary 
       return 0
     })
     .map(([name, namespaceEntries]) => {
-      const description = flattened.namespaces.get(name)?.description
+      const rawDescription = flattened.namespaces.get(name)?.description?.split("\n", 1)[0]?.trim()
+      const description = rawDescription && rawDescription.length > DESCRIPTION_LIMIT
+        ? rawDescription.slice(0, DESCRIPTION_LIMIT - 3) + "..."
+        : rawDescription
       const listings = namespaceEntries
         .map((entry) => {
           const firstLine = entry.description.split("\n", 1)[0]?.trim() ?? ""
