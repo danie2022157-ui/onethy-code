@@ -63,12 +63,12 @@ function renderAutoCustomizationsDirective(_directory: string): string {
   const activeFeatures: string[] = []
   if (config.useSkills) {
     activeFeatures.push(
-      "- [SKILLS]: Quando o trabalho envolver testes, arquitetura, design, UI, git, segurança, documentação, vídeo, SEO, banco de dados ou refatoração, invoque imediatamente a skill apropriada através da ferramenta 'skill' ou execute seu fluxo de trabalho recomendado. Nunca hesite em carregar skills disponíveis.",
+      "- [SKILLS]: Antes de tarefas especializadas (testes, arquitetura, segurança, UI, SEO etc.), consulte omni_intelligence action=customizations com query relacionado à tarefa para descobrir as skills registradas. Carregue via skill apenas as pertinentes, respeitando permissões; não presuma que uma skill esteja instalada.",
     )
   }
   if (config.useAgents) {
     activeFeatures.push(
-      "- [SUBAGENTES]: Para investigações aprofundadas, tarefas paralelas de codebase, revisões de segurança ou exploração rápida, delegue subtarefas para subagentes especializados adequados (@architect, @researcher, @coder, @reviewer, @librarian) utilizando a ferramenta 'subagent'.",
+      "- [SUBAGENTES]: Quando houver benefício real de delegação, descubra especialistas via omni_intelligence action=customizations query=<tarefa> e use subagent agent=auto para seleção conservadora ou um ID explícito de especialista. Evite delegações desnecessárias.",
     )
   }
   if (config.useMcps) {
