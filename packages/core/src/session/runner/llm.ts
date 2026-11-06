@@ -72,7 +72,7 @@ const layer = Layer.effect(
       let stepped = input.stepped ?? false
       // Transient: never mutate the user-pinned session model. Reuse the healthy
       // fallback for subsequent steps in this *one* drain only.
-      let activeFailover: Model.Ref | undefined
+      const failover = { model: undefined as Model.Ref | undefined }
       const promotable = input.promotable ?? "input"
       if (!force && !continuing && !stepped) {
         const pending = yield* SessionInbox.nextPromotable(db, sessionID, "input")
@@ -207,8 +207,8 @@ const layer = Layer.effect(
                   if (promoted > 0) step = 1
                   return {
                     _tag: "Ready" as const,
-                    context: yield* context.load(activeFailover
-                      ? { ...selected, session: { ...selected.session, model: activeFailover } }
+                    context: yield* context.load(failover.model
+                      ? { ...selected, session: { ...selected.session, model: failover.model } }
                       : selected),
                   }
                 }),
@@ -222,7 +222,7 @@ const layer = Layer.effect(
       while (true) {
         const next = yield* advanceToStep()
         if (next._tag !== "Ready") return next
-        continuing = yield* runStep(next.context, step)
+        continuing = yield* runStep(next.context, step, failover)
         stepped = true
         step++
         force = false
@@ -240,7 +240,7 @@ const layer = Layer.effect(
     })
 
     /** Owns logical Step policy; each attempt owns its streaming, tools, and durable settlement. */
-    const runStep = Effect.fn("SessionRunner.runStep")(function* (first: SessionContext.Loaded, step: number) {
+    const runStep = Effect.fn("SessionRunner.runStep")(function* (first: SessionContext.Loaded, step: number, failover: { model?: Model.Ref }) {
       const sessionID = first.session.id
       let assistantMessageID = SessionMessage.ID.create()
       const retry = yield* SessionRunnerRetry.make(bus, sessionID)
@@ -254,8 +254,8 @@ const layer = Layer.effect(
       while (true) {
         // Reuse boundary preparation once; retries refresh context without delivering more input.
         const loaded = initial ?? (yield* prepareContext(sessionID).pipe(
-          Effect.flatMap((selection) => context.load(activeFailover
-            ? { ...selection, session: { ...selection.session, model: activeFailover } }
+          Effect.flatMap((selection) => context.load(failover.model
+            ? { ...selection, session: { ...selection.session, model: failover.model } }
             : selection)),
         ))
         initial = undefined
@@ -364,7 +364,7 @@ const layer = Layer.effect(
                 return yield* new StepFailedError({ error: outcome.error })
               }
               const from = loaded.model.ref.providerID + "/" + loaded.model.ref.id
-              activeFailover = Model.Ref.make({ providerID: candidate.providerID, id: candidate.id })
+              failover.model = Model.Ref.make({ providerID: candidate.providerID, id: candidate.id })
               attemptedModels.add(candidate.providerID + "/" + candidate.id)
               failovers++
               yield* Effect.logInfo("OnethyCode Auto-Failover: replaying pre-output request on a healthy model", {
