@@ -5,6 +5,7 @@ import { Clock, Context, Effect, Layer } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Model } from "./model.js"
 import { ModelSelectionPolicy } from "./model-selection-policy.js"
+import { agentModelRanking, efficiencyProfile } from "./efficiency-profile.js"
 import { Location } from "./location.js"
 import { OmniBus } from "./omni-bus.js"
 import { OmniConfig } from "./omni-config.js"
@@ -519,11 +520,7 @@ const layer = Layer.effect(
         mode: "automatic" as const,
         requiredTypes: ["chat"],
         requiredCapabilities: { tools: true },
-        rankBy: category === "fast_explore" || category === "external_research"
-          ? "cost" as const
-          : category === "deep_architecture" || category === "security_review"
-            ? "context" as const
-            : "newest" as const,
+        rankBy: agentModelRanking(agentId, efficiencyProfile().mode),
         isCoolingDown: (ref: Model.Ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
       }
       const eligible = availableModels.filter((model) =>
