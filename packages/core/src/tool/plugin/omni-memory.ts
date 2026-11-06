@@ -63,7 +63,7 @@ export const description = [
   "Never store credentials, passwords, tokens, customer data or secrets in global memory.",
   "Stores architectural decisions, project requirements, tech stack constraints, and current task focus across sessions.",
   "- 'read': Retrieves memory bank files so agents remember project patterns without context amnesia.",
-  "- 'search': Returns only relevant, short memory sections; uses offline lexical ranking and optional local Ollama embeddings."
+  "- 'search': Returns only relevant, short memory sections; uses offline lexical ranking and optional local Ollama embeddings.",
   "- 'update': Writes or updates 'project-brief', 'system-patterns', 'tech-context', or 'active-context'.",
   "- 'init': Scaffolds the memory bank templates if they do not yet exist.",
   "- 'status': Checks memory bank existence and last modified dates.",
