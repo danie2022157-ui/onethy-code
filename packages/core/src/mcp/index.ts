@@ -522,6 +522,14 @@ export const layer = (options?: Options) =>
           }
           yield* Scope.close(scope, Exit.void)
           entry.scope = undefined
+          // A failed live handshake invalidates any restored discovery hints.
+          // In particular, do not leave previously cached tools advertised
+          // after auth errors or a local subprocess changing its schema.
+          if (entry.tools) {
+            entry.tools = undefined
+            entry.prompts = undefined
+            yield* bus.publish(McpEvent.ToolsChanged, { server: name })
+          }
           const error = Cause.squash(result.cause)
           entry.status =
             error instanceof McpClient.NeedsAuthError
