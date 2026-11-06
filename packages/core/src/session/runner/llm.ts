@@ -360,7 +360,21 @@ const layer = Layer.effect(
                 yield* Effect.logWarning("OnethyCode Auto-Failover: no safe, authorized model available", {
                   sessionID, model: loaded.model.ref, attemptedModels: [...attemptedModels],
                 })
-                return yield* new StepFailedError({ error: outcome.error })
+                return yield* new StepFailedError({ error: {
+                  ...outcome.error,
+                  message: outcome.error.message + " [diagnostic " + JSON.stringify({
+                    min: estimate.measured + estimate.estimated,
+                    allowed: allowedAutoModels(process.env.OMNICODE_ALLOWED_MODELS),
+                    excluded: [...excluded],
+                    current: loaded.model.ref.providerID + "/" + loaded.model.ref.id,
+                    capabilities: loaded.model.capabilities,
+                    candidates: connected.map((model) => ({
+                      id: model.providerID + "/" + model.id, enabled: model.enabled,
+                      type: model.type, status: model.status, capabilities: model.capabilities,
+                      context: model.limit.context,
+                    })),
+                  }) + "]",
+                } })
               }
               const from = loaded.model.ref.providerID + "/" + loaded.model.ref.id
               activeFailover = Model.Ref.make({ providerID: candidate.providerID, id: candidate.id })
