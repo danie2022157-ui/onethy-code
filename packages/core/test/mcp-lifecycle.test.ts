@@ -25,6 +25,14 @@ describe("Onethy MCP maintenance policy", () => {
     expect(canIdle(state, now, "standby", false)).toBe(false)
   })
 
+  test("adaptive idle window honors recent MCP usage without allowing in-flight calls to stop", () => {
+    const now = 50_000_000
+    const state = { lastUsedAt: now - 20 * 60_000, activeCalls: 0 }
+    expect(canIdle(state, now, "connected", false, 10 * 60_000)).toBe(true)
+    expect(canIdle(state, now, "connected", false, 60 * 60_000)).toBe(false)
+    expect(canIdle({ ...state, activeCalls: 1 }, now, "connected", false, 10 * 60_000)).toBe(false)
+  })
+
   test("health checks are only performed while no session is using a connection", () => {
     const state = { lastHealthAt: now - MCP_POLICY.healthMs, activeCalls: 0 }
     expect(shouldHealthCheck(state, now, "connected")).toBe(true)

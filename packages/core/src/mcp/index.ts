@@ -19,6 +19,7 @@ import { Location } from "../location.js"
 import { waitForAbort } from "@opencode/util/process"
 import { State } from "../state.js"
 import { MCP_POLICY, retryDelay, retryAllowed, canIdle, shouldHealthCheck } from "./lifecycle.js"
+import { openMcpUsage } from "./usage.js"
 import type { McpClient } from "./client.js"
 
 export const ServerName = Schema.String.pipe(Schema.brand("MCP.ServerName"))
@@ -181,6 +182,9 @@ export const layer = (options?: Options) =>
     Service,
     Effect.gen(function* () {
       const location = yield* Location.Service
+      const automaticMcp = (process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1") &&
+        process.env.ONETHY_MCP_AUTONOMY !== "off"
+      const usage = automaticMcp ? yield* Effect.promise(() => openMcpUsage(location.directory)) : undefined
       const environment = yield* Environment.Service
       const bus = yield* Bus.Service
       const forms = yield* Form.Service
@@ -692,20 +696,47 @@ export const layer = (options?: Options) =>
           yield* Effect.forEach(entries, ([name, entry]) => register(name, entry), { discard: true })
           applied = servers
 
-          // Initial connections stay asynchronous so one slow server does not block Location startup.
-          for (const [name, entry] of entries) {
-            if (entry.config.disabled) {
-              entry.status = { status: "disabled" }
-              entry.startup.openUnsafe()
+          // Every allowed server is discovered, including user-installed MCPs. Frequent
+          // servers connect first; less-used servers publish their tool schemas and then
+          // go to standby. No user configuration or authorizations are changed.
+          const enabled = [...entries].filter(([, entry]) => !entry.config.disabled)
+          const plan = usage?.prioritize(enabled.map(([name]) => name))
+          const order = new Map(plan?.map((item, index) => [item.name, index]) ?? [])
+          const cold = new Set(plan?.filter((item) => item.tier === "standby").map((item) => item.name) ?? [])
+          const sorted = plan ? enabled.sort(([a], [b]) =>
+            (order.get(a) ?? Infinity) - (order.get(b) ?? Infinity)) : enabled
+          const startup = ([name, entry]: [ServerName, ServerEntry]) =>
+            Effect.gen(function* () {
+              // A manual disconnect/disable always overrides an asynchronous startup.
+              if (entries.get(name) !== entry || entry.status.status !== "pending")
+                return yield* entry.startup.open
+              yield* startServer(name, entry)
+              if (!cold.has(name) || entry.status.status !== "connected" ||
+                (entry.activeCalls ?? 0) !== 0 || entries.get(name) !== entry) return
+              // Keep discovered schemas so a standby tool can still be selected
+              // and the transport is started on demand before the next tool call.
+              yield* stopServer(name, entry, true)
+              entry.status = { status: "standby" }
               yield* bus.publish(McpEvent.StatusChanged, { server: name })
-              continue
-            }
-            fork(
-              Effect.gen(function* () {
-                // connect() or disconnect() may have settled the server while this startup waited to run.
-                if (entry.status.status !== "pending") return yield* entry.startup.open
-                yield* startServer(name, entry)
-              }).pipe(locks.withLock(name)),
+            }).pipe(locks.withLock(name))
+
+          for (const [name, entry] of entries) {
+            if (!entry.config.disabled) continue
+            entry.status = { status: "disabled" }
+            entry.startup.openUnsafe()
+            yield* bus.publish(McpEvent.StatusChanged, { server: name })
+          }
+          // With no learning history (or outside Onethy mode) all servers keep
+          // the original asynchronous startup behavior.
+          if (!usage) {
+            for (const item of sorted) fork(startup(item))
+          } else {
+            for (const item of sorted.filter(([name]) => !cold.has(name))) fork(startup(item))
+            const deferred = sorted.filter(([name]) => cold.has(name))
+            if (deferred.length) fork(
+              Effect.sleep("1 second").pipe(Effect.andThen(
+                Effect.forEach(deferred, startup, { concurrency: 2, discard: true }),
+              )),
             )
           }
           return
@@ -796,7 +827,12 @@ export const layer = (options?: Options) =>
             yield* startServer(name, entry)
             return
           }
-          if (canIdle(entry, now, entry.status.status, Boolean(entry.config.disabled))) {
+          // Learn idle preference from recent actual calls, never from an MCP's installation origin.
+          const warm = usage?.prioritize(
+            [...entries].filter(([, item]) => !item.config.disabled).map(([id]) => id), now,
+          ).some((item) => item.name === name && item.tier === "warm")
+          if (canIdle(entry, now, entry.status.status, Boolean(entry.config.disabled),
+            warm ? 60 * 60_000 : 10 * 60_000)) {
             // Retain only the catalog of tool definitions. Calls wake the owning
             // connection on demand; the local subprocess is actually stopped.
             yield* stopServer(name, entry, true)
@@ -909,9 +945,14 @@ export const layer = (options?: Options) =>
           // owns its name outright when no configured server has it.
           const client = attached.get(server)?.at(-1)
           if (client && (client.tools.some((tool) => tool.name === input.name) || !entries.has(server))) {
+            const startedAt = Date.now()
             const result = yield* client.client
               .callTool({ name: input.name, args: input.args, sessionID: input.sessionID })
               .pipe(
+                Effect.onExit((exit) => usage
+                  ? Effect.promise(() => usage.record(server, Exit.isSuccess(exit) && exit.value.isError !== true,
+                    Date.now() - startedAt))
+                  : Effect.void),
                 Effect.mapError(
                   (error) =>
                     new ToolCallError({
@@ -934,6 +975,7 @@ export const layer = (options?: Options) =>
             })
           target.entry.lastUsedAt = Date.now()
           target.entry.activeCalls = (target.entry.activeCalls ?? 0) + 1
+          const startedAt = Date.now()
           const result = yield* recovering(target.name, target.entry, target.entry.client, (connection) =>
             connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID }),
           ).pipe(
@@ -941,6 +983,10 @@ export const layer = (options?: Options) =>
               target.entry.activeCalls = Math.max(0, (target.entry.activeCalls ?? 1) - 1)
               target.entry.lastUsedAt = Date.now()
             })),
+            Effect.onExit((exit) => usage
+              ? Effect.promise(() => usage.record(server, Exit.isSuccess(exit) && exit.value.isError !== true,
+                Date.now() - startedAt))
+              : Effect.void),
             Effect.mapError(
               (error) =>
                 new ToolCallError({
