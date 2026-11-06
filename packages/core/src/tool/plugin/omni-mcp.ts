@@ -4,14 +4,16 @@ import { ToolFailure } from "@opencode/ai/effect"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { Effect, Schema } from "effect"
 import { Mcp } from "../../mcp/index.js"
+import { openMcpUsage } from "../../mcp/usage.js"
+import { Location } from "../../location.js"
 import { canRetryMcp, diagnoseMcp, redactMcpError } from "../../mcp/autonomy.js"
 import { rankCatalog } from "../../omni-intelligence.js"
 
 export const name = "omni_mcp"
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["list", "recover"]).annotate({
-    description: "list: inspect configured MCP servers and their actual tools; recover: attempt to reconnect one already-authorized server after a failure.",
+  action: Schema.Literals(["list", "recover", "usage"]).annotate({
+    description: "list: inspect MCP servers and tools; recover: reconnect one authorized server; usage: inspect private per-project usage statistics and learned startup priority.",
   }),
   server: Schema.optionalKey(Schema.String).annotate({ description: "Exact server name; required for recover." }),
   query: Schema.optionalKey(Schema.String).annotate({ description: "Optional keyword search for available MCP tools." }),
@@ -27,6 +29,7 @@ export const Output = Schema.Struct({
 export const description = [
   "Autonomous, permission-preserving MCP discovery and connection recovery for OnethyCode.",
   "list: show every configured server's status, with searchable tools actually advertised by connected or standby servers.",
+  "usage: show locally learned use frequency, connection priority and warm/standby preferences, including custom MCPs.",
   "recover: reconnect one failed or standby MCP, verify the new status and re-discover its tools.",
   "Never enables disabled servers, installs packages, changes config, modifies credentials or bypasses OAuth.",
   "A tool execution error may have occurred after external side effects: never replay that call automatically.",
@@ -36,6 +39,7 @@ export const Plugin = {
   id: "opencode.tool.omni_mcp",
   effect: Effect.fn("OmniMcpTool.Plugin")(function* (ctx: Context) {
     const mcp = yield* Mcp.Service
+    const location = yield* Location.Service
     // Prevent a model from creating a busy retry loop. Background maintenance has its own backoff.
     const lastRecovery = new Map<string, number>()
 
@@ -52,6 +56,26 @@ export const Plugin = {
           const limit = input.limit ?? 20
           if (!Number.isInteger(limit) || limit < 1 || limit > 50)
             return yield* new ToolFailure({ message: "limit must be between 1 and 50." })
+
+          if (action === "usage") {
+            const [servers, learning] = yield* Effect.all([
+              mcp.servers(),
+              Effect.promise(() => openMcpUsage(location.directory)),
+            ], { concurrency: 2 })
+            const allowed = servers.filter((server) => server.status.status !== "disabled")
+            const priority = learning.prioritize(allowed.map((server) => server.name))
+            const summary = [
+              "OnethyCode MCP Auto Learning (this project; local statistics only).",
+              "Approved servers: " + allowed.length + "; warm startup slots: up to 3.",
+              ...priority.map((item) =>
+                "[" + item.tier + "] " + item.name + " · " + item.calls7d +
+                " tool calls in 7 days · score " + item.score),
+              "The ranking is based on actual tool calls, not whether a server came bundled with OnethyCode.",
+              "Disable the adaptive startup entirely with ONETHY_MCP_AUTONOMY=off before launching the app.",
+              "Credentials, tool parameters and results are never stored in the usage history.",
+            ].join("\n").slice(0, 12000)
+            return { output: { action, summary }, content: summary, metadata: { action, servers: allowed.length } }
+          }
 
           if (action === "recover") {
             const server = input.server?.trim()
