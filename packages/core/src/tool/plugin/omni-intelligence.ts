@@ -122,6 +122,15 @@ export const Plugin = {
             ], { concurrency: 4 })
             const imported = loadedAgents.filter((agent) =>
               agent.description?.startsWith("AITmpl specialist ("))
+            // The inventory and actual use are different. Count persisted, real
+            // tool calls rather than claiming that a loaded skill was invoked.
+            const now = Date.now()
+            const activity = yield* SessionStats.get({
+              projectID: location.project.id, from: now - 7 * 86_400_000,
+              to: now, tools: "detail",
+            })
+            const recorded = activity.tools.mode === "detail" ? activity.tools.usage : []
+            const usage = (name: string) => recorded.find((entry) => entry.name === name)?.calls ?? 0
             const activeExperts = loadedAgents.filter((agent) =>
               agent.mode !== "primary" && !agent.hidden)
             const categories = [
@@ -162,6 +171,9 @@ export const Plugin = {
               "Descriptor references — " + refs.join(", ") + ". Descriptors are not executable plugins.",
               "MCP servers: " + servers.length + "; states: " +
                 Object.entries(statuses).map(([state, count]) => state + "=" + count).join(", ") + ".",
+              "Actual tool calls, last 7 days (this project): skill=" + usage("skill") +
+                ", subagent=" + usage("subagent") + ", omni_mcp=" + usage("omni_mcp") +
+                ". Counted from saved session tool invocations.",
               "Disabled MCPs are not started automatically; use explicit approval to enable one.",
               ...(matches.length ? ["Matching available resources:",
                 ...matches.map((item) =>
