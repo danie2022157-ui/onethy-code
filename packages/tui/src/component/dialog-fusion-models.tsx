@@ -1,11 +1,12 @@
-import { createMemo, createSignal, For, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js"
 import { useTerminalDimensions } from "@opentui/solid"
-import { RGBA, TextAttributes } from "@opentui/core"
+import { RGBA, TextAttributes, type BoxRenderable, type ScrollBoxRenderable } from "@opentui/core"
 import { useLocal } from "../context/local"
-import { DialogHeader, DialogLayout, useDialog } from "../ui/dialog"
+import { DIALOG_INSET, dialogWidth, DialogHeader, DialogLayout, useDialog } from "../ui/dialog"
 import { useTheme } from "../context/theme"
 import { Keymap } from "../context/keymap"
 import { useToast } from "../ui/toast"
+import { stringWidth } from "../util/string-width"
 
 type ProviderColumnItem = {
   id: string
@@ -33,15 +34,26 @@ const PROVIDER_META: Record<string, { title: string; icon: string; accentHex: st
   xai: { title: "xAI / Grok", icon: "⚡", accentHex: "#F43F5E", order: 6 },
 }
 
-function cleanModelLabel(name: string, id: string, maxLen = 23): string {
+function cleanModelLabel(name: string, id: string): string {
   const base = name
     .replace(/^(OpenAI|Google|Anthropic|OpenCode)\s*[:\-–]?\s*/i, "")
     .replace(/\bAntigravity\s+/i, "")
     .replace(/\s*\(Free\)/i, " Free")
     .trim()
-  const label = base.length > 0 ? base : id
-  if (label.length <= maxLen) return label
-  return label.slice(0, maxLen - 1) + "…"
+  return base.length > 0 ? base : id
+}
+
+// Measure terminal cells, not JavaScript string length: emoji and wide characters
+// must never push the model's classification badge out of its column.
+function fitLabel(value: string, maxWidth: number): string {
+  const width = Math.max(1, Math.floor(maxWidth))
+  if (stringWidth(value) <= width) return value
+  let result = ""
+  for (const character of value) {
+    if (stringWidth(result + character) >= width) break
+    result += character
+  }
+  return result + "…"
 }
 
 export function DialogFusionModels() {
@@ -56,6 +68,19 @@ export function DialogFusionModels() {
 
   const [colIdx, setColIdx] = createSignal(0)
   const [rowIdx, setRowIdx] = createSignal(0)
+  let scroll: ScrollBoxRenderable | undefined
+  const modelRows = new Map<string, BoxRenderable>()
+
+  // The dialog is capped at 116 cells. The terminal can be much wider, so using
+  // terminal width directly was packing three columns into a much smaller dialog.
+  // Keep space for DialogLayout padding and the scroll bar.
+  const contentWidth = createMemo(() =>
+    Math.max(1, Math.min(dialogWidth("xlarge"), dimensions().width - 2) - DIALOG_INSET * 2 - 1),
+  )
+  const columnsPerRow = createMemo(() => (contentWidth() >= 104 ? 3 : contentWidth() >= 66 ? 2 : 1))
+  const columnWidth = createMemo(() => Math.floor((contentWidth() - (columnsPerRow() - 1)) / columnsPerRow()))
+  // Column border(2), padding(2), row padding(2), check(1), gaps(2), badge(4).
+  const modelLabelWidth = createMemo(() => Math.max(1, columnWidth() - 13))
 
   const columns = createMemo<ProviderColumn[]>(() => {
     const raw = local.model.auto.rawConnectedModels()
@@ -99,7 +124,7 @@ export function DialogFusionModels() {
 
   const columnRows = createMemo<ProviderColumn[][]>(() => {
     const cols = columns()
-    const perRow = dimensions().width >= 96 ? 3 : dimensions().width >= 68 ? 2 : 1
+    const perRow = columnsPerRow()
     const rows: ProviderColumn[][] = []
     for (let i = 0; i < cols.length; i += perRow) {
       rows.push(cols.slice(i, i + perRow))
@@ -119,6 +144,25 @@ export function DialogFusionModels() {
     if (!col || col.models.length === 0) return undefined
     const idx = Math.min(Math.max(0, rowIdx()), col.models.length - 1)
     return col.models[idx]
+  })
+
+  // Ensure keyboard navigation stays visible even when a provider has many models.
+  function revealActiveRow() {
+    const model = activeModel()
+    if (!model || !scroll || scroll.isDestroyed) return
+    const row = modelRows.get(`${model.providerID}/${model.id}`)
+    if (!row || row.isDestroyed) return
+    if (row.y < scroll.viewport.y) scroll.scrollBy(row.y - scroll.viewport.y)
+    else if (row.y + row.height > scroll.viewport.y + scroll.viewport.height)
+      scroll.scrollBy(row.y + row.height - scroll.viewport.y - scroll.viewport.height)
+  }
+
+  createEffect(() => {
+    colIdx()
+    rowIdx()
+    columnsPerRow()
+    dimensions().height
+    revealActiveRow()
   })
 
   function moveColumn(delta: number) {
@@ -276,9 +320,9 @@ export function DialogFusionModels() {
   }))
 
   const bucketBadge = (bucket: "efficiency" | "balanced" | "intelligence") => {
-    if (bucket === "efficiency") return { label: "⚡Fast", color: RGBA.fromHex("#10B981") }
-    if (bucket === "intelligence") return { label: "🧠Int", color: RGBA.fromHex("#A855F7") }
-    return { label: "⚖Bal", color: RGBA.fromHex("#38BDF8") }
+    if (bucket === "efficiency") return { label: "Fast", color: RGBA.fromHex("#10B981") }
+    if (bucket === "intelligence") return { label: "Deep", color: RGBA.fromHex("#A855F7") }
+    return { label: "Bal", color: RGBA.fromHex("#38BDF8") }
   }
 
   const bucketFullName = (bucket: "efficiency" | "balanced" | "intelligence") => {
@@ -294,9 +338,11 @@ export function DialogFusionModels() {
           titleView={
             <box flexDirection="row" gap={1}>
               <text fg={RGBA.fromHex("#00F5FF")} attributes={TextAttributes.BOLD}>
-                ⚡ Omni Fusion — Allowed Models by Provider
+                {contentWidth() < 72 ? "⚡ Omni Fusion — Models" : "⚡ Omni Fusion — Allowed Models by Provider"}
               </text>
-              <text fg={theme.text.muted}>({local.model.auto.allowedModelsSummary()})</text>
+              <Show when={contentWidth() >= 80}>
+                <text fg={theme.text.muted}>({local.model.auto.allowedModelsSummary()})</text>
+              </Show>
             </box>
           }
           closeLabel="esc"
@@ -306,13 +352,14 @@ export function DialogFusionModels() {
       <box flexDirection="column" gap={1}>
         {/* Top Action Bar */}
         <box
-          flexDirection="row"
+          flexDirection={contentWidth() < 90 ? "column" : "row"}
           justifyContent="space-between"
+          gap={contentWidth() < 90 ? 1 : 0}
           paddingLeft={1}
           paddingRight={1}
           backgroundColor={RGBA.fromInts(0, 0, 0, 90)}
         >
-          <box flexDirection="row" gap={1}>
+          <box flexDirection="row" flexWrap="wrap" gap={1}>
             <box
               paddingLeft={1}
               paddingRight={1}
@@ -337,7 +384,7 @@ export function DialogFusionModels() {
               onMouseUp={() => triggerPreset()}
             >
               <text fg={RGBA.fromHex("#F59E0B")} attributes={TextAttributes.BOLD} selectable={false}>
-                ⭐ Recommended Preset (2-3 Models) [R]
+                {contentWidth() < 75 ? "Preset [R]" : "★ Recommended Preset (2-3 Models) [R]"}
               </text>
             </box>
           </box>
@@ -355,13 +402,19 @@ export function DialogFusionModels() {
               attributes={local.model.auto.thinkingRouting() ? TextAttributes.BOLD : undefined}
               selectable={false}
             >
-              {local.model.auto.thinkingRouting() ? "✓ 🧠 Thinking Auto: ON [T]" : "○ 🧠 Thinking Auto: OFF [T]"}
+              {contentWidth() < 75
+                ? local.model.auto.thinkingRouting() ? "Thinking: ON [T]" : "Thinking: OFF [T]"
+                : local.model.auto.thinkingRouting() ? "✓ Thinking Auto: ON [T]" : "○ Thinking Auto: OFF [T]"}
             </text>
           </box>
         </box>
 
         {/* Provider Columns Matrix (up to 3 columns per row) */}
-        <scrollbox maxHeight={Math.max(10, dimensions().height - 16)}>
+        <scrollbox
+          ref={(element: ScrollBoxRenderable) => (scroll = element)}
+          maxHeight={Math.max(3, dimensions().height - (contentWidth() < 90 ? 21 : 18))}
+          contentOptions={{ minHeight: 0 }}
+        >
           <box flexDirection="column" gap={1}>
             <For each={columnRows()}>
               {(rowCols) => (
@@ -378,6 +431,7 @@ export function DialogFusionModels() {
                           flexDirection="column"
                           flexGrow={1}
                           flexBasis={0}
+                          minWidth={0}
                           border={["top", "bottom", "left", "right"]}
                           borderColor={
                             isColActive() ? RGBA.fromHex(col.accentHex) : RGBA.fromInts(148, 163, 184, 55)
@@ -405,7 +459,7 @@ export function DialogFusionModels() {
                               wrapMode="none"
                               selectable={false}
                             >
-                              {col.icon} {col.title}
+                              {fitLabel(`${col.icon} ${col.title}`, Math.max(1, columnWidth() - 13))}
                             </text>
                             <text
                               fg={allColAllowed() ? RGBA.fromHex("#10B981") : theme.text.muted}
@@ -426,8 +480,10 @@ export function DialogFusionModels() {
 
                                 return (
                                   <box
+                                    ref={(element: BoxRenderable) => modelRows.set(`${m.providerID}/${m.id}`, element)}
                                     flexDirection="row"
                                     justifyContent="space-between"
+                                    minWidth={0}
                                     paddingLeft={1}
                                     paddingRight={1}
                                     backgroundColor={
@@ -443,7 +499,7 @@ export function DialogFusionModels() {
                                       local.model.auto.toggleModelAllowed(m.providerID, m.id)
                                     }}
                                   >
-                                    <box flexDirection="row" gap={1} flexShrink={1}>
+                                    <box flexDirection="row" gap={1} flexShrink={1} minWidth={0}>
                                       <text
                                         fg={isAllowed() ? RGBA.fromHex("#10B981") : theme.text.muted}
                                         attributes={isAllowed() ? TextAttributes.BOLD : undefined}
@@ -460,14 +516,15 @@ export function DialogFusionModels() {
                                               : theme.text.muted
                                         }
                                         attributes={isSelectedRow() ? TextAttributes.BOLD : undefined}
+                                        width={modelLabelWidth()}
                                         wrapMode="none"
                                         selectable={false}
                                       >
-                                        {m.shortName}
+                                        {fitLabel(m.shortName, modelLabelWidth())}
                                       </text>
                                     </box>
 
-                                    <text fg={badge.color} wrapMode="none" selectable={false}>
+                                    <text fg={badge.color} width={4} flexShrink={0} wrapMode="none" selectable={false}>
                                       {badge.label}
                                     </text>
                                   </box>
@@ -485,44 +542,50 @@ export function DialogFusionModels() {
           </box>
         </scrollbox>
 
-        {/* Active Model Info & Keyboard Shortcuts Footer */}
-        <Show when={activeModel()}>
+        {/* Full selected model name remains readable even when the grid labels truncate. */}
+        <Show when={dimensions().height >= 17 ? activeModel() : undefined}>
           {(m) => (
             <box
-              flexDirection="row"
-              justifyContent="space-between"
+              flexDirection="column"
               paddingLeft={1}
               paddingRight={1}
               backgroundColor={RGBA.fromInts(15, 23, 42, 180)}
             >
-              <text fg={theme.text.base} wrapMode="none">
-                <span style={{ fg: RGBA.fromHex("#00F5FF") }}>▸ {m().name}</span>
-                <span style={{ fg: theme.text.muted }}>{` (${m().providerID}/${m().id})`}</span>
+              <text fg={RGBA.fromHex("#00F5FF")} wrapMode="none">
+                {fitLabel(`▸ ${m().name}`, Math.max(1, contentWidth() - 2))}
               </text>
-              <text fg={theme.text.muted} wrapMode="none">
-                {bucketFullName(m().bucket)}
-              </text>
+              <box flexDirection="row" justifyContent="space-between">
+                <text fg={theme.text.muted} wrapMode="none">
+                  {fitLabel(`${m().providerID}/${m().id}`, Math.max(1, contentWidth() - (contentWidth() > 85 ? 43 : 2)))}
+                </text>
+                <Show when={contentWidth() > 85}>
+                  <text fg={theme.text.muted} wrapMode="none">{bucketFullName(m().bucket)}</text>
+                </Show>
+              </box>
             </box>
           )}
         </Show>
 
-        <box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1}>
+        <box flexDirection="row" justifyContent="space-between" gap={1} paddingLeft={1} paddingRight={1}>
           <text fg={theme.text.muted} wrapMode="none">
-            <span style={{ fg: RGBA.fromHex("#00F5FF") }}>←/→</span> Column ·{" "}
-            <span style={{ fg: RGBA.fromHex("#00F5FF") }}>↑/↓</span> Model ·{" "}
-            <span style={{ fg: RGBA.fromHex("#10B981") }}>Space/Enter</span> Toggle ·{" "}
-            <span style={{ fg: RGBA.fromHex("#38BDF8") }}>[P]</span> Provider ·{" "}
-            <span style={{ fg: RGBA.fromHex("#F59E0B") }}>[R]</span> Preset ·{" "}
-            <span style={{ fg: RGBA.fromHex("#A855F7") }}>[A]</span> All
+            {fitLabel(
+              contentWidth() >= 100
+                ? "←/→ Column · ↑/↓ Model · Space/Enter Toggle · [P] Provider · [R] Preset · [A] All"
+                : contentWidth() >= 65
+                  ? "←/→ Column · ↑/↓ Model · Enter Toggle · [P] Provider · [R] Preset"
+                  : "←/→ Column · ↑/↓ Model · Enter Toggle",
+              Math.max(1, contentWidth() - (contentWidth() < 55 ? 10 : 21)),
+            )}
           </text>
           <box
+            flexShrink={0}
             paddingLeft={1}
             paddingRight={1}
             backgroundColor={RGBA.fromInts(255, 255, 255, 18)}
             onMouseUp={() => dialog.pop()}
           >
             <text fg={RGBA.fromHex("#38BDF8")} selectable={false}>
-              ← Back [Backspace]
+              {contentWidth() < 55 ? "Back" : "← Back [Backspace]"}
             </text>
           </box>
         </box>
