@@ -324,7 +324,8 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
               EventTable.type,
               Event.versionedType(SessionEvent.UsageRecorded.type, SessionEvent.UsageRecorded.durable.version),
             ),
-            sql`json_extract(${EventTable.data}, '$.source') = 'compaction'`,
+            // Every UsageRecorded event represents a separately billed auxiliary request.
+            // Main runner steps are counted from assistant rows above, so do not count them twice.
             gte(EventTable.created, from),
             lt(EventTable.created, to),
           ),
