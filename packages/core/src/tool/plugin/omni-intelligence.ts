@@ -12,11 +12,13 @@ import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { Session } from "../../session.js"
 import { rankCatalog, reviewDiff, searchProjectHistory, searchWorkspace, type CatalogEntry } from "../../omni-intelligence.js"
 import { OmniEmbeddings } from "../../omni-embeddings.js"
+import { SessionStats } from "../../session/stats.js"
+import { efficiencyProfile } from "../../efficiency-profile.js"
 
 export const name = "omni_intelligence"
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["code", "semantic", "tools", "history", "review", "metrics"]).annotate({
+  action: Schema.Literals(["code", "semantic", "tools", "history", "review", "metrics", "efficiency"]).annotate({
     description: "code: lexical source search; semantic: on-device Ollama vector search; tools: discover tools/skills/MCP; history: project sessions and memory; review: read-only git diff; metrics: agent usage and events.",
   }),
   query: Schema.optionalKey(Schema.String).annotate({
@@ -37,7 +39,8 @@ export const description = [
   "tools: rank registered tool, skill and connected MCP capabilities by meaning.",
   "history: search persisted project missions, plans, sessions and memory notes.",
   "review: inspect staged and unstaged Git changes without editing or approving.",
-  "metrics: inspect recent agent events and mission task states; tokens/costs remain in native usage telemetry.",
+  "metrics: inspect recent agent events and mission task states.",
+  "efficiency: report local seven-day token, cache, cost, and subagent statistics and active resource budgets.",
   "Read-only. Does not execute discovered tools, run commands or grant permissions.",
 ].join("\n")
 
@@ -106,6 +109,43 @@ export const Plugin = {
                 item.file + ":" + item.line + " [cosine " + item.score.toFixed(3) + "] " + item.excerpt,
               ).join("\n")
               : "No eligible source files found in the bounded local embedding index."
+          } else if (action === "efficiency") {
+            const profile = efficiencyProfile()
+            const now = Date.now()
+            const stats = yield* SessionStats.get({
+              projectID: location.project.id,
+              from: now - 7 * 86_400_000,
+              to: now,
+              tools: "summary",
+            })
+            const tokens = stats.tokens
+            const totalInput = tokens.input + tokens.cache.read + tokens.cache.write
+            const cacheShare = totalInput > 0 ? Math.round(100 * tokens.cache.read / totalInput) : 0
+            const totalTokens = totalInput + tokens.output + tokens.reasoning
+            const recommendations: string[] = []
+            if (totalInput > 0 && cacheShare < 20)
+              recommendations.push("Check stable system prefixes and prompt caching on the active provider.")
+            if (stats.subagents > stats.sessions * 3)
+              recommendations.push("Review multi-agent delegation; independent subagents increase total context usage.")
+            if (stats.steps > stats.prompts * 12 && stats.prompts > 0)
+              recommendations.push("Review long execution loops and redundant reads before increasing step limits.")
+            summary = [
+              "OnethyCode Efficiency — past 7 days, this project only.",
+              "Profile: " + profile.mode + " · mission rounds " + profile.missionRounds +
+                " · max parallel by default " + profile.parallel +
+                " · goal rounds " + profile.goalRounds + ".",
+              "Sessions: " + stats.sessions + " · Subagents: " + stats.subagents +
+                " · User prompts: " + stats.prompts + " · Assistant steps: " + stats.steps + ".",
+              "Recorded tokens: " + totalTokens.toLocaleString("en-US") +
+                " (noncached input " + tokens.input + "; cache read " + tokens.cache.read +
+                "; cache write " + tokens.cache.write + "; output " + tokens.output +
+                "; reasoning " + tokens.reasoning + ").",
+              "Cached input share: " + cacheShare + "% · Estimated/recorded cost: USD " +
+                Number(stats.cost).toFixed(4) + ".",
+              "Usage totals include auxiliary title, compaction and generation events when reported by the provider.",
+              "Provider bills, subscriptions, failed attempts and missing provider usage may differ from these estimates.",
+              ...recommendations,
+            ].join("\n")
           } else if (action === "history") {
             const results = yield* Effect.tryPromise({
               try: () => searchProjectHistory(root, query, limit),
