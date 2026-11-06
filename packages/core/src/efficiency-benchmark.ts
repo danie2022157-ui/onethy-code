@@ -36,7 +36,8 @@ export function summarizeTrials(trials: ReadonlyArray<Trial>): Summary {
   if (!trials.length) throw new Error("Benchmark requires at least one task")
   const unique = new Set<string>()
   for (const trial of trials) {
-    if (!trial.taskId.trim() || unique.has(trial.taskId)) throw new Error("Duplicate or empty benchmark task ID")
+    if (typeof trial.taskId !== "string" || !trial.taskId.trim() || unique.has(trial.taskId) ||
+      typeof trial.verified !== "boolean") throw new Error("Invalid, duplicate or missing benchmark task ID or verdict")
     if (!Number.isFinite(trial.costUsd) || trial.costUsd < 0 ||
       !Number.isFinite(trial.durationMs) || trial.durationMs < 0)
       throw new Error("Invalid benchmark trial cost or duration")
