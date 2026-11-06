@@ -20,7 +20,7 @@ const PROFILES: Record<EfficiencyMode, EfficiencyProfile> = {
     projectMemoryChars: 8_000, globalMemoryChars: 5_000,
   },
   balanced: {
-    mode: "balanced", goalRounds: 30, missionRounds: 24, parallel: 3,
+    mode: "balanced", goalRounds: 50, missionRounds: 40, parallel: 3,
     toolOutputBytes: 24 * 1024, toolOutputLines: 1_000,
     projectMemoryChars: 16_000, globalMemoryChars: 12_000,
   },
@@ -63,16 +63,21 @@ export function boundedMemorySections(
   maxChars: number,
   label = "Memory Bank",
 ): string[] {
+  const entries = sections.map(({ name, text }) => ({ name, text: text.trim() })).filter((item) => item.text)
   let remaining = Math.max(0, maxChars)
-  return sections.flatMap(({ name, text }) => {
-    const trimmed = text.trim()
-    if (!trimmed || !remaining) return []
+  // Reserve a fair share for every memory document. A long project brief must
+  // not starve active-context or architectural decisions.
+  return entries.flatMap(({ name, text }, index) => {
     const header = "### [" + label + ": " + name + "]\n"
-    if (remaining <= header.length + 80) return []
-    const limit = remaining - header.length
-    const shown = trimmed.length <= limit ? trimmed : trimmed.slice(0, limit).trimEnd()
-    remaining -= header.length + shown.length
-    return [header + shown + (shown.length < trimmed.length
-      ? "\n[More memory available on demand via omni_memory: " + name + "]" : "")]
+    const marker = "\n[More memory available on demand via omni_memory: " + name + "]"
+    const share = Math.floor(remaining / (entries.length - index))
+    if (share <= header.length) return []
+    const fits = text.length <= share - header.length
+    const limit = share - header.length - (fits ? 0 : marker.length)
+    if (limit <= 0) return []
+    const shown = text.slice(0, limit).trimEnd()
+    const rendered = header + shown + (shown.length < text.length ? marker : "")
+    remaining -= rendered.length
+    return [rendered]
   })
 }
