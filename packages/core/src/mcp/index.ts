@@ -20,6 +20,7 @@ import { waitForAbort } from "@opencode/util/process"
 import { State } from "../state.js"
 import { MCP_POLICY, retryDelay, retryAllowed, canIdle, shouldHealthCheck } from "./lifecycle.js"
 import { openMcpUsage } from "./usage.js"
+import { openMcpCatalogCache } from "./catalog-cache.js"
 import type { McpClient } from "./client.js"
 
 export const ServerName = Schema.String.pipe(Schema.brand("MCP.ServerName"))
@@ -185,6 +186,10 @@ export const layer = (options?: Options) =>
       const automaticMcp = (process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1") &&
         process.env.ONETHY_MCP_AUTONOMY !== "off"
       const usage = automaticMcp ? yield* Effect.promise(() => openMcpUsage(location.directory)) : undefined
+      // Cache failures are nonfatal: no local disk permissions must block MCP startup.
+      const catalogCache = automaticMcp
+        ? yield* Effect.promise(() => openMcpCatalogCache(location.directory).catch(() => undefined))
+        : undefined
       // Flush learning updates at shutdown, including short-lived terminal sessions.
       if (usage) yield* Effect.addFinalizer(() => Effect.promise(() => usage.flush()))
       const environment = yield* Environment.Service
@@ -349,6 +354,9 @@ export const layer = (options?: Options) =>
           Effect.map((tools) => {
             entry.tools = tools.map((tool) => toTool(name, entry, tool))
           }),
+          Effect.tap(() => catalogCache && entry.tools
+            ? Effect.promise(() => catalogCache.save(name, entry.config, entry.tools!).catch(() => false))
+            : Effect.void),
         )
 
       const refreshPrompts = (name: ServerName, entry: ServerEntry, connection: McpClient.Connection) =>
@@ -494,6 +502,8 @@ export const layer = (options?: Options) =>
           if (Exit.isSuccess(result)) {
             entry.client = result.value.connection
             entry.tools = result.value.tools.map((tool) => toTool(name, entry, tool))
+            if (catalogCache) yield* Effect.promise(() =>
+              catalogCache.save(name, entry.config, result.value.tools).catch(() => false))
             entry.prompts = []
             entry.status = { status: "connected" }
             entry.lastUsedAt = Date.now()
@@ -578,6 +588,7 @@ export const layer = (options?: Options) =>
         const entry = entries.get(name)
         if (!entry) return
         yield* disposeServer(name, entry)
+        if (catalogCache) yield* Effect.promise(() => catalogCache.invalidate(name))
         // Credentials are keyed by name + URL and intentionally survive removal for a later re-add.
         entries.delete(name)
         yield* bus.publish(McpEvent.StatusChanged, { server: name })
@@ -705,6 +716,22 @@ export const layer = (options?: Options) =>
           const plan = usage?.prioritize(enabled.map(([name]) => name))
           const order = new Map(plan?.map((item, index) => [item.name, index]) ?? [])
           const cold = new Set(plan?.filter((item) => item.tier === "standby").map((item) => item.name) ?? [])
+          // A valid, permission-preserving cached schema lets an approved local
+          // server remain in standby without starting its process on every launch.
+          const restored = new Set<string>()
+          if (catalogCache) {
+            yield* Effect.forEach(enabled.filter(([name]) => cold.has(name)), ([name, entry]) =>
+              Effect.gen(function* () {
+                const saved = yield* Effect.promise(() => catalogCache.load(name, entry.config).catch(() => undefined))
+                if (!saved || entry.status.status !== "pending" || entries.get(name) !== entry) return
+                entry.tools = saved.map((tool) => toTool(name, entry, tool))
+                entry.status = { status: "standby" }
+                entry.startup.openUnsafe()
+                restored.add(name)
+                yield* bus.publish(McpEvent.ToolsChanged, { server: name })
+                yield* bus.publish(McpEvent.StatusChanged, { server: name })
+              }), { concurrency: 4, discard: true })
+          }
           const sorted = plan ? enabled.sort(([a], [b]) =>
             (order.get(a) ?? Infinity) - (order.get(b) ?? Infinity)) : enabled
           const startup = ([name, entry]: [ServerName, ServerEntry]) =>
@@ -734,7 +761,7 @@ export const layer = (options?: Options) =>
             for (const item of sorted) fork(startup(item))
           } else {
             for (const item of sorted.filter(([name]) => !cold.has(name))) fork(startup(item))
-            const deferred = sorted.filter(([name]) => cold.has(name))
+            const deferred = sorted.filter(([name]) => cold.has(name) && !restored.has(name))
             if (deferred.length) fork(
               Effect.sleep("1 second").pipe(Effect.andThen(
                 Effect.forEach(deferred, startup, { concurrency: 2, discard: true }),
@@ -968,12 +995,24 @@ export const layer = (options?: Options) =>
           }
           const target = yield* requireServer(server)
           yield* target.entry.startup.await
-          // A tool call itself may wake an already-approved MCP after a transient outage.\n          // Honor the normal failure cap/backoff; never revive disabled or auth-required servers.\n          if (retryAllowed(target.entry, Date.now(), target.entry.status.status, Boolean(target.entry.config.disabled)))\n            yield* maintainOne(target.name, target.entry, Date.now())\n          yield* wake(target.name, target.entry)
+          // A tool call may wake an already-approved MCP after a transient outage.
+          // Honor the normal failure cap/backoff; never revive disabled or auth-required servers.
+          if (retryAllowed(target.entry, Date.now(), target.entry.status.status, Boolean(target.entry.config.disabled)))
+            yield* maintainOne(target.name, target.entry, Date.now())
+          yield* wake(target.name, target.entry)
           if (!target.entry.client)
             return yield* new ToolCallError({
               server: target.name,
               tool: input.name,
               message: unavailable(target.name, target.entry.status),
+            })
+          // Cached schemas are only discovery hints. After reconnect, verify that
+          // the *live* MCP still advertises the requested tool before executing.
+          if (!target.entry.tools?.some((tool) => tool.name === input.name))
+            return yield* new ToolCallError({
+              server: target.name,
+              tool: input.name,
+              message: "MCP tool is no longer advertised by the connected server; refresh the tool catalog.",
             })
           target.entry.lastUsedAt = Date.now()
           target.entry.activeCalls = (target.entry.activeCalls ?? 0) + 1
