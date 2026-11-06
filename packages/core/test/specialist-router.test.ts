@@ -14,6 +14,14 @@ describe("autonomous specialist discovery", () => {
     expect(chooseImportedSpecialist("Corrija meu componente React e adicione testes", agents)).toBe("frameworks-react-specialist")
     expect(chooseImportedSpecialist("Criar serviço Python", agents)).toBe("programming-languages-python-pro")
   })
+  test("uses concise specialization metadata to break a Python API tie without reading system prompts", () => {
+    const candidates = [
+      { id: "languages-python-mcp", mode: "subagent", description: "Python MCP server development" },
+      { id: "languages-python-web", mode: "subagent", description: "Python web API and FastAPI development" },
+    ]
+    expect(chooseImportedSpecialist("Implementar FastAPI Python", candidates)).toBe("languages-python-web")
+  })
+
   test("does not guess between near-identical versions or execute a primary agent", () => {
     expect(chooseImportedSpecialist("Escreva um script powershell", agents)).toBe("general")
     expect(chooseImportedSpecialist("Analisar acesso da conta e segurança", agents)).toBe("general")
