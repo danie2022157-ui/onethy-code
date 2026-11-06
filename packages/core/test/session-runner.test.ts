@@ -5895,6 +5895,7 @@ describe("SessionRunnerLLM", () => {
       // Failover on a *different* provider has no retry-after wait; a direct
       // invocation exposes a terminal failure instead of hanging on the queue.
       const result = yield* Effect.exit(s.resume)
+      if (Exit.isFailure(result)) throw new Error("Auto-Failover runner failed: " + Cause.pretty(result.cause))
       expect(Exit.isSuccess(result)).toBe(true)
       expect(s.requests.map((request) => request.model.id)).toEqual(["fake-model", "replacement"])
       expect(s.executions).toEqual([])
