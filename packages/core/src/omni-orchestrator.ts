@@ -221,7 +221,7 @@ const layer = Layer.effect(
       modelID: string,
       durationMs = 5 * 60_000,
     ) {
-      cooldowns.set(`${providerID}/${modelID}`, (yield* Clock.currentTimeMillis) + Math.max(0, Math.min(durationMs, 5 * 60_000)))
+      cooldowns.set(`${providerID}/${modelID}`, (yield* Clock.currentTimeMillis) + Math.max(0, Math.min(durationMs, 15 * 60_000)))
     })
     const clearModelCooldown = Effect.fn("OmniOrchestrator.clearModelCooldown")(function* (
       providerID?: string,
