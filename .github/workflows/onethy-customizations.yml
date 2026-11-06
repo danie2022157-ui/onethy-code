@@ -16,8 +16,19 @@ on:
       - 'packages/cli/src/services/onethy-customizations-descriptors.mjs'
       - 'packages/core/src/config/plugin/onethy-customization.ts'
       - 'packages/core/src/plugin/internal.ts'
+      - 'install.ps1'
+      - 'packages/core/src/config/plugin/agent.ts'
+      - 'packages/core/src/config/plugin/onethy-agent-compat.ts'
+      - 'packages/core/src/specialist-router.ts'
+      - 'packages/core/src/tool/plugin/subagent.ts'
+      - 'packages/core/src/tool/plugin/omni-intelligence.ts'
+      - 'packages/core/src/instructions/builtins.ts'
+      - 'packages/core/src/plugin/agent.ts'
+      - 'packages/core/test/onethy-agent-compat.test.ts'
+      - 'packages/core/test/specialist-router.test.ts'
       - 'package.json'
       - 'script/onethy-customizations-bootstrap.mjs'
+      - 'script/onethy-customizations-bootstrap.test.mjs'
       - 'script/onethy-customizations.test.mjs'
       - 'script/onethy-mcp-management.test.mjs'
       - 'packages/cli/test/mcp-management.test.ts'
@@ -62,6 +73,7 @@ jobs:
       - run: node --check packages/cli/src/services/onethy-customizations-descriptors.mjs
       - run: node --check script/onethy-customizations-bootstrap.mjs
       - run: node --test script/onethy-customizations.test.mjs
+      - run: node --test script/onethy-customizations-bootstrap.test.mjs
       - run: node --test script/onethy-mcp-management.test.mjs
       - name: Verify real catalog import preview (no writes)
         shell: bash
