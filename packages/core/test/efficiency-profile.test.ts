@@ -25,7 +25,8 @@ describe("Onethy efficiency profiles", () => {
       { name: "project-brief.md", text: "a".repeat(500) },
       { name: "system-patterns.md", text: "b".repeat(500) },
     ], 240)
-    expect(small).toHaveLength(1)
+    expect(small).toHaveLength(2)
+    expect(small.join("\n")).toContain("system-patterns.md")
     expect(small[0]).toContain("More memory available on demand")
     expect(small[0]).toContain("project-brief.md")
     expect(small.join("")).not.toContain("b".repeat(20))
