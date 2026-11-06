@@ -24,7 +24,16 @@ describe("bounded memory retrieval", () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "onethy-memory-"))
     roots.push(root)
     await fs.writeFile(path.join(root, "private.md"), "should never index this data")
-    await fs.symlink(path.join(root, "private.md"), path.join(root, "project-brief.md"))
+    // Some Windows runners do not grant the symlink creation privilege.
+    // Always verify that arbitrary files are excluded; on capable hosts,
+    // additionally assert that a symlink cannot expose their content.
+    expect(memoryChunks(root, "project")).toEqual([])
+    try {
+      await fs.symlink(path.join(root, "private.md"), path.join(root, "project-brief.md"))
+    } catch (error) {
+      if (process.platform !== "win32") throw error
+      return
+    }
     expect(memoryChunks(root, "project")).toEqual([])
     expect(tokenize("Architectural Architecture")).toEqual(["architectural", "architecture"])
   })
