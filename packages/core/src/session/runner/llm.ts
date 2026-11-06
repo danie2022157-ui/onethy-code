@@ -372,6 +372,16 @@ const layer = Layer.effect(
                       id: model.providerID + "/" + model.id, enabled: model.enabled,
                       type: model.type, status: model.status, capabilities: model.capabilities,
                       context: model.limit.context,
+                      checks: {
+                        other: model.providerID + "/" + model.id !== loaded.model.ref.providerID + "/" + loaded.model.ref.id,
+                        unblocked: !excluded.has(model.providerID + "/" + model.id),
+                        active: model.enabled && model.status !== "deprecated",
+                        chat: (model.type ?? "chat") === "chat",
+                        tools: model.capabilities.tools === loaded.model.capabilities.tools,
+                        input: loaded.model.capabilities.input.every((type) => model.capabilities.input.includes(type)),
+                        output: loaded.model.capabilities.output.every((type) => model.capabilities.output.includes(type)),
+                        context: model.limit.context >= estimate.measured + estimate.estimated,
+                      },
                     })),
                   }) + "]",
                 } })
