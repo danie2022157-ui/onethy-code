@@ -39,9 +39,10 @@ export function canIdle(
   now: number,
   status: string,
   disabled: boolean,
+  idleMs = MCP_POLICY.idleMs,
 ): boolean {
   return !disabled && status === "connected" && (state.activeCalls ?? 0) === 0 &&
-    now - (state.lastUsedAt ?? now) >= MCP_POLICY.idleMs
+    now - (state.lastUsedAt ?? now) >= idleMs
 }
 
 export function shouldHealthCheck(
