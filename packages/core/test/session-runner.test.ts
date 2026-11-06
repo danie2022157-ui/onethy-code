@@ -5891,11 +5891,11 @@ describe("SessionRunnerLLM", () => {
         Stream.fail(rateLimited(5_000)),
         TestLLM.text("Recovered safely", "failover-recovered"),
       )
-      const scheduled = yield* subscribeRetries(s)
-      const run = yield* s.resume.pipe(Effect.forkChild)
-      yield* Queue.take(scheduled)
-      yield* TestClock.adjust("1 millis")
-      yield* Fiber.join(run)
+      expect((yield* Model.Service.pipe(Effect.flatMap((service) => service.available()))).length).toBe(2)
+      // Failover on a *different* provider has no retry-after wait; a direct
+      // invocation exposes a terminal failure instead of hanging on the queue.
+      const result = yield* Effect.exit(s.resume)
+      expect(Exit.isSuccess(result)).toBe(true)
       expect(s.requests.map((request) => request.model.id)).toEqual(["fake-model", "replacement"])
       expect(s.executions).toEqual([])
       expect((yield* s.session.get(sessionID))?.model).toBeUndefined()
