@@ -128,7 +128,8 @@ export const Plugin = define({
             // gave all of them the same generic description, and sometimes
             // installed a wildcard allow. Repair only this exact legacy signature
             // in memory; never overwrite the user's files or custom agents.
-            const historical = process.env.OMNICODE_ACTIVE === "1"
+            const historical = process.env.OMNICODE_ACTIVE === "1" &&
+              process.env.ONETHY_LEGACY_AGENT_COMPAT !== "off"
               ? legacyAITmplAgent(id, item) : undefined
             if (historical) {
               agent.mode = historical.mode
