@@ -16,6 +16,7 @@ import { Location } from "../../location.js"
 import { Worktree } from "../../worktree.js"
 import { ModelSelectionPolicy } from "../../model-selection-policy.js"
 import { agentModelRanking, efficiencyProfile } from "../../efficiency-profile.js"
+import { chooseImportedSpecialist } from "../../specialist-router.js"
 import { OmniBus } from "../../omni-bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { Permission } from "../../permission.js"
@@ -139,7 +140,7 @@ function safeVariantForModel(
 export const Input = Schema.Struct({
   agent: Schema.String.annotate({
     description:
-      "The type of specialized agent to use for this task. If the user asks for a subagent by a name that is not one of the available subagents, they most likely mean a model: pick a suitable agent and pass the name through the model parameter instead.",
+      "The specialized agent ID. On OnethyCode use agent=auto to choose among registered, available specialists by task; ambiguous matches use general. Respect explicit agent IDs and user model choices.",
   }),
   description: Schema.String.annotate({ description: "A short 3-5 word label for the task, displayed to the user" }),
   prompt: Schema.String.annotate({ description: "The task for the subagent to perform" }),
@@ -172,6 +173,7 @@ export const description = [
   "Background mode (background=true) launches it asynchronously and returns immediately; you are notified when it finishes.",
   "Use background only for independent work that can run while you continue elsewhere.",
   "worktree=true isolates a new child in a separate detached Git worktree, with permission approval and verification.",
+  "OnethyCode: agent=auto performs local specialist lookup among enabled agents; user permissions and model constraints still apply.",
 ].join("\n")
 
 export const Plugin = {
@@ -254,10 +256,17 @@ export const Plugin = {
                 return yield* new ToolFailure({
                   message: `Subagent depth limit reached (${limit}). Increase "experimental.subagent_depth" to allow nested subagents.`,
                 })
-              const agent = yield* agents.resolve(input.agent)
-              if (agent === undefined) return yield* new ToolFailure({ message: `Unknown agent: ${input.agent}` })
+              if (input.agent === "auto" && input.sessionID !== undefined)
+                return yield* new ToolFailure({
+                  message: "Follow-ups require the exact agent ID from the existing subagent session.",
+                })
+              const selectedAgent = input.agent === "auto" && process.env.OMNICODE_ACTIVE === "1"
+                ? chooseImportedSpecialist(input.prompt + "\n" + input.description, yield* agents.list())
+                : input.agent
+              const agent = yield* agents.resolve(selectedAgent)
+              if (agent === undefined) return yield* new ToolFailure({ message: `Unknown agent: ${selectedAgent}` })
               if (agent.mode === "primary")
-                return yield* new ToolFailure({ message: `Agent ${input.agent} cannot run as a subagent` })
+                return yield* new ToolFailure({ message: `Agent ${selectedAgent} cannot run as a subagent` })
               yield* permission
                 .assert({
                   action: name,
