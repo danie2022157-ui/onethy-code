@@ -5,6 +5,9 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { Cause, Effect, Exit, FiberMap, Layer } from "effect"
 import { Database } from "../../database/database.js"
 import { Bus } from "../../bus.js"
+import { Model } from "../../model.js"
+import { OmniOrchestrator } from "../../omni-orchestrator.js"
+import { selectFailoverModel, allowedAutoModels, canFailover, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
 import { LocationLifecycle } from "../../location-lifecycle.js"
 import { InstructionState } from "../instruction-state.js"
 import { SessionCompaction } from "../compaction.js"
@@ -47,6 +50,8 @@ const layer = Layer.effect(
     const lifecycle = yield* LocationLifecycle.Service
     const store = yield* SessionStore.Service
     const context = yield* SessionContext.Service
+    const modelCatalog = yield* Model.Service
+    const orchestrator = yield* Effect.serviceOption(OmniOrchestrator.Service)
     const modelTransport = yield* SessionModelTransport.Service
     const db = (yield* Database.Service).db
     const compaction = yield* SessionCompaction.Service
@@ -65,6 +70,9 @@ const layer = Layer.effect(
       let step = input.continuation?.step ?? 1
       let entering = true
       let stepped = input.stepped ?? false
+      // Transient: never mutate the user-pinned session model. Reuse the healthy
+      // fallback for subsequent steps in this *one* drain only.
+      const failover = { model: undefined as Model.Ref | undefined }
       const promotable = input.promotable ?? "input"
       if (!force && !continuing && !stepped) {
         const pending = yield* SessionInbox.nextPromotable(db, sessionID, "input")
@@ -197,7 +205,12 @@ const layer = Layer.effect(
                       onlyIfMissing: true,
                     })
                   if (promoted > 0) step = 1
-                  return { _tag: "Ready" as const, context: yield* context.load(selected) }
+                  return {
+                    _tag: "Ready" as const,
+                    context: yield* context.load(failover.model
+                      ? { ...selected, session: { ...selected.session, model: failover.model } }
+                      : selected),
+                  }
                 }),
               )
               if (ready) return ready
@@ -209,7 +222,7 @@ const layer = Layer.effect(
       while (true) {
         const next = yield* advanceToStep()
         if (next._tag !== "Ready") return next
-        continuing = yield* runStep(next.context, step)
+        continuing = yield* runStep(next.context, step, failover)
         stepped = true
         step++
         force = false
@@ -227,16 +240,24 @@ const layer = Layer.effect(
     })
 
     /** Owns logical Step policy; each attempt owns its streaming, tools, and durable settlement. */
-    const runStep = Effect.fn("SessionRunner.runStep")(function* (first: SessionContext.Loaded, step: number) {
+    const runStep = Effect.fn("SessionRunner.runStep")(function* (first: SessionContext.Loaded, step: number, failover: { model?: Model.Ref }) {
       const sessionID = first.session.id
       let assistantMessageID = SessionMessage.ID.create()
       const retry = yield* SessionRunnerRetry.make(bus, sessionID)
       let initial: SessionContext.Loaded | undefined = first
       let recoverOverflow = true
       let recoverContinuation = true
+      const attemptedModels = new Set<string>([
+        first.model.ref.providerID + "/" + first.model.ref.id,
+      ])
+      let failovers = 0
       while (true) {
         // Reuse boundary preparation once; retries refresh context without delivering more input.
-        const loaded = initial ?? (yield* prepareContext(sessionID).pipe(Effect.flatMap(context.load)))
+        const loaded = initial ?? (yield* prepareContext(sessionID).pipe(
+          Effect.flatMap((selection) => context.load(failover.model
+            ? { ...selection, session: { ...selection.session, model: failover.model } }
+            : selection)),
+        ))
         initial = undefined
         const estimate = SessionCompaction.estimatePrompt(loaded)
         const compacted = yield* compaction.compact({ reason: "auto", context: loaded, estimate })
@@ -318,12 +339,52 @@ const layer = Layer.effect(
               )
             return outcome.needsContinuation
           }),
-          Retry: (outcome) =>
-            retry.wait({
+          Retry: Effect.fnUntraced(function* (outcome) {
+            // Only an actual typed 429/quota response *before any output or tool
+            // execution* can trigger transparent cross-model replay.
+            if (outcome.cooldownMs !== undefined && canFailover(Boolean(first.session.model))) {
+              if (failovers >= MAX_FAILOVERS_PER_STEP)
+                return yield* new StepFailedError({ error: outcome.error })
+              const excluded = new Set(attemptedModels)
+              const connected = yield* modelCatalog.available()
+              if (orchestrator._tag === "Some") {
+                for (const model of connected)
+                  if (yield* orchestrator.value.isModelInCooldown(model.providerID, model.id))
+                    excluded.add(model.providerID + "/" + model.id)
+              }
+              const candidate = selectFailoverModel(connected, {
+                ...loaded.model.ref,
+                capabilities: loaded.model.capabilities,
+              }, excluded, allowedAutoModels(process.env.OMNICODE_ALLOWED_MODELS),
+                Math.max(0, estimate.measured + estimate.estimated))
+              if (!candidate) {
+                yield* Effect.logWarning("OnethyCode Auto-Failover: no safe, authorized model available", {
+                  sessionID, model: loaded.model.ref, attemptedModels: [...attemptedModels],
+                })
+                return yield* new StepFailedError({ error: outcome.error })
+              }
+              const from = loaded.model.ref.providerID + "/" + loaded.model.ref.id
+              failover.model = Model.Ref.make({ providerID: candidate.providerID, id: candidate.id })
+              attemptedModels.add(candidate.providerID + "/" + candidate.id)
+              failovers++
+              yield* Effect.logInfo("OnethyCode Auto-Failover: replaying pre-output request on a healthy model", {
+                sessionID, from, to: candidate.providerID + "/" + candidate.id,
+                cooldownMs: outcome.cooldownMs, failovers,
+              })
+              // Retry-after applies to the rate-limited model, not an independent provider.
+              // Keep the durable attempt accounting while avoiding an unnecessary wait.
+              return yield* retry.wait({
+                decision: { ...outcome.decision, delay: 0 },
+                error: outcome.error,
+                assistantMessageID,
+              })
+            }
+            return yield* retry.wait({
               decision: outcome.decision,
               error: outcome.error,
               assistantMessageID,
-            }),
+            })
+          }),
           Continue: Effect.fnUntraced(function* (outcome) {
             yield* retry.wait({
               decision: outcome.decision,
@@ -443,6 +504,7 @@ export const node = makeLocationNode({
     LocationLifecycle.node,
     llmClient,
     SessionContext.node,
+    Model.node,
     SessionModelTransport.node,
     SessionStore.node,
     SessionCompaction.node,

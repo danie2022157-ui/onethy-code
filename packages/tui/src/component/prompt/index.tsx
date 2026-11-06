@@ -1171,7 +1171,15 @@ export function Prompt(props: PromptProps) {
     const agent = local.agent.current()
     if (!agent) return false
     if (trimmed && local.model.auto?.enabled()) {
-      local.model.auto.routeForPrompt(inputText)
+      const routed = local.model.auto.routeForPrompt(inputText)
+      if (!routed) {
+        toast.show({
+          variant: "warning",
+          message: "Omni Auto: nenhum modelo disponível fora do cooldown. Aguarde ou escolha manualmente um modelo autorizado.",
+          duration: 5000,
+        })
+        return false
+      }
     }
     const selection = local.model.selection()
     if (!selection) {
