@@ -53,6 +53,24 @@ No terminal:
 onethy stats --cost --models --tools
 ~~~
 
+## Quality Gate reproduzível
+
+Registre cada tarefa do benchmark em dois arquivos JSON, baseline.json e candidate.json, ambos com **o mesmo conjunto de IDs**. Cada registro deve conter taskId (identificador opaco), costUsd (custo total das tentativas, incluindo subagentes), durationMs (tempo total) e verified (resultado de teste de aceitação independente).
+
+Exemplo de um item:
+
+~~~json
+{"taskId":"fix-auth-regression","costUsd":0.32,"durationMs":5000,"verified":true}
+~~~
+
+Compare os arquivos com:
+
+~~~bash
+bun --cwd packages/core script/efficiency-compare.ts baseline.json candidate.json
+~~~
+
+O processo retorna código de falha se o desempenho p95 piorar mais de 20%, o percentual de tarefas verificadas diminuir ou o custo por tarefa correta aumentar. A meta de menos 20% de custo é informativa; ela só será considerada atendida se os critérios de qualidade também passarem. Não use prompts, chaves, trechos de código privado ou dados pessoais nos arquivos de benchmark.
+
 ## Segurança
 
 - Saídas grandes truncadas na conversa são preservadas no armazenamento tool-output para consulta, não descartadas.
