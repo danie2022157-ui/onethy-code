@@ -4,6 +4,9 @@ import type { FileSystem } from "../filesystem.js"
 import { LLMClient, Message, type AIError } from "@opencode/ai/effect"
 import { Effect } from "effect"
 import { Database } from "../database/database.js"
+import { Bus } from "../bus.js"
+import { SessionEvent } from "../session/event.js"
+import { SessionUsage } from "./usage.js"
 import { Instance } from "../instance/service.js"
 import { Plugin } from "../plugin/service.js"
 import type { Instructions } from "../instructions/index.js"
@@ -30,6 +33,7 @@ export const generate = Effect.fn("SessionGenerate.generate")(function* (input: 
   const instances = yield* Instance.Service
   const database = yield* Database.Service
   const llm = yield* LLMClient.Service
+  const bus = yield* Bus.Service
 
   return yield* Effect.gen(function* () {
     yield* Plugin.awaitActivation
@@ -62,7 +66,15 @@ export const generate = Effect.fn("SessionGenerate.generate")(function* (input: 
       modelID: model.ref.id,
     })
     const response = yield* llm.generate(prepared.request, prepared.options).pipe(ModelRetry.retry)
-    yield* Effect.logInfo("session generation usage diagnostic", { usage: response.usage })
+    // Auxiliary generations (goal evaluation, user prompts, etc.) are real provider calls,
+    // yet they do not create assistant message rows. Publish their usage separately.
+    if (response.usage) {
+      yield* bus.publish(SessionEvent.UsageRecorded, {
+        sessionID: input.session.id,
+        source: "generate",
+        ...SessionUsage.record(response.usage, model.cost),
+      })
+    }
     return response.text
   }).pipe(instances.provide(input.session))
 })
