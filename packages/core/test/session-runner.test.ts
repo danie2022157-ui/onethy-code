@@ -5874,8 +5874,10 @@ describe("SessionRunnerLLM", () => {
     const originalAuto = process.env.OMNICODE_AUTO_MODEL
     const originalOmni = process.env.OMNICODE_ACTIVE
     const originalAllowed = process.env.OMNICODE_ALLOWED_MODELS
+    const originalDebug = process.env.ONETHY_DEBUG_FAILOVER
     try {
       process.env.OMNICODE_ACTIVE = "1"
+      process.env.ONETHY_DEBUG_FAILOVER = "1"
       process.env.OMNICODE_AUTO_MODEL = "1"
       process.env.OMNICODE_ALLOWED_MODELS = '["fake/fake-model","fake/replacement"]'
       const candidate = (id: string): Model.Info => ({
@@ -5905,6 +5907,8 @@ describe("SessionRunnerLLM", () => {
         Expected.assistant({ finish: "stop" }, [Expected.text("Recovered safely")]),
       ])
     } finally {
+      if (originalDebug === undefined) delete process.env.ONETHY_DEBUG_FAILOVER
+      else process.env.ONETHY_DEBUG_FAILOVER = originalDebug
       if (originalAuto === undefined) delete process.env.OMNICODE_AUTO_MODEL
       else process.env.OMNICODE_AUTO_MODEL = originalAuto
       if (originalOmni === undefined) delete process.env.OMNICODE_ACTIVE
