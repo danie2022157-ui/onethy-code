@@ -58,9 +58,8 @@ export function selectFailoverModel(
       try { return ModelSelectionPolicy.select(crossProvider, policy).selected } catch { /* same provider fallback */ }
     }
     return ModelSelectionPolicy.select(safe, policy).selected
-  } catch (error) {
-    // Test-only diagnostic, removed before production merge.
-    if (process.env.ONETHY_DEBUG_FAILOVER === "1") throw error
+  } catch {
+    // No connected eligible candidate or a malformed allowlist: fail closed.
     return
   }
 }
