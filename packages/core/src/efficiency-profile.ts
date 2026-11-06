@@ -61,12 +61,13 @@ export function agentModelRanking(
 export function boundedMemorySections(
   sections: ReadonlyArray<{ name: string; text: string }>,
   maxChars: number,
+  label = "Memory Bank",
 ): string[] {
   let remaining = Math.max(0, maxChars)
   return sections.flatMap(({ name, text }) => {
     const trimmed = text.trim()
     if (!trimmed || !remaining) return []
-    const header = "### [Memory Bank: " + name + "]\n"
+    const header = "### [" + label + ": " + name + "]\n"
     if (remaining <= header.length + 80) return []
     const limit = remaining - header.length
     const shown = trimmed.length <= limit ? trimmed : trimmed.slice(0, limit).trimEnd()
