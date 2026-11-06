@@ -7,6 +7,7 @@ import { Global } from "@opencode/util/global"
 import { Location } from "../location.js"
 import { Instructions } from "./index.js"
 import { OmniOrchestrator } from "../omni-orchestrator.js"
+import { boundedMemorySections, efficiencyProfile } from "../efficiency-profile.js"
 import { projectMemoryDirectory, readMemoryFile, renderGlobalMemory } from "../omni-memory-bank.js"
 
 export interface Interface {
@@ -27,12 +28,12 @@ function readMemoryBank(directory: string): string {
   }
 
   const files = ["project-brief.md", "system-patterns.md", "tech-context.md", "active-context.md"]
-  const sections: string[] = []
+  const sections: Array<{ name: string; text: string }> = []
   for (const file of files) {
     // A corrupt or unreadable memory file must never prevent the entire app from starting.
     try {
       const content = readMemoryFile(memDir, file)?.trim()
-      if (content) sections.push(`### [Memory Bank: ${file}]\n${content.slice(0, 12000)}`)
+      if (content) sections.push({ name: file, text: content.slice(0, 12000) })
     } catch {
       // Continue loading the remaining trusted local files.
     }
@@ -51,7 +52,7 @@ function readMemoryBank(directory: string): string {
   return [
     "<auto_memory_bank>",
     "Durable cross-session project memory loaded automatically from .omnicode/memory-bank/:\n",
-    sections.join("\n\n"),
+    boundedMemorySections(sections, efficiencyProfile().projectMemoryChars).join("\n\n"),
     "\nInstruction: You MUST keep this memory bank in sync whenever architectural decisions or milestones change using 'omni_memory'.",
     "</auto_memory_bank>",
   ].join("\n")
