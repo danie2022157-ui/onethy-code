@@ -14,6 +14,7 @@ import { Cause, Clock, Data, Effect, Exit, Fiber, Option, Stream } from "effect"
 import { SessionError } from "@opencode/schema/session-error"
 import { Bus } from "../../bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
+import { rateLimitCooldown } from "../../model-failover.js"
 import { Permission } from "../../permission.js"
 import { Snapshot } from "../../snapshot.js"
 import { Tool } from "../../tool.js"
@@ -32,7 +33,7 @@ import { SessionRunnerRetry } from "./retry.js"
 
 export type Outcome = Data.TaggedEnum<{
   Completed: { readonly needsContinuation: boolean }
-  Retry: { readonly error: SessionError.Error; readonly decision: SessionRunnerRetry.Decision }
+  Retry: { readonly error: SessionError.Error; readonly decision: SessionRunnerRetry.Decision; readonly cooldownMs?: number }
   Continue: {
     readonly error: SessionError.Error
     readonly decision: SessionRunnerRetry.Decision
@@ -180,14 +181,14 @@ export const make = Effect.gen(function* () {
             : undefined
         const llmFailure = streamFailure instanceof AIError ? streamFailure : unknownFinish
         const llmError = llmFailure && !recorded.providerFailed ? toSessionError(llmFailure) : undefined
-        const isQuotaOrFreeLimit =
-          llmFailure !== undefined &&
-          (llmFailure.reason._tag === "RateLimit" ||
-            /Free usage limit reached|usage limit reached|QuotaExceeded|429|quota|rate limit/i.test(llmFailure.message))
-        if (isQuotaOrFreeLimit) {
+        // Only structured provider rate-limit errors or an actual HTTP 429
+        // may affect model health. Never scan arbitrary event or user text.
+        const cooldownMs = llmFailure ? rateLimitCooldown(llmFailure) : undefined
+        const isQuotaOrFreeLimit = cooldownMs !== undefined
+        if (cooldownMs !== undefined) {
           const orchestrator = yield* Effect.serviceOption(OmniOrchestrator.Service)
           if (Option.isSome(orchestrator))
-            yield* orchestrator.value.markModelCooldown(input.model.ref.providerID, input.model.ref.id, 5 * 60_000)
+            yield* orchestrator.value.markModelCooldown(input.model.ref.providerID, input.model.ref.id, cooldownMs)
         }
         if (
           input.recoverContinuation &&
@@ -211,7 +212,10 @@ export const make = Effect.gen(function* () {
         if (llmFailure && llmError && retry?.retry && !recorded.outputStarted) {
           // Retry state projects onto the existing assistant, even before it has produced output.
           yield* publisher.startAssistant()
-          return Outcome.Retry({ error: llmError, decision: retry })
+          return Outcome.Retry({
+            error: llmError, decision: retry,
+            ...(cooldownMs !== undefined && toolRuns.length === 0 ? { cooldownMs } : {}),
+          })
         }
         if (llmError) yield* publisher.failAssistant(llmError)
 
