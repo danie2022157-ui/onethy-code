@@ -17,6 +17,7 @@ import type { FileAccess } from "../../file-access.js"
 import type { ReadTool } from "../../tool/plugin/read.js"
 import type { EditTool } from "../../tool/plugin/edit.js"
 import { AbsolutePath } from "../../schema.js"
+import { legacyAITmplAgent } from "./onethy-agent-compat.js"
 
 const legacySources = [
   { pattern: "{agent,agents}/**/*.md", primary: false },
@@ -122,6 +123,23 @@ export const Plugin = define({
             if (item.steps !== undefined) agent.steps = item.steps
             if (item.permissions !== undefined) {
               agent.permissions.push(...expandPermissions(item.permissions, global.home))
+            }
+            // Historical AITmpl importers registered every specialist as primary,
+            // gave all of them the same generic description, and sometimes
+            // installed a wildcard allow. Repair only this exact legacy signature
+            // in memory; never overwrite the user's files or custom agents.
+            const historical = process.env.OMNICODE_ACTIVE === "1" &&
+              process.env.ONETHY_LEGACY_AGENT_COMPAT !== "off"
+              ? legacyAITmplAgent(id, item) : undefined
+            if (historical) {
+              agent.mode = historical.mode
+              agent.description = historical.description
+              agent.permissions = agent.permissions.filter((rule) =>
+                !(rule.action === "*" && rule.resource === "*" && rule.effect === "allow"))
+              agent.permissions.push(
+                { action: "subagent", resource: "*", effect: "deny" },
+                { action: "question", resource: "*", effect: "deny" },
+              )
             }
           })
         }

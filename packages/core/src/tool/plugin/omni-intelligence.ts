@@ -6,6 +6,8 @@ import { Effect, Schema } from "effect"
 import { Location } from "../../location.js"
 import { Tool } from "../../tool.js"
 import { Skill } from "../../skill.js"
+import { Agent } from "../../agent.js"
+import { Command } from "../../command.js"
 import { Mcp } from "../../mcp/index.js"
 import { OmniBus } from "../../omni-bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
@@ -19,7 +21,7 @@ import { readOutcomes, rankVerifiedModels } from "../../model-outcomes.js"
 export const name = "omni_intelligence"
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["code", "semantic", "tools", "history", "review", "metrics", "efficiency", "quality"]).annotate({
+  action: Schema.Literals(["code", "semantic", "tools", "history", "review", "metrics", "efficiency", "quality", "customizations"]).annotate({
     description: "code: lexical source search; semantic: on-device Ollama vector search; tools: discover tools/skills/MCP; history: project sessions and memory; review: read-only git diff; metrics: agent usage and events.",
   }),
   query: Schema.optionalKey(Schema.String).annotate({
@@ -43,6 +45,7 @@ export const description = [
   "metrics: inspect recent agent events and mission task states.",
   "efficiency: report local seven-day token, cache, cost, and subagent statistics and active resource budgets.",
   "quality: inspect evidence counts, pass rates and cost-per-correct-task for eligible learned model rankings.",
+  "customizations: report registered agents, skills, commands and MCP status; optional query ranks matching specialists/resources.",
   "Read-only. Does not execute discovered tools, run commands or grant permissions.",
 ].join("\n")
 
@@ -52,6 +55,8 @@ export const Plugin = {
     const location = yield* Location.Service
     const tool = yield* Tool.Service
     const skill = yield* Skill.Service
+    const agents = yield* Agent.Service
+    const commands = yield* Command.Service
     const mcp = yield* Mcp.Service
     const bus = yield* OmniBus.Service
     const orchestrator = yield* OmniOrchestrator.Service
@@ -111,6 +116,73 @@ export const Plugin = {
                 item.file + ":" + item.line + " [cosine " + item.score.toFixed(3) + "] " + item.excerpt,
               ).join("\n")
               : "No eligible source files found in the bounded local embedding index."
+          } else if (action === "customizations") {
+            const [loadedAgents, loadedSkills, loadedCommands, servers] = yield* Effect.all([
+              agents.list(), skill.list(), commands.list(), mcp.servers(),
+            ], { concurrency: 4 })
+            const imported = loadedAgents.filter((agent) =>
+              agent.description?.startsWith("AITmpl specialist ("))
+            // The inventory and actual use are different. Count persisted, real
+            // tool calls rather than claiming that a loaded skill was invoked.
+            const now = Date.now()
+            const activity = yield* SessionStats.get({
+              projectID: location.project.id, from: now - 7 * 86_400_000,
+              to: now, tools: "detail",
+            })
+            const recorded = activity.tools.mode === "detail" ? activity.tools.usage : []
+            const usage = (name: string) => recorded.find((entry) => entry.name === name)?.calls ?? 0
+            const activeExperts = loadedAgents.filter((agent) =>
+              agent.mode !== "primary" && !agent.hidden)
+            const categories = [
+              { label: "hooks", prefix: "hook-" },
+              { label: "mods", prefix: "mod-" },
+              { label: "settings", prefix: "setting-" },
+            ]
+            const refs = categories.map((type) =>
+              type.label + ": " + loadedSkills.filter((skill) => String(skill.id).startsWith(type.prefix)).length)
+            const catalog: CatalogEntry[] = [
+              ...activeExperts.map((agent) => ({
+                category: "agent", name: String(agent.id),
+                description: String(agent.description ?? ""),
+              })),
+              ...loadedSkills.map((skill) => ({
+                category: "skill", name: String(skill.id),
+                description: String(skill.description ?? ""),
+              })),
+              ...loadedCommands.map((command) => ({
+                category: "command", name: command.name,
+                description: String(command.description ?? ""),
+              })),
+              ...servers.filter((server) => server.status.status === "connected").map((server) => ({
+                category: "mcp", name: server.name, description: "connected MCP server",
+              })),
+            ]
+            const matches = query ? rankCatalog(catalog, query, limit) : []
+            const statuses = servers.reduce<Record<string, number>>((acc, server) => {
+              const state = server.status.status
+              acc[state] = (acc[state] ?? 0) + 1
+              return acc
+            }, {})
+            summary = [
+              "OnethyCode personalizations — registered inventory, not execution counts.",
+              "Agents: " + loadedAgents.length + " total; " + activeExperts.length +
+                " available for delegation; " + imported.length + " legacy AITmpl specialists normalized.",
+              "Skills: " + loadedSkills.length + "; commands: " + loadedCommands.length + ".",
+              "Descriptor references — " + refs.join(", ") + ". Descriptors are not executable plugins.",
+              "MCP servers: " + servers.length + "; states: " +
+                Object.entries(statuses).map(([state, count]) => state + "=" + count).join(", ") + ".",
+              "Actual tool calls, last 7 days (this project): skill=" + usage("skill") +
+                ", subagent=" + usage("subagent") + ", omni_mcp=" + usage("omni_mcp") +
+                ". Counted from saved session tool invocations.",
+              "Disabled MCPs are not started automatically; use explicit approval to enable one.",
+              ...(matches.length ? ["Matching available resources:",
+                ...matches.map((item) =>
+                  "[" + item.category + "] " + item.name + " — " + item.description.slice(0, 180))] :
+                query ? ["No registered resources match that request."] : [
+                  'Use query="React testing" or query="Python" to rank matching agents and skills.',
+                ]),
+              "Availability does not prove invocation; review individual session tool-call logs for actual usage.",
+            ].join("\n")
           } else if (action === "quality") {
             const outcomes = yield* Effect.promise(() => readOutcomes(root))
             const categories = [
@@ -202,6 +274,9 @@ export const Plugin = {
               })),
               ...skills.map((item) => ({
                 category: "skill", name: String(item.id), description: String(item.description ?? ""),
+              })),
+              ...(yield* agents.list()).filter((item) => item.mode !== "primary" && !item.hidden).map((item) => ({
+                category: "agent", name: String(item.id), description: String(item.description ?? ""),
               })),
               ...mcpTools.map((item) => ({
                 category: "mcp:" + String(item.server), name: item.name, description: String(item.description ?? ""),

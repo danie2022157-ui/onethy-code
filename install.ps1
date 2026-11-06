@@ -190,3 +190,35 @@ Write-Host "[OK] Comandos 'onethy', 'onethy-code' e aliases instalados em: $targ
 Write-Host "[OK] Agora você pode abrir qualquer terminal e digitar 'onethy' diretamente!" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan
 
+# First-install personalization sync. Bun postinstall normally runs BEFORE the
+# OnethyCode environment is set, so the bootstrap would otherwise be skipped.
+# Never execute third-party scripts or enable MCP servers during this import.
+# Explicit opt-out and CI guard keep offline/automated installs deterministic.
+if ($env:ONETHY_SKIP_CUSTOMIZATION_SYNC -ne "1" -and $env:GITHUB_ACTIONS -ne "true" -and $env:CI -ne "true") {
+  $bootstrap = Join-Path $currentDir "script\onethy-customizations-bootstrap.mjs"
+  if (Test-Path -LiteralPath $bootstrap -PathType Leaf) {
+    $previousRoot = $env:ONETHY_INSTALL_ROOT
+    $previousOmni = $env:OMNICODE_ACTIVE
+    $previousOnethy = $env:ONETHY_ACTIVE
+    try {
+      $env:ONETHY_INSTALL_ROOT = $currentDir
+      $env:OMNICODE_ACTIVE = "1"
+      $env:ONETHY_ACTIVE = "1"
+      Push-Location -LiteralPath $currentDir
+      try {
+        & $nodePath $bootstrap
+        if ($LASTEXITCODE -ne 0) {
+          Write-Warning "OnethyCode personalizations were not synchronized. The CLI installation is still usable."
+        }
+      } finally {
+        Pop-Location
+      }
+    } catch {
+      Write-Warning "Unable to synchronize optional personalizations: $_"
+    } finally {
+      $env:ONETHY_INSTALL_ROOT = $previousRoot
+      $env:OMNICODE_ACTIVE = $previousOmni
+      $env:ONETHY_ACTIVE = $previousOnethy
+    }
+  }
+}
