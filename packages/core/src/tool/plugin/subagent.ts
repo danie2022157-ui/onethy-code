@@ -15,6 +15,7 @@ import { Model } from "../../model.js"
 import { Location } from "../../location.js"
 import { Worktree } from "../../worktree.js"
 import { ModelSelectionPolicy } from "../../model-selection-policy.js"
+import { agentModelRanking, efficiencyProfile } from "../../efficiency-profile.js"
 import { OmniBus } from "../../omni-bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { Permission } from "../../permission.js"
@@ -327,8 +328,7 @@ export const Plugin = {
                     mode: "automatic",
                     requiredTypes: ["chat"],
                     requiredCapabilities: { tools: true },
-                    rankBy: ["explore", "researcher", "librarian"].includes(agent.id) ? "cost"
-                      : ["architect", "reviewer"].includes(agent.id) ? "context" : "newest",
+                    rankBy: agentModelRanking(agent.id, efficiencyProfile().mode),
                     allowedModels: allowedSet ? [...allowedSet] : undefined,
                     isCoolingDown: (ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
                   }),
