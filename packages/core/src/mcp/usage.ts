@@ -106,8 +106,33 @@ export async function openMcpUsage(directory: string, dataRoot = GlobalPath.data
   }
   const records = new Map(sanitize(parsed, Date.now()).map((entry) => [entry.name, entry]))
   let pending: Promise<void> = Promise.resolve()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let dirty = false
   const snapshot = (): McpActivity[] =>
     sanitize({ version: 1, servers: [...records.values()] }, Date.now())
+  const persist = (): Promise<void> => {
+    if (!dirty) return pending
+    dirty = false
+    const contents = JSON.stringify({ version: 1, servers: snapshot() } satisfies Database)
+    pending = pending.catch(() => {}).then(async () => {
+      await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 })
+      const temp = file + "." + randomBytes(6).toString("hex") + ".tmp"
+      try {
+        await fs.writeFile(temp, contents, { encoding: "utf8", mode: 0o600, flag: "wx" })
+        await fs.rename(temp, file)
+      } finally {
+        await fs.rm(temp, { force: true }).catch(() => {})
+      }
+    }).catch(() => { dirty = true })
+    return pending
+  }
+  const flush = async () => {
+    if (timer !== undefined) {
+      clearTimeout(timer)
+      timer = undefined
+    }
+    await persist()
+  }
   const record = (name: string, succeeded: boolean, durationMs: number): Promise<void> => {
     if (!validName(name)) return Promise.resolve()
     const now = Date.now()
@@ -122,18 +147,16 @@ export async function openMcpUsage(directory: string, dataRoot = GlobalPath.data
       totalLatencyMs: Math.min(1_000_000_000, old.totalLatencyMs + Math.min(120_000, Math.max(0, Math.round(durationMs)))),
     }
     records.set(name, { name, lastUsedAt: now, days })
-    const contents = JSON.stringify({ version: 1, servers: snapshot() } satisfies Database)
-    pending = pending.catch(() => {}).then(async () => {
-      await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 })
-      const temp = file + "." + randomBytes(6).toString("hex") + ".tmp"
-      try {
-        await fs.writeFile(temp, contents, { encoding: "utf8", mode: 0o600, flag: "wx" })
-        await fs.rename(temp, file)
-      } finally {
-        await fs.rm(temp, { force: true }).catch(() => {})
-      }
-    }).catch(() => {})
-    return pending
+    dirty = true
+    // Coalesce bursts of MCP calls. Do not put disk I/O in the tool completion path.
+    if (timer === undefined) {
+      timer = setTimeout(() => {
+        timer = undefined
+        void persist()
+      }, 500)
+      timer.unref?.()
+    }
+    return Promise.resolve()
   }
-  return { record, snapshot, prioritize: (names: ReadonlyArray<string>, now = Date.now()) => prioritizeMcp(names, snapshot(), now) }
+  return { record, flush, snapshot, prioritize: (names: ReadonlyArray<string>, now = Date.now()) => prioritizeMcp(names, snapshot(), now) }
 }
