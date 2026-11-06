@@ -72,8 +72,13 @@ export function select(catalog: ReadonlyArray<Model.Info>, policy: Policy, reque
   if (!eligible.length) throw new NoModelCandidateError()
 
   const price = (model: Model.Info) => {
-    const tier = model.cost[0]
-    return tier ? tier.input + tier.output : Number.POSITIVE_INFINITY
+    // Compare a representative coding workload rather than adding input and
+    // output prices equally. Include cache reads/writes when the catalog has rates.
+    const tier = model.cost.find((item) => item.tier === undefined) ?? model.cost[0]
+    if (!tier) return Number.POSITIVE_INFINITY
+    const estimate = 0.65 * tier.input + 0.25 * tier.output +
+      0.08 * tier.cache.read + 0.02 * tier.cache.write
+    return Number.isFinite(estimate) && estimate >= 0 ? estimate : Number.POSITIVE_INFINITY
   }
   const rank = (model: Model.Info) => {
     if (policy.rankBy === "cost") return price(model)

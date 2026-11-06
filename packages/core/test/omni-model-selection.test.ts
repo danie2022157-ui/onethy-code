@@ -73,6 +73,19 @@ describe("model selection policy", () => {
     expect(String(decision.selected.id)).toBe("z-cheap")
   })
 
+  it("uses weighted input, output and cache prices instead of just an input price", () => {
+    const amount = Money.USDPerMillionTokens.make
+    const cheapInput = info("p", "cheap-input-expensive-output", {
+      cost: [{ input: amount(0.1), output: amount(30), cache: { read: amount(0.1), write: amount(0.1) } }],
+    })
+    const balanced = info("p", "balanced", {
+      cost: [{ input: amount(2), output: amount(2), cache: { read: amount(1), write: amount(2) } }],
+    })
+    expect(ModelSelectionPolicy.select([cheapInput, balanced], {
+      mode: "automatic", rankBy: "cost",
+    }).selected.id).toBe("balanced")
+  })
+
   it("supports context requirements and context ranking", () => {
     const small = info("p", "a-small", { limit: { context: 20_000, output: 8_000 } })
     const large = info("p", "z-large", { limit: { context: 200_000, output: 8_000 } })

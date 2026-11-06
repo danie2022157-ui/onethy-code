@@ -255,7 +255,7 @@ const setup = Effect.gen(function* () {
 })
 
 it.effect(
-  "generates from fresh settled Session context without durable mutation",
+  "generates from fresh settled Session context and records auxiliary usage without changing history",
   () =>
     Effect.gen(function* () {
       requests.length = 0
@@ -356,7 +356,13 @@ it.effect(
       expect(requests[0]?.tools).toMatchObject([{ name: "lookup", description: "Lookup" }])
       expect(requests[0]?.toolChoice).toBeUndefined()
       expect(options[0]?.webSocket).toBeUndefined()
-      expect(yield* durableState(db, sessionID)).toEqual(before)
+      const after = yield* durableState(db, sessionID)
+      expect(after.messages).toEqual(before.messages)
+      expect(after.pending).toEqual(before.pending)
+      expect(after.instructions).toEqual(before.instructions)
+      expect(after.blobs).toEqual(before.blobs)
+      expect(after.sequence).toBe(before.sequence + 1)
+      expect(after.bus.at(-1)?.type).toBe(Bus.versionedType(SessionEvent.UsageRecorded.type, 1))
     }),
   { timeout: 15_000 },
 )
@@ -427,7 +433,12 @@ it.effect("regenerates a failed partial answer without mutating Session history"
     expect(requests).toHaveLength(2)
     expect(requests[1]).toBe(requests[0])
     expect(userTexts(requests[1])).toContain("Summarize privately")
-    expect(yield* durableState(db, sessionID)).toEqual(before)
+    const after = yield* durableState(db, sessionID)
+    expect(after.messages).toEqual(before.messages)
+    expect(after.pending).toEqual(before.pending)
+    expect(after.bus.slice(before.bus.length).every((item) =>
+      item.type === Bus.versionedType(SessionEvent.UsageRecorded.type, 1),
+    )).toBe(true)
   }).pipe(Effect.provide(TestLLM.testLayer())),
 )
 

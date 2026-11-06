@@ -4,6 +4,8 @@ export * as OmniEmbeddings from "./omni-embeddings.js"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { execFile } from "node:child_process"
+import { createHash } from "node:crypto"
+import { localEmbeddingIndex } from "./embedding-index.js"
 import { promisify } from "node:util"
 
 const git = promisify(execFile)
@@ -20,7 +22,7 @@ const EXCLUDED = new Set([
   ".git", ".omnicode", "node_modules", "dist", "build", ".next", "coverage",
   "vendor", "target", ".venv", ".turbo", "out", "__pycache__",
 ])
-const cache = new Map<string, { mtime: number; bytes: number; vector: number[] }>()
+const cache = new Map<string, { contentHash: string; vector: number[] }>()
 
 export interface Result {
   readonly file: string
@@ -83,7 +85,7 @@ async function embed(input: string[]): Promise<number[][]> {
 
 /**
  * Git-scoped bounded embedding retrieval. Results are computed on-device and cached
- * in process memory only; no project source code is sent to remote endpoints.
+ * privately on disk across restarts; no project source code is sent to remote endpoints.
  */
 export async function semanticSearch(root: string, query: string, limit = 10): Promise<Result[]> {
   if (!query.trim()) return []
@@ -92,7 +94,8 @@ export async function semanticSearch(root: string, query: string, limit = 10): P
     cwd, timeout: 10_000, maxBuffer: 4 * 1024 * 1024, encoding: "utf8",
   })
   const files = output.stdout.split("\0").filter(sourceAllowed).slice(0, MAX_FILES)
-  const nodes: Array<{ file: string; key: string; mtime: number; bytes: number; source: string }> = []
+  const index = await localEmbeddingIndex(cwd, MODEL)
+  const nodes: Array<{ file: string; key: string; mtime: number; bytes: number; source: string; contentHash: string }> = []
   for (const file of files) {
     try {
       const fullPath = path.join(cwd, file)
@@ -101,24 +104,36 @@ export async function semanticSearch(root: string, query: string, limit = 10): P
       if (!stat.isFile() || stat.isSymbolicLink() || !stat.size || stat.size > MAX_BYTES_PER_FILE) continue
       const content = (await fs.readFile(fullPath, "utf8")).slice(0, MAX_INPUT_CHARACTERS)
       if (content.includes("\0")) continue
+      const source = file + "\n" + content
       nodes.push({
         file, key: fullPath, mtime: stat.mtimeMs, bytes: stat.size,
-        source: file + "\n" + content,
+        source,
+        contentHash: createHash("sha256").update(source).digest("hex"),
       })
     } catch {}
   }
   const missing = nodes.filter((node) => {
     const cached = cache.get(node.key)
-    return !cached || cached.mtime !== node.mtime || cached.bytes !== node.bytes
+    if (cached?.contentHash === node.contentHash) return false
+    const persisted = index.get(node.file, node.contentHash)
+    if (persisted) {
+      cache.set(node.key, { contentHash: node.contentHash, vector: persisted })
+      return false
+    }
+    return true
   })
   for (let i = 0; i < missing.length; i += 16) {
     const batch = missing.slice(i, i + 16)
     const vectors = await embed(batch.map((node) => node.source))
     for (let j = 0; j < batch.length; j++) {
       const node = batch[j]!
-      cache.set(node.key, { mtime: node.mtime, bytes: node.bytes, vector: vectors[j]! })
+      cache.set(node.key, { contentHash: node.contentHash, vector: vectors[j]! })
     }
   }
+  if (missing.length) await index.update(missing.map((node) => ({
+    file: node.file, contentHash: node.contentHash, mtime: node.mtime, bytes: node.bytes,
+    vector: cache.get(node.key)!.vector,
+  })), nodes.map((node) => node.file))
   const [queryVector] = await embed([query])
   return nodes.map((node) => {
     const content = node.source.split("\n")

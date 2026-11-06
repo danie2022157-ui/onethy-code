@@ -185,6 +185,8 @@ export const layer = (options?: Options) =>
       const automaticMcp = (process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1") &&
         process.env.ONETHY_MCP_AUTONOMY !== "off"
       const usage = automaticMcp ? yield* Effect.promise(() => openMcpUsage(location.directory)) : undefined
+      // Flush learning updates at shutdown, including short-lived terminal sessions.
+      if (usage) yield* Effect.addFinalizer(() => Effect.promise(() => usage.flush()))
       const environment = yield* Environment.Service
       const bus = yield* Bus.Service
       const forms = yield* Form.Service

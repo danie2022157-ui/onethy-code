@@ -1387,7 +1387,7 @@ export type ExperimentalSessionLogOutput =
             | undefined
           readonly data: {
             readonly sessionID: Session.ID
-            readonly source: "title" | "compaction"
+            readonly source: "title" | "compaction" | "generate"
             readonly cost: Money.USD
             readonly tokens: {
               readonly input: number

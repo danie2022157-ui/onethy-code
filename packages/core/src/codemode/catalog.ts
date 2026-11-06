@@ -47,6 +47,7 @@ export type Options = {
 const DESCRIPTION_LIMIT = 120
 const CHARACTERS_PER_TOKEN = 4
 const INLINE_BUDGET = 2_000
+const MAX_INLINE_NAMESPACES = 64
 
 // Keep every namespace visible, then select full listings one per namespace per round,
 // considering shorter listings first until the inline budget is exhausted.
@@ -60,7 +61,10 @@ export function summarize(inventory: Inventory, options: Options = {}): Summary 
       return 0
     })
     .map(([name, namespaceEntries]) => {
-      const description = flattened.namespaces.get(name)?.description
+      const rawDescription = flattened.namespaces.get(name)?.description?.split("\n", 1)[0]?.trim()
+      const description = rawDescription && rawDescription.length > DESCRIPTION_LIMIT
+        ? rawDescription.slice(0, DESCRIPTION_LIMIT - 3) + "..."
+        : rawDescription
       const listings = namespaceEntries
         .map((entry) => {
           const firstLine = entry.description.split("\n", 1)[0]?.trim() ?? ""
@@ -91,11 +95,20 @@ export function summarize(inventory: Inventory, options: Options = {}): Summary 
       }
     })
 
-  const active = new Set(namespaces)
-  // TODO: Bound namespace discovery once large namespace inventories and descriptions can no longer stay inline.
+  // A project can configure hundreds of MCP servers. Listing every namespace could
+  // overflow the prompt even when no tool signature is included. Keep pinned
+  // namespaces visible and require Code Mode's search() for the remainder.
+  const pinnedNamespaces = namespaces.filter((namespace) => namespace.selectedListings.size > 0)
+  const selected = new Set([
+    ...pinnedNamespaces,
+    ...namespaces.filter((namespace) => namespace.selectedListings.size === 0)
+      .slice(0, Math.max(0, MAX_INLINE_NAMESPACES - pinnedNamespaces.length)),
+  ])
+  const visible = namespaces.filter((namespace) => selected.has(namespace))
+  const active = new Set(visible)
   let remaining =
     budget -
-    namespaces.reduce(
+    visible.reduce(
       (total, namespace) =>
         total +
         cost(
@@ -108,7 +121,7 @@ export function summarize(inventory: Inventory, options: Options = {}): Summary 
         ),
       0,
     ) -
-    namespaces
+    visible
       .flatMap((namespace) => namespace.listings.filter((listing) => namespace.selectedListings.has(listing)))
       .reduce((total, listing) => total + cost(listing.line), 0)
   while (active.size > 0) {
@@ -125,7 +138,7 @@ export function summarize(inventory: Inventory, options: Options = {}): Summary 
     }
   }
 
-  const namespaceSummaries = namespaces.map((namespace) => ({
+  const namespaceSummaries = visible.map((namespace) => ({
     name: namespace.name,
     ...(namespace.description === undefined ? {} : { description: namespace.description }),
     count: namespace.listings.length,

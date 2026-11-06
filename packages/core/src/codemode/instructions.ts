@@ -24,9 +24,10 @@ export function render(catalog: CodeModeCatalog.Summary) {
     return [CodeModeCatalog.namespaceLine(namespace), ...namespace.entries.map((entry) => entry.line)]
   })
 
+  const hidden = Math.max(0, catalog.total - catalog.namespaces.reduce((sum, namespace) => sum + namespace.count, 0))
   return `${prompt(catalog.shown < catalog.total)}
 
-${tools.join("\n")}`
+${tools.join("\n")}${hidden > 0 ? `\n\n[${hidden} additional tools belong to namespaces omitted for context efficiency. Use search(...) to find them by task.]` : ""}`
 }
 
 export function update(previous: CodeModeCatalog.Summary, current: CodeModeCatalog.Summary) {

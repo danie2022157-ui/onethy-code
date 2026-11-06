@@ -51,6 +51,17 @@ describe("CodeModeCatalog.summarize", () => {
     expect(catalog.namespaces.every((namespace) => namespace.entries.length === 0)).toBe(true)
   })
 
+  test("bounds namespace explosion and preserves pinned MCP entries for tool search", () => {
+    const tools = Array.from({ length: 100 }, (_, index) =>
+      entry("namespace" + String(index).padStart(3, "0") + ".tool", "Tool " + index, undefined, index === 99))
+    const summary = CodeModeCatalog.summarize({ tools })
+    expect(summary.total).toBe(100)
+    expect(summary.namespaces.length).toBeLessThanOrEqual(64)
+    expect(summary.namespaces.some((namespace) => namespace.name === "namespace099")).toBe(true)
+    expect(CodeModeInstructions.render(summary)).toContain("additional tools belong to namespaces omitted")
+    expect(CodeModeInstructions.render(summary)).toContain("search(...)")
+  })
+
   test("always retains pinned tools beyond the inline budget", () => {
     const pinned = [entry("alpha.first", "First", undefined, true), entry("beta.second", "Second", undefined, true)]
     const catalog = CodeModeCatalog.summarize(

@@ -181,6 +181,13 @@ describe("SessionStats", () => {
         tokens: { input: 2, output: 2, reasoning: 2, cache: { read: 2, write: 2 } },
       })
 
+      yield* bus.publish(SessionEvent.UsageRecorded, {
+        sessionID,
+        source: "generate",
+        cost: Money.USD.make(0.75),
+        tokens: { input: 3, output: 3, reasoning: 3, cache: { read: 3, write: 3 } },
+      })
+
       const stats = yield* SessionStats.get({
         from: Date.UTC(2026, 0, 1),
         to: Date.UTC(2026, 1, 1),
@@ -192,8 +199,8 @@ describe("SessionStats", () => {
       expect(stats.subagents).toBe(1)
       expect(stats.prompts).toBe(1)
       expect(stats.steps).toBe(3)
-      expect(stats.tokens).toEqual({ input: 42, output: 22, reasoning: 10, cache: { read: 18, write: 6 } })
-      expect(stats.cost).toBe(Money.USD.make(6.25))
+      expect(stats.tokens).toEqual({ input: 46, output: 26, reasoning: 14, cache: { read: 22, write: 10 } })
+      expect(stats.cost).toBe(Money.USD.make(7.5))
       expect(stats.tools).toMatchObject({
         mode: "detail",
         totals: { calls: 3, succeeded: 1, failed: 1, unfinished: 1 },
