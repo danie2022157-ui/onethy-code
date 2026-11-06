@@ -10,10 +10,14 @@ if (root && isOnethy && resolve(root) === resolve(process.cwd())) {
   try {
     const report = await syncOnethyCustomizations({
       global: true,
-      globalDir: process.env.OPENCODE_CONFIG_DIR || process.env.OMNICODE_CONFIG_DIR,
+      // Never import OnethyCode assets into another product's config directory.
+      globalDir: process.env.OMNICODE_CONFIG_DIR,
+      sourceDir: process.env.ONETHY_CUSTOMIZATION_SOURCE_DIR || undefined,
       install: true,
     })
-    console.info("OnethyCode personalizations:", report.installed, "native files installed;", report.pending, "components requiring review not activated.", "Retired generated MCPs removed:", report.obsoleteGeneratedMcpRemoved ?? 0)
+    console.info("OnethyCode personalizations:", report.installed, "installed;", report.existing,
+      "already present;", report.pending, "reference-only or disabled;", report.rejected,
+      "rejected; target:", report.target, "Removed obsolete MCPs:", report.obsoleteGeneratedMcpRemoved ?? 0)
   } catch (error) {
     console.warn("OnethyCode personalization sync unavailable:", error instanceof Error ? error.message : String(error))
     // Do not undo a successful software update when the external catalog is unavailable.
