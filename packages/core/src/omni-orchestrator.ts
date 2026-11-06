@@ -11,6 +11,7 @@ import { OmniBus } from "./omni-bus.js"
 import { OmniConfig } from "./omni-config.js"
 import { OmniSession } from "./omni-session.js"
 import { OmniTaskGraph } from "./omni-task-graph.js"
+import { learnedModelOrder, readOutcomes } from "./model-outcomes.js"
 
 export interface AutoCustomizationsConfig {
   enabled: boolean
@@ -210,6 +211,10 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const bus = yield* OmniBus.Service
     const store = yield* OmniSession.Service
+    const location = yield* Location.Service
+    // Verified training files are deliberately imported offline, never self-labelled by agents.
+    const observed = process.env.ONETHY_QUALITY_ROUTER === "off"
+      ? [] : yield* Effect.promise(() => readOutcomes(location.project.directory))
     const cooldowns = new Map<string, number>()
     const markModelCooldown = Effect.fn("OmniOrchestrator.markModelCooldown")(function* (
       providerID: string,
@@ -527,10 +532,23 @@ const layer = Layer.effect(
         model.enabled && model.status !== "deprecated" &&
         (model.type ?? "chat") === "chat" && model.capabilities.tools,
       )
-      const decision = eligible.length ? ModelSelectionPolicy.select(eligible, policy) : undefined
-      const primary = decision && { providerID: decision.selected.providerID, id: decision.selected.id }
+      const ranked = learnedModelOrder(
+        eligible.filter((model) => !coolingDown.has(model.providerID + "/" + model.id))
+          .map((model) => model.providerID + "/" + model.id),
+        observed, category,
+      )
+      // Never replace a user-pinned model: this selection is only for automatic subagents.
+      // With sparse outcomes the existing deterministic policy remains authoritative.
+      const learningPrimary = ranked.length
+        ? eligible.find((model) => model.providerID + "/" + model.id === ranked[0]) : undefined
+      const decision = !learningPrimary && eligible.length ? ModelSelectionPolicy.select(eligible, policy) : undefined
+      const chosen = learningPrimary ?? decision?.selected
+      const primary = chosen && { providerID: chosen.providerID, id: chosen.id }
       const alternates = eligible.filter((model) => model.providerID !== primary?.providerID || model.id !== primary?.id)
-      const secondary = alternates.length ? ModelSelectionPolicy.select(alternates, policy).selected : undefined
+      const learningFallback = ranked.length > 1
+        ? alternates.find((model) => model.providerID + "/" + model.id === ranked[1]) : undefined
+      const secondary = learningFallback ??
+        (alternates.length ? ModelSelectionPolicy.select(alternates, policy).selected : undefined)
       const fallback = secondary && { providerID: secondary.providerID, id: secondary.id }
 
       const thinkingLevel: "off" | "low" | "medium" | "high" | "max" = "medium"

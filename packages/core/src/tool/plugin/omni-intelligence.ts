@@ -14,11 +14,12 @@ import { rankCatalog, reviewDiff, searchProjectHistory, searchWorkspace, type Ca
 import { OmniEmbeddings } from "../../omni-embeddings.js"
 import { SessionStats } from "../../session/stats.js"
 import { efficiencyProfile } from "../../efficiency-profile.js"
+import { readOutcomes, rankVerifiedModels } from "../../model-outcomes.js"
 
 export const name = "omni_intelligence"
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["code", "semantic", "tools", "history", "review", "metrics", "efficiency"]).annotate({
+  action: Schema.Literals(["code", "semantic", "tools", "history", "review", "metrics", "efficiency", "quality"]).annotate({
     description: "code: lexical source search; semantic: on-device Ollama vector search; tools: discover tools/skills/MCP; history: project sessions and memory; review: read-only git diff; metrics: agent usage and events.",
   }),
   query: Schema.optionalKey(Schema.String).annotate({
@@ -41,6 +42,7 @@ export const description = [
   "review: inspect staged and unstaged Git changes without editing or approving.",
   "metrics: inspect recent agent events and mission task states.",
   "efficiency: report local seven-day token, cache, cost, and subagent statistics and active resource budgets.",
+  "quality: inspect evidence counts, pass rates and cost-per-correct-task for eligible learned model rankings.",
   "Read-only. Does not execute discovered tools, run commands or grant permissions.",
 ].join("\n")
 
@@ -109,6 +111,30 @@ export const Plugin = {
                 item.file + ":" + item.line + " [cosine " + item.score.toFixed(3) + "] " + item.excerpt,
               ).join("\n")
               : "No eligible source files found in the bounded local embedding index."
+          } else if (action === "quality") {
+            const outcomes = yield* Effect.promise(() => readOutcomes(root))
+            const categories = [
+              "fast_explore", "external_research", "deep_architecture",
+              "code_implementation", "security_review", "orchestration",
+            ]
+            const reports = categories.flatMap((category) => {
+              const scores = rankVerifiedModels(outcomes, category)
+              return scores.length ? [
+                "[" + category + "]",
+                ...scores.slice(0, 8).map((item) =>
+                  item.model + ": " + item.attempts + " cases, " +
+                  Math.round(item.passRate * 100) + "% verified, USD " +
+                  item.usdPerVerified.toFixed(4) + "/verified"),
+              ] : []
+            })
+            summary = [
+              "OnethyCode Model Quality — trusted offline benchmark results.",
+              "Workspace outcome records: " + outcomes.length + " (rolling 90 days).",
+              ...reports,
+              "Learned routing activates only with at least two qualified, connected and allowed models per category.",
+              "To import independently checked results, run the local quality-ingest.ts script; restart afterward.",
+              "The model does not label its own outcomes; direct user model choices take precedence.",
+            ].join("\n")
           } else if (action === "efficiency") {
             const profile = efficiencyProfile()
             const now = Date.now()

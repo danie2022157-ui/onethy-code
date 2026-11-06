@@ -323,18 +323,25 @@ export const Plugin = {
                     coolingDown.add(`${model.providerID}/${model.id}`)
                 }
                 parentCoolingDown = parent.model !== undefined && coolingDown.has(`${parent.model.providerID}/${parent.model.id}`)
+                const permitted = availableList.filter((model) =>
+                  !allowedSet || allowedSet.has(model.providerID + "/" + model.id))
+                const chosen = yield* orchestratorOpt.value.selectModelForAgent(
+                  agent.id, input.description, permitted,
+                )
                 const decision = yield* Effect.try({
-                  try: () => ModelSelectionPolicy.select(availableList, {
+                  try: () => ModelSelectionPolicy.select(permitted, {
                     mode: "automatic",
                     requiredTypes: ["chat"],
                     requiredCapabilities: { tools: true },
                     rankBy: agentModelRanking(agent.id, efficiencyProfile().mode),
-                    allowedModels: allowedSet ? [...allowedSet] : undefined,
                     isCoolingDown: (ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
                   }),
                   catch: (error) => new ToolFailure({ message: "No connected model satisfies the selection policy.", error }),
                 })
-                routedModel = { providerID: decision.selected.providerID, id: decision.selected.id }
+                const recommended = chosen.primary
+                routedModel = recommended && permitted.some((model) =>
+                  model.providerID === recommended.providerID && model.id === recommended.id)
+                  ? recommended : { providerID: decision.selected.providerID, id: decision.selected.id }
               }
 
               if (

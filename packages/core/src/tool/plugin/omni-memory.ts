@@ -3,6 +3,7 @@ export * as OmniMemoryTool from "./omni-memory.js"
 import fs from "node:fs"
 import path from "node:path"
 import { ToolFailure } from "@opencode/ai/effect"
+import { searchMemory } from "../../memory-retrieval.js"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { Effect, Schema } from "effect"
 import { Location } from "../../location.js"
@@ -29,7 +30,7 @@ export const Input = Schema.Struct({
   confirm: Schema.optionalKey(Schema.Boolean).annotate({
     description: "Required to delete or clear global memory (only after the user explicitly asks).",
   }),
-  action: Schema.Literals(["read", "update", "init", "status", "delete", "clear"]).annotate({
+  action: Schema.Literals(["read", "search", "update", "init", "status", "delete", "clear"]).annotate({
     description:
       "Action to perform: 'read' reads memory bank files; 'update' updates a memory bank file; 'init' initializes the 4 memory bank files; 'status' checks memory bank readiness; 'delete' deletes a specific memory bank file; 'clear' clears all memory bank files.",
   }),
@@ -41,6 +42,9 @@ export const Input = Schema.Struct({
   content: Schema.optionalKey(Schema.String).annotate({
     description: "New markdown content when action is 'update'.",
   }),
+  query: Schema.optionalKey(Schema.String).annotate({ description: "Search query for relevant project or global memory sections." }),
+  limit: Schema.optionalKey(Schema.Number).annotate({ description: "Maximum returned memory sections, 1-10; default 5." }),
+  semantic: Schema.optionalKey(Schema.Boolean).annotate({ description: "Try local Ollama embeddings; fall back to offline lexical search." }),
   append: Schema.optionalKey(Schema.Boolean).annotate({
     description: "Whether to append to the file rather than replace entire content.",
   }),
@@ -59,6 +63,7 @@ export const description = [
   "Never store credentials, passwords, tokens, customer data or secrets in global memory.",
   "Stores architectural decisions, project requirements, tech stack constraints, and current task focus across sessions.",
   "- 'read': Retrieves memory bank files so agents remember project patterns without context amnesia.",
+  "- 'search': Returns only relevant, short memory sections; uses offline lexical ranking and optional local Ollama embeddings.",
   "- 'update': Writes or updates 'project-brief', 'system-patterns', 'tech-context', or 'active-context'.",
   "- 'init': Scaffolds the memory bank templates if they do not yet exist.",
   "- 'status': Checks memory bank existence and last modified dates.",
@@ -139,6 +144,24 @@ export const Plugin = {
                   output: { action: "status", summary },
                   content: summary,
                   metadata: { action: "status" },
+                }
+              }
+
+              if (params.action === "search") {
+                const query = params.query?.trim()
+                if (!query) return yield* new ToolFailure({ message: "query is required for memory search." })
+                const limit = params.limit ?? 5
+                if (!Number.isInteger(limit) || limit < 1 || limit > 10)
+                  return yield* new ToolFailure({ message: "limit must be an integer from 1 to 10." })
+                const matches = yield* Effect.promise(() =>
+                  searchMemory(memoryDir, scope, query, limit, params.semantic !== false))
+                const summary = matches.length ? matches.map((hit) =>
+                  "=== " + hit.file + ":" + hit.line + " [" + hit.method + "] ===\n" + hit.excerpt,
+                ).join("\n\n") : "No matching safe memory sections in this scope."
+                return {
+                  output: { action: "search", summary },
+                  content: summary,
+                  metadata: { action: "search", scope, count: matches.length },
                 }
               }
 

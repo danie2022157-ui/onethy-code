@@ -83,6 +83,9 @@ async function embed(input: string[]): Promise<number[][]> {
   return parseVectors(await res.json(), input.length)
 }
 
+/** Local-only vectorization shared with the Memory Bank. */
+export const embedTexts = embed
+
 /**
  * Git-scoped bounded embedding retrieval. Results are computed on-device and cached
  * privately on disk across restarts; no project source code is sent to remote endpoints.
