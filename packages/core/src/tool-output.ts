@@ -9,6 +9,7 @@ import { Global } from "@opencode/util/global"
 import { Identifier } from "@opencode/schema/identifier"
 import { FileRetention } from "./file-retention.js"
 import { State } from "./state.js"
+import { efficiencyProfile } from "./efficiency-profile.js"
 
 export const MAX_LINES = 2_000
 export const MAX_BYTES = 50 * 1024 // 50 KiB
@@ -57,7 +58,7 @@ const layer = Layer.effect(
     const directory = path.join(global.data, DIRECTORY)
     const state = State.create<Limits, Editor>({
       name: "tool-output",
-      initial: () => ({ maxLines: MAX_LINES, maxBytes: MAX_BYTES }),
+      initial: () => ({ maxLines: efficiencyProfile().toolOutputLines, maxBytes: efficiencyProfile().toolOutputBytes }),
       editor: (editor) => ({
         configure: (limits) => {
           if (limits.maxLines !== undefined) editor.maxLines = limits.maxLines
