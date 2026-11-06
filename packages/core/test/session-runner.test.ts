@@ -219,6 +219,7 @@ const makeRunnerState = (compaction?: SessionRunnerModel.Resolved["compaction"])
     }).pipe(Effect.andThen(Deferred.succeed(barrier.release, undefined)), Effect.asVoid)
   return {
     currentModel: model,
+    modelCandidates: [] as Model.Info[],
     compaction,
     modelResolveHook: resolvesModel,
     systemBaseline: "Initial context",
@@ -417,7 +418,7 @@ const layer = Layer.unwrap(
     const promptModels = Layer.mock(Model.Service, {
       get: () => Effect.undefined,
       all: () => Effect.succeed([]),
-      available: () => Effect.succeed([]),
+      available: () => Effect.succeed(state.modelCandidates),
       default: () => Effect.undefined,
       small: () => Effect.undefined,
     })
@@ -5867,6 +5868,49 @@ describe("SessionRunnerLLM", () => {
       { type: "user" },
       Expected.assistant({ finish: "stop" }, [Expected.text("Recovered")]),
     ])
+  })
+
+  scenario("Auto-Failover retries real pre-output 429 on compatible backup without duplicating tools", function* (s) {
+    const originalAuto = process.env.OMNICODE_AUTO_MODEL
+    const originalOmni = process.env.OMNICODE_ACTIVE
+    const originalAllowed = process.env.OMNICODE_ALLOWED_MODELS
+    try {
+      process.env.OMNICODE_ACTIVE = "1"
+      process.env.OMNICODE_AUTO_MODEL = "1"
+      process.env.OMNICODE_ALLOWED_MODELS = '["fake/fake-model","fake/replacement"]'
+      const candidate = (id: string): Model.Info => ({
+        ...Model.Info.default(Provider.ID.make("fake"), ID.make(id)),
+        enabled: true,
+        status: "active",
+        capabilities: { ...Model.Capabilities.default(), tools: true, input: ["text", "image"], output: ["text"] },
+        limit: { context: 200_000, output: 32_000 },
+      })
+      s.modelCandidates = [candidate("fake-model"), candidate("replacement")]
+      yield* s.admit("Recover pre-output limit")
+      yield* s.llm.push(
+        Stream.fail(rateLimited(5_000)),
+        TestLLM.text("Recovered safely", "failover-recovered"),
+      )
+      const scheduled = yield* subscribeRetries(s)
+      const run = yield* s.resume.pipe(Effect.forkChild)
+      yield* Queue.take(scheduled)
+      yield* TestClock.adjust("1 millis")
+      yield* Fiber.join(run)
+      expect(s.requests.map((request) => request.model.id)).toEqual(["fake-model", "replacement"])
+      expect(s.executions).toEqual([])
+      expect((yield* s.session.get(sessionID))?.model).toBeUndefined()
+      expect(yield* s.context).toMatchObject([
+        { type: "user" },
+        Expected.assistant({ finish: "stop" }, [Expected.text("Recovered safely")]),
+      ])
+    } finally {
+      if (originalAuto === undefined) delete process.env.OMNICODE_AUTO_MODEL
+      else process.env.OMNICODE_AUTO_MODEL = originalAuto
+      if (originalOmni === undefined) delete process.env.OMNICODE_ACTIVE
+      else process.env.OMNICODE_ACTIVE = originalOmni
+      if (originalAllowed === undefined) delete process.env.OMNICODE_ALLOWED_MODELS
+      else process.env.OMNICODE_ALLOWED_MODELS = originalAllowed
+    }
   })
 
   scenario("uses a larger provider retry-after delay", function* (s) {
