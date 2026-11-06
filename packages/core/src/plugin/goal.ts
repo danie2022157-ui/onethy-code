@@ -11,6 +11,7 @@ import CONTINUATION from "./goal/continuation.txt"
 import JUDGE from "./goal/judge.txt"
 import KICKOFF from "./goal/kickoff.txt"
 import REMINDER from "./goal/reminder.txt"
+import { efficiencyProfile } from "../efficiency-profile.js"
 
 export const MAX_OBJECTIVE = 4_000
 export const MAX_ROUNDS = 50
@@ -394,7 +395,7 @@ export const Plugin = define({
               objective: text,
               status: "active",
               rounds: 0,
-              maxRounds: MAX_ROUNDS,
+              maxRounds: Math.min(MAX_ROUNDS, efficiencyProfile().goalRounds),
               boot: boot(),
               updatedAt: yield* Clock.currentTimeMillis,
             }
