@@ -6,6 +6,7 @@ import type { Context } from "@opencode/plugin/effect/plugin"
 import { ToolFailure } from "@opencode/ai/effect"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { Tool } from "../../tool.js"
+import { efficiencyProfile } from "../../efficiency-profile.js"
 
 export const name = "omni_mission"
 
@@ -101,7 +102,7 @@ export const Plugin = {
             return { output: { action: "status", summary }, content: summary, metadata: { missionID, count: tasks.length } }
           }
           if (params.action === "claim") {
-            const tasks = yield* orchestrator.claimReadyTasks(missionID, params.maxParallel ?? 3)
+            const tasks = yield* orchestrator.claimReadyTasks(missionID, params.maxParallel ?? efficiencyProfile().parallel)
             const summary = tasks.length
               ? `Reserved tasks for ${missionID}; dispatch to assigned agents:\n${describe(tasks)}`
               : `No runnable tasks for ${missionID}. Check status for running, failed or completed stages.`
@@ -111,10 +112,11 @@ export const Plugin = {
           if (params.action === "dispatch") {
             const existing = yield* orchestrator.getActiveTasks(missionID)
             if (!existing.length) return yield* new ToolFailure({ message: "Cannot dispatch an unknown or empty mission." })
-            const maxParallel = params.maxParallel ?? 3
+            const maxParallel = params.maxParallel ?? efficiencyProfile().parallel
+            const maxRounds = efficiencyProfile().missionRounds
             const outcomes: string[] = []
             const isolate = params.isolateWorkers ?? true
-            for (let round = 0; round < 40; round++) {
+            for (let round = 0; round < maxRounds; round++) {
               const claimed = yield* orchestrator.claimReadyTasks(missionID, maxParallel)
               if (!claimed.length) break
               const snapshot = yield* tools.snapshot()
@@ -176,7 +178,7 @@ export const Plugin = {
               describe(final),
               "",
               final.some((task) => task.status !== "completed")
-                ? "Mission incomplete. Review pending, running or failed tasks before retry."
+                ? "Mission incomplete or execution budget reached. Review pending, running or failed tasks before retry."
                 : "All mission tasks were confirmed completed by their subagents. Run final review and tests before merging.",
             ].join("\n")
             return { output: { action: "dispatch", summary }, content: summary, metadata: {
