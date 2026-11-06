@@ -225,6 +225,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         process.env.OMNICODE_THINKING_ROUTING = autoStore.thinkingRouting ? "1" : "0"
         process.env.OMNICODE_OPTIMIZE_TIER = autoStore.explicitTier ?? autoStore.managedDefaultTier
         process.env.OMNICODE_AUTO_CUSTOMIZATIONS = JSON.stringify(ALWAYS_ON_CUSTOMIZATIONS)
+        // The runner may transparently replace a TUI-selected model only while
+        // the user has opted into Omni Auto; manual model selections stay pinned.
+        process.env.OMNICODE_AUTO_MODEL = autoStore.enabled ? "1" : "0"
       }
 
       function saveAutoStore() {
@@ -696,7 +699,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               const until = autoStore.cooldowns[`${m.providerID}/${m.id}`]
               return !until || until <= now
             })
-            return healthy.length > 0 ? healthy : allowed
+            // If every model is rate-limited, do not silently select a blocked one.
+            return healthy
           },
           isModelInCooldown(providerID: string, modelID: string): boolean {
             const until = autoStore.cooldowns[`${providerID}/${modelID}`]
@@ -1078,29 +1082,41 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const model = createModel()
 
-    onCleanup(
-      event.subscribe((evt) => {
-        try {
-          if (!model.auto.enabled()) return
-          const raw = JSON.stringify(evt)
-          if (!/(429|FreeUsageLimitError|free-limit|rate[_\s-]?limit|quota|Too Many Requests)/i.test(raw)) return
-          const cur = model.current()
-          if (!cur) return
-          if (model.auto.isModelInCooldown(cur.providerID, cur.modelID)) return
-          model.auto.markCooldown(cur.providerID, cur.modelID, 5 * 60_000)
-          const next = model.auto.routeForPrompt("")
-          if (next && (next.providerID !== cur.providerID || next.modelID !== cur.modelID)) {
-            toast.show({
-              variant: "warning",
-              message: `⚡ Auto-Failover Anti-429: ${cur.providerID}/${cur.modelID} em cooldown (5m) → Redirecionado para ${next.modelName}`,
-              duration: 5000,
-            })
-          }
-        } catch {
-          // ignore
-        }
-      }),
-    )
+    // A retry event is a typed provider error, not an arbitrary transcript.
+    // Only announce the new model after a new physical step actually starts.
+    const rateLimitPending = new Map<string, { from: string; recordedAt: number }>()
+    onCleanup(event.on("session.retry.scheduled", (evt) => {
+      if (!model.auto.enabled()) return
+      if (route.data.type !== "session" || route.data.sessionID !== evt.data.sessionID) return
+      if (evt.data.error.type !== "provider.rate-limit" && evt.data.error.status !== 429) return
+      const cur = model.current()
+      if (!cur) return
+      const duration = evt.data.error.retryAfterMs === undefined
+        ? 5 * 60_000 : Math.max(1_000, Math.min(evt.data.error.retryAfterMs, 15 * 60_000))
+      if (!model.auto.isModelInCooldown(cur.providerID, cur.modelID))
+        model.auto.markCooldown(cur.providerID, cur.modelID, duration)
+      rateLimitPending.set(evt.data.sessionID, {
+        from: cur.providerID + "/" + cur.modelID,
+        recordedAt: Date.now(),
+      })
+    }))
+    onCleanup(event.on("session.step.started", (evt) => {
+      const pending = rateLimitPending.get(evt.data.sessionID)
+      if (!pending || Date.now() - pending.recordedAt > 20 * 60_000) {
+        rateLimitPending.delete(evt.data.sessionID)
+        return
+      }
+      const next = evt.data.model.providerID + "/" + evt.data.model.id
+      if (next === pending.from) return
+      rateLimitPending.delete(evt.data.sessionID)
+      toast.show({
+        variant: "info",
+        message: `⚡ Auto-Failover Anti-429: ${pending.from} → ${next}. A tentativa no novo modelo começou.`,
+        duration: 5000,
+      })
+    }))
+    onCleanup(event.on("session.execution.failed", (evt) => rateLimitPending.delete(evt.data.sessionID)))
+    onCleanup(event.on("session.execution.succeeded", (evt) => rateLimitPending.delete(evt.data.sessionID)))
 
     function createSession() {
       const [sessionStore, setSessionStore] = createStore<{
