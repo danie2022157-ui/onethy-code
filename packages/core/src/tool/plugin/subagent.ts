@@ -260,8 +260,10 @@ export const Plugin = {
                 return yield* new ToolFailure({
                   message: "Follow-ups require the exact agent ID from the existing subagent session.",
                 })
-              const selectedAgent = input.agent === "auto" && process.env.OMNICODE_ACTIVE === "1"
-                ? chooseImportedSpecialist(input.prompt + "\n" + input.description, yield* agents.list())
+              const selectedAgent = input.agent === "auto"
+                ? process.env.OMNICODE_ACTIVE === "1" && process.env.ONETHY_CUSTOMIZATION_ROUTING !== "off"
+                  ? chooseImportedSpecialist(input.prompt + "\n" + input.description, yield* agents.list())
+                  : "general"
                 : input.agent
               const agent = yield* agents.resolve(selectedAgent)
               if (agent === undefined) return yield* new ToolFailure({ message: `Unknown agent: ${selectedAgent}` })
