@@ -925,7 +925,7 @@ export const layer = (options?: Options) =>
           }
           const target = yield* requireServer(server)
           yield* target.entry.startup.await
-          yield* wake(target.name, target.entry)
+          // A tool call itself may wake an already-approved MCP after a transient outage.\n          // Honor the normal failure cap/backoff; never revive disabled or auth-required servers.\n          if (retryAllowed(target.entry, Date.now(), target.entry.status.status, Boolean(target.entry.config.disabled)))\n            yield* maintainOne(target.name, target.entry, Date.now())\n          yield* wake(target.name, target.entry)
           if (!target.entry.client)
             return yield* new ToolCallError({
               server: target.name,
