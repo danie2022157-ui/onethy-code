@@ -355,36 +355,13 @@ const layer = Layer.effect(
               const candidate = selectFailoverModel(connected, {
                 ...loaded.model.ref,
                 capabilities: loaded.model.capabilities,
-              }, excluded, allowedAutoModels(process.env.OMNICODE_ALLOWED_MODELS), Math.max(0, estimate))
+              }, excluded, allowedAutoModels(process.env.OMNICODE_ALLOWED_MODELS),
+                Math.max(0, estimate.measured + estimate.estimated))
               if (!candidate) {
                 yield* Effect.logWarning("OnethyCode Auto-Failover: no safe, authorized model available", {
                   sessionID, model: loaded.model.ref, attemptedModels: [...attemptedModels],
                 })
-                return yield* new StepFailedError({ error: {
-                  ...outcome.error,
-                  message: outcome.error.message + " [diagnostic " + JSON.stringify({
-                    min: estimate.measured + estimate.estimated,
-                    allowed: allowedAutoModels(process.env.OMNICODE_ALLOWED_MODELS),
-                    excluded: [...excluded],
-                    current: loaded.model.ref.providerID + "/" + loaded.model.ref.id,
-                    capabilities: loaded.model.capabilities,
-                    candidates: connected.map((model) => ({
-                      id: model.providerID + "/" + model.id, enabled: model.enabled,
-                      type: model.type, status: model.status, capabilities: model.capabilities,
-                      context: model.limit.context,
-                      checks: {
-                        other: model.providerID + "/" + model.id !== loaded.model.ref.providerID + "/" + loaded.model.ref.id,
-                        unblocked: !excluded.has(model.providerID + "/" + model.id),
-                        active: model.enabled && model.status !== "deprecated",
-                        chat: (model.type ?? "chat") === "chat",
-                        tools: model.capabilities.tools === loaded.model.capabilities.tools,
-                        input: loaded.model.capabilities.input.every((type) => model.capabilities.input.includes(type)),
-                        output: loaded.model.capabilities.output.every((type) => model.capabilities.output.includes(type)),
-                        context: model.limit.context >= estimate.measured + estimate.estimated,
-                      },
-                    })),
-                  }) + "]",
-                } })
+                return yield* new StepFailedError({ error: outcome.error })
               }
               const from = loaded.model.ref.providerID + "/" + loaded.model.ref.id
               activeFailover = Model.Ref.make({ providerID: candidate.providerID, id: candidate.id })
