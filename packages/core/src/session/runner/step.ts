@@ -14,7 +14,7 @@ import { Cause, Clock, Data, Effect, Exit, Fiber, Option, Stream } from "effect"
 import { SessionError } from "@opencode/schema/session-error"
 import { Bus } from "../../bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
-import { rateLimitCooldown } from "../../model-failover.js"
+import { rateLimitCooldown, antigravity429 } from "../../model-failover.js"
 import { Permission } from "../../permission.js"
 import { Snapshot } from "../../snapshot.js"
 import { Tool } from "../../tool.js"
@@ -105,13 +105,24 @@ export const make = Effect.gen(function* () {
     // Provider and tool fibers retain per-source order without a shared writer queue.
     // A local execution starts only after its Tool.Called publication completes.
     let overflowFailure: ProviderErrorEvent | undefined
+    let deferredAntigravity429: AIError | undefined
     // Read to the end, not just the finish event, so the next request can reuse this response.
     const providerStream = llm.stream(input.prepared.request, input.prepared.options).pipe(
       Stream.runForEach((event) =>
         Effect.gen(function* () {
-          if (overflowFailure || publisher.hasProviderError()) return
+          if (overflowFailure || deferredAntigravity429 || publisher.hasProviderError()) return
           // Wait here, where cancellation still works, rather than inside the uninterruptible publish.
           if (!publisher.hasStarted()) yield* Fiber.join(pendingStartSnapshot)
+          // Some Antigravity versions emit the Google quota failure as a
+          // provider-error event, not as a failed stream. Defer only a verified
+          // Google 429 while no model output or tool calls have started.
+          if (LLMEvent.is.providerError(event) && !publisher.record().outputStarted && toolRuns.length === 0) {
+            const quota = antigravity429(event.message, input.model.ref)
+            if (quota) {
+              deferredAntigravity429 = quota
+              return
+            }
+          }
           if (
             LLMEvent.is.providerError(event) &&
             isContextOverflowFailure(event) &&
@@ -179,7 +190,11 @@ export const make = Effect.gen(function* () {
                 }),
               })
             : undefined
-        const llmFailure = streamFailure instanceof AIError ? streamFailure : unknownFinish
+        const llmFailure =
+          (streamFailure instanceof AIError
+            ? antigravity429(streamFailure, input.model.ref) ?? streamFailure
+            : antigravity429(streamFailure, input.model.ref)) ??
+          deferredAntigravity429 ?? unknownFinish
         const llmError = llmFailure && !recorded.providerFailed ? toSessionError(llmFailure) : undefined
         // Only structured provider rate-limit errors or an actual HTTP 429
         // may affect model health. Never scan arbitrary event or user text.

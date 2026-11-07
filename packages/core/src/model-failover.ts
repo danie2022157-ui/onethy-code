@@ -1,5 +1,5 @@
 /** Conservative failover decisions. No string-search of user or event content. */
-import type { AIError } from "@opencode/ai/effect"
+import { AIError, HttpContext, RateLimitError } from "@opencode/ai/effect"
 import type { Model } from "./model.js"
 import { ModelSelectionPolicy } from "./model-selection-policy.js"
 
@@ -79,7 +79,66 @@ export function allowedAutoModels(raw: string | undefined): string[] | undefined
 
 /** Sessions with a manually pinned model must not be rerouted unless their TUI
  * explicitly enabled Omni's automatic model-selection mode for this process. */
-export function canFailover(hasPinnedModel: boolean, env: NodeJS.ProcessEnv = process.env): boolean {
+export function canFailover(
+  hasPinnedModel: boolean,
+  env: NodeJS.ProcessEnv = process.env,
+  explicitAuto?: boolean,
+): boolean {
   return env.OMNICODE_ACTIVE === "1" && env.ONETHY_AUTO_FAILOVER !== "off" &&
-    (!hasPinnedModel || env.OMNICODE_AUTO_MODEL === "1")
+    (explicitAuto === false ? false : explicitAuto === true ? true :
+      !hasPinnedModel || env.OMNICODE_AUTO_MODEL === "1")
+}
+
+/**
+ * A prompt carries its own immutable Omni Auto selection. The TUI is often a
+ * separate process from the session runner: mutating process.env in the TUI
+ * cannot authorize a failover inside the server.
+ */
+export const AUTO_FAILOVER_KEY = "onethy.autoFailover"
+export interface AutoFailoverIntent {
+  readonly enabled: boolean
+  readonly allowedModels?: readonly string[]
+}
+type UserMessage = { readonly type: string; readonly metadata?: Readonly<Record<string, unknown>> }
+
+export function readAutoFailoverIntent(messages: ReadonlyArray<UserMessage>): AutoFailoverIntent | undefined {
+  const latest = messages.findLast((item) => item.type === "user")
+  if (!latest || !latest.metadata || !(AUTO_FAILOVER_KEY in latest.metadata)) return
+  const value = latest.metadata[AUTO_FAILOVER_KEY]
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { enabled: false }
+  const item = value as Record<string, unknown>
+  if (item.version !== 1 || typeof item.enabled !== "boolean") return { enabled: false }
+  if (!item.enabled) return { enabled: false }
+  if (item.allowedModels === null || item.allowedModels === undefined) return { enabled: true }
+  if (!Array.isArray(item.allowedModels) || item.allowedModels.length > 100 ||
+    !item.allowedModels.every((x) => typeof x === "string" && /^[^\s/]+\/[^\s/]+$/.test(x)))
+    return { enabled: false }
+  return { enabled: true, allowedModels: [...new Set(item.allowedModels)] }
+}
+
+/**
+ * The native Antigravity extension may throw its Google 429 as a plain Error
+ * or emit a provider-error event instead of an AIError. Recognize only the
+ * provider's precise diagnostic envelope, never transcript or arbitrary text.
+ */
+export function antigravity429(error: unknown, model: { providerID: string; id: string }): AIError | undefined {
+  if (!/antigravity/i.test(model.providerID + "/" + model.id)) return
+  if (error instanceof AIError &&
+    (error.reason._tag === "RateLimit" || error.reason._tag === "QuotaExceeded")) return error
+  const text = typeof error === "string" ? error :
+    error instanceof Error ? error.message : undefined
+  if (!text || text.length > 32_768) return
+  if (!/\bResource has been exhausted\b/i.test(text) ||
+    !/\[Debug Info\]/i.test(text) ||
+    !/^\s*Endpoint:\s*https:\/\/cloudcode-pa\.googleapis\.com\/v1internal(?::|\/)/mi.test(text) ||
+    !/^\s*Status:\s*429\s*$/mi.test(text)) return
+  // Strip project identifiers, credentials and any untrusted provider detail.
+  return new AIError({ reason: new RateLimitError({
+    message: "Antigravity Google endpoint exhausted its quota (HTTP 429); switching to another allowed model.",
+    http: new HttpContext({
+      url: "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent",
+      status: 429,
+      headers: {},
+    }),
+  }) })
 }
