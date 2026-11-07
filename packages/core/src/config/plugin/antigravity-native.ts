@@ -1,13 +1,15 @@
 /**
- * OnethyCode's built-in Antigravity Auth integration.
+ * OnethyCode's native Antigravity authentication source.
  *
- * Package code is supplied by CortexKit under MIT; OnethyCode does NOT copy or
- * own Google credentials, impersonate Google sign-in, or auto-enroll accounts.
- * A compatible major version range prevents unattended 3.x -> 4.x migration.
+ * The old CortexKit package is replaced with JoshRob297's OpenCode v2 plugin.
+ * Pin the upstream Git commit so production does not silently execute changed
+ * third-party OAuth code. Bumping the revision requires explicit review.
+ * Authentication and stored account migration remain user-controlled.
  */
-export const ANTIGRAVITY_PACKAGE = "@cortexkit/opencode-antigravity-auth"
-export const ANTIGRAVITY_BASELINE = "3.0.30"
-export const ANTIGRAVITY_SPEC = ANTIGRAVITY_PACKAGE + "@^" + ANTIGRAVITY_BASELINE
+export const ANTIGRAVITY_PACKAGE = "github:JoshRob297/opencode-antigravity-auth"
+export const ANTIGRAVITY_REVISION = "4e670a71080c16abeeac2aa5789b0e14f376c960" // upstream v2.5.4
+export const ANTIGRAVITY_SPEC = ANTIGRAVITY_PACKAGE + "#" + ANTIGRAVITY_REVISION
+export const LEGACY_ANTIGRAVITY_PACKAGE = "@cortexkit/opencode-antigravity-auth"
 
 export interface PluginOperation {
   readonly type: "add" | "remove"
@@ -21,19 +23,30 @@ export function antigravityEnabled(env: NodeJS.ProcessEnv = process.env) {
 }
 
 export function isAntigravityTarget(target: string) {
-  return target === ANTIGRAVITY_PACKAGE ||
-    target.startsWith(ANTIGRAVITY_PACKAGE + "@")
+  return target === ANTIGRAVITY_PACKAGE || target.startsWith(ANTIGRAVITY_PACKAGE + "#")
 }
 
-/** Avoid installing duplicates, and respect explicit user removal/disable. */
+export function isLegacyAntigravityTarget(target: string) {
+  return target === LEGACY_ANTIGRAVITY_PACKAGE ||
+    target.startsWith(LEGACY_ANTIGRAVITY_PACKAGE + "@")
+}
+
+/**
+ * Strip obsolete CortexKit plugin registrations, including legacy user config,
+ * before adding the chosen GitHub source. Never load the two OAuth plugins
+ * together (they may register overlapping provider integrations).
+ * Respect explicit opt-out and removals; never migrate credentials implicitly.
+ */
 export function withNativeAntigravity<T extends PluginOperation>(
   operations: readonly T[],
   env: NodeJS.ProcessEnv = process.env,
 ): readonly (T | { type: "add"; target: string; options: Record<string, never> })[] {
-  if (!antigravityEnabled(env)) return operations
-  if (operations.some((op) => op.type === "remove" &&
-    (op.target === "*" || op.target === "opencode.antigravity-auth" ||
-      op.target === "cortexkit.antigravity-auth" || isAntigravityTarget(op.target)))) return operations
-  if (operations.some((op) => op.type === "add" && isAntigravityTarget(op.target))) return operations
-  return [{ type: "add", target: ANTIGRAVITY_SPEC, options: {} }, ...operations]
+  const active = operations.filter((op) => op.type !== "add" || !isLegacyAntigravityTarget(op.target))
+  if (!antigravityEnabled(env)) return active
+  if (active.some((op) => op.type === "remove" &&
+    (op.target === "*" || op.target === "opencode-antigravity-auth" ||
+      op.target === "opencode.antigravity-auth" || op.target === "cortexkit.antigravity-auth" ||
+      isAntigravityTarget(op.target)))) return active
+  if (active.some((op) => op.type === "add" && isAntigravityTarget(op.target))) return active
+  return [{ type: "add", target: ANTIGRAVITY_SPEC, options: {} }, ...active]
 }
