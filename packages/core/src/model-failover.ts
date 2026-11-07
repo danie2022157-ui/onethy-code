@@ -5,16 +5,22 @@ import { ModelSelectionPolicy } from "./model-selection-policy.js"
 
 export const DEFAULT_COOLDOWN_MS = 5 * 60_000
 export const MAX_COOLDOWN_MS = 15 * 60_000
-export const MAX_INDIVIDUAL_QUOTA_COOLDOWN_MS = 7 * 24 * 60 * 60_000
 export const MAX_FAILOVERS_PER_STEP = 2
 
-export function rateLimitCooldown(error: AIError): number | undefined {
+export function rateLimitCooldown(
+  error: AIError,
+  model?: { readonly providerID: string; readonly id: string },
+): number | undefined {
   const reason = error.reason
   if (reason._tag !== "RateLimit" && reason._tag !== "QuotaExceeded" && reason.http?.status !== 429)
     return undefined
+  // The Antigravity plugin manages per-account quota resets independently.
+  // Only the OnethyCode model-routing cooldown is five minutes.
+  if (model && /antigravity/i.test(model.providerID + "/" + model.id))
+    return DEFAULT_COOLDOWN_MS
   const after = "retryAfterMs" in reason ? reason.retryAfterMs : undefined
   return typeof after === "number" && Number.isFinite(after) && after >= 0
-    ? Math.min(reason.message.startsWith("Antigravity individual quota reached") ? MAX_INDIVIDUAL_QUOTA_COOLDOWN_MS : MAX_COOLDOWN_MS, Math.max(1_000, Math.ceil(after)))
+    ? Math.min(MAX_COOLDOWN_MS, Math.max(1_000, Math.ceil(after)))
     : DEFAULT_COOLDOWN_MS
 }
 
@@ -135,20 +141,11 @@ export function antigravity429(error: unknown, model: { providerID: string; id: 
     !/\[Debug Info\]/i.test(text) ||
     !/^\s*Endpoint:\s*https:\/\/(?:daily-)?cloudcode-pa\.googleapis\.com\/v1internal(?::|\/)/mi.test(text) ||
     !/^\s*Status:\s*429\s*$/mi.test(text)) return
-  // The reset time is a provider-supplied duration, not permission to bypass quota.
-  const reset = individualQuota
-    ? /\bquota resets in\s+(\d{1,3})h\s+(\d{1,2})m\s+(\d{1,2})s\b/i.exec(text)
-    : null
-  const retryAfterMs = reset
-    ? Math.min(MAX_INDIVIDUAL_QUOTA_COOLDOWN_MS,
-        ((Number(reset[1]) * 60 + Number(reset[2])) * 60 + Number(reset[3])) * 1_000)
-    : undefined
   // Strip project identifiers, credentials and any untrusted provider detail.
   return new AIError({ reason: new RateLimitError({
     message: individualQuota
       ? "Antigravity individual quota reached; switching to another allowed model."
       : "Antigravity Google endpoint exhausted its quota (HTTP 429); switching to another allowed model.",
-    ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
     http: new HttpContext({
       url: "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent",
       status: 429,
