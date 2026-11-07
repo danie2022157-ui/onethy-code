@@ -1085,11 +1085,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     // A retry event is a typed provider error, not an arbitrary transcript.
     // Only announce the new model after a new physical step actually starts.
     const rateLimitPending = new Map<string, { from: string; recordedAt: number }>()
+    // The actual model started by the runner is authoritative, not a local
+    // selector that may be ahead of or behind the session's request.
+    const latestStepModel = new Map<string, { providerID: string; modelID: string }>()
     onCleanup(event.on("session.retry.scheduled", (evt) => {
       if (!model.auto.enabled()) return
       if (route.data.type !== "session" || route.data.sessionID !== evt.data.sessionID) return
       if (evt.data.error.type !== "provider.rate-limit" && evt.data.error.status !== 429) return
-      const cur = model.current()
+      const cur = latestStepModel.get(evt.data.sessionID) ?? model.current()
       if (!cur) return
       const duration = evt.data.error.retryAfterMs === undefined
         ? 5 * 60_000 : Math.max(1_000, Math.min(evt.data.error.retryAfterMs, 15 * 60_000))
@@ -1101,22 +1104,37 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       })
     }))
     onCleanup(event.on("session.step.started", (evt) => {
+      const nextModel = { providerID: evt.data.model.providerID, modelID: evt.data.model.id }
+      latestStepModel.set(evt.data.sessionID, nextModel)
       const pending = rateLimitPending.get(evt.data.sessionID)
       if (!pending || Date.now() - pending.recordedAt > 20 * 60_000) {
         rateLimitPending.delete(evt.data.sessionID)
         return
       }
-      const next = evt.data.model.providerID + "/" + evt.data.model.id
+      if (!model.auto.enabled() || route.data.type !== "session" || route.data.sessionID !== evt.data.sessionID) {
+        rateLimitPending.delete(evt.data.sessionID)
+        return
+      }
+      const next = nextModel.providerID + "/" + nextModel.modelID
       if (next === pending.from) return
       rateLimitPending.delete(evt.data.sessionID)
+      // The backup really started: align the selector with it so the user
+      // sees the actual model and subsequent Omni Auto turns avoid the blocked one.
+      model.set(nextModel, { fromAuto: true })
       toast.show({
         variant: "info",
-        message: `⚡ Auto-Failover Anti-429: ${pending.from} → ${next}. A tentativa no novo modelo começou.`,
+        message: `⚡ Auto-Failover Anti-429: ${pending.from} → ${next}. Tentativa iniciada no novo modelo.`,
         duration: 5000,
       })
     }))
-    onCleanup(event.on("session.execution.failed", (evt) => rateLimitPending.delete(evt.data.sessionID)))
-    onCleanup(event.on("session.execution.succeeded", (evt) => rateLimitPending.delete(evt.data.sessionID)))
+    onCleanup(event.on("session.execution.failed", (evt) => {
+      rateLimitPending.delete(evt.data.sessionID)
+      latestStepModel.delete(evt.data.sessionID)
+    }))
+    onCleanup(event.on("session.execution.succeeded", (evt) => {
+      rateLimitPending.delete(evt.data.sessionID)
+      latestStepModel.delete(evt.data.sessionID)
+    }))
 
     function createSession() {
       const [sessionStore, setSessionStore] = createStore<{
