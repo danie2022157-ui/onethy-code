@@ -17,7 +17,7 @@ import { LocationServiceMap } from "./location-service-map.js"
 import { Project } from "./project.js"
 import { Worktree } from "@opencode/schema/worktree"
 import { WorktreeTable } from "./worktree/sql.js"
-import { canonical, DirectoryUnavailableError } from "./worktree/directory.js"
+import { canonical, confirmedMissing, DirectoryUnavailableError } from "./worktree/directory.js"
 import type { EffectDrizzleSqlite } from "./database/drizzle.js"
 import { ProjectTable } from "./project/sql.js"
 import { AppProcess } from "@opencode/util/process"
@@ -256,15 +256,30 @@ const layer = Layer.effect(
 
     const remove = Effect.fn("Worktree.remove")(function* (input: RemoveInput, current?: WorktreeStrategies.Interface) {
       const row = yield* project(input.projectID)
-      const worktreeDirectory = yield* canonical(fs, input.directory)
+      const present = yield* fs.isDir(input.directory)
+      // The old flow canonicalized first and could never remove a recorded
+      // worktree after someone deleted its directory using Explorer or Git.
+      // The original DB key is already canonical when it was registered.
+      const worktreeDirectory = present ? yield* canonical(fs, input.directory) : input.directory
       const stored = yield* ops.find(input.projectID, worktreeDirectory)
+      // Never clean an arbitrary caller-supplied path or a project's main checkout.
       if (!stored?.strategy) return yield* new InvalidDirectoryError({ directory: worktreeDirectory })
+      // A file, inaccessible checkout or other object at this path is not proof
+      // of a stale worktree. Do not silently unlink its registry record.
+      if (!present && !(yield* confirmedMissing(input.directory)))
+        return yield* new DirectoryUnavailableError({ directory: input.directory })
       const settings = yield* load(row.worktree, current)
       const strategy = yield* getStrategy(stored.strategy, settings.strategies)
+      const sources = present
+        ? undefined
+        : (yield* ops.list(input.projectID)).filter((item) => !item.strategy).map((item) => item.directory)
+      // The owning strategy must finish first. For Git, it removes only this
+      // missing linked worktree's own metadata (not a repository-wide prune).
       yield* strategy
         .remove({
           directory: worktreeDirectory,
           force: input.force,
+          ...(sources ? { sourceDirectories: sources } : {}),
         })
         .pipe(Effect.mapError((error) => operationError(strategy.id, "remove", error)))
       yield* changed(input.projectID, yield* ops.remove(input.projectID, worktreeDirectory))
