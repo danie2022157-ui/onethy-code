@@ -7,6 +7,7 @@ import { Database } from "../../database/database.js"
 import { Bus } from "../../bus.js"
 import { Model } from "../../model.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
+import { agentModelRanking, efficiencyProfile } from "../../efficiency-profile.js"
 import { selectFailoverModel, allowedAutoModels, readAutoFailoverIntent, canFailover, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
 import { LocationLifecycle } from "../../location-lifecycle.js"
 import { InstructionState } from "../instruction-state.js"
@@ -363,7 +364,8 @@ const layer = Layer.effect(
                 ...loaded.model.ref,
                 capabilities: loaded.model.capabilities,
               }, excluded, allowedModels,
-                Math.max(0, estimate.measured + estimate.estimated))
+                Math.max(0, estimate.measured + estimate.estimated),
+                agentModelRanking(String(loaded.agent.id), efficiencyProfile().mode))
               if (!candidate) {
                 yield* Effect.logWarning("OnethyCode Auto-Failover: no safe, authorized model available", {
                   sessionID, model: loaded.model.ref, attemptedModels: [...attemptedModels],
@@ -377,6 +379,7 @@ const layer = Layer.effect(
               yield* Effect.logInfo("OnethyCode Auto-Failover: replaying pre-output request on a healthy model", {
                 sessionID, from, to: candidate.providerID + "/" + candidate.id,
                 cooldownMs: outcome.cooldownMs, failovers,
+                ranking: agentModelRanking(String(loaded.agent.id), efficiencyProfile().mode),
               })
               // Retry-after applies to the rate-limited model, not an independent provider.
               // Keep the durable attempt accounting while avoiding an unnecessary wait.
