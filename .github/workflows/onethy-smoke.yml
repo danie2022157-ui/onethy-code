@@ -130,6 +130,15 @@ jobs:
       - name: Real Antigravity quota recovery regression (Windows and Ubuntu)
         run: bun --cwd packages/core test test/session-runner.test.ts -t "Auto-Failover recovers an Antigravity 429"
 
+      - name: Statusless usage quota classification regression
+        run: bun --cwd packages/ai test test/provider-error.test.ts -t "recognizes an exhausted usage allowance"
+
+      - name: Statusless quota cross-provider session regression
+        run: bun --cwd packages/core test test/session-runner.test.ts -t "Auto-Failover switches to another provider on statusless"
+
+      - name: Plugin retry veto policy regression
+        run: bun --cwd packages/core test test/session-runner.test.ts -t "a plugin cannot re-enable a forbidden retry"
+
       - name: MCP configuration and connectivity regressions
         run: bun --cwd packages/core test test/config/normalization.test.ts test/mcp.test.ts test/mcp-lifecycle.test.ts test/mcp-usage.test.ts test/mcp-catalog-cache.test.ts test/omni-mcp-autonomy.test.ts
 
