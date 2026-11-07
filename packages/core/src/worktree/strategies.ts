@@ -19,7 +19,12 @@ export interface Strategy {
     directory: AbsolutePath
     branch?: string
   }) => Effect.Effect<Worktree.Info, unknown>
-  readonly remove: (input: { directory: AbsolutePath; force: boolean }) => Effect.Effect<void, unknown>
+  readonly remove: (input: {
+    directory: AbsolutePath
+    force: boolean
+    /** Optional verified project checkout roots, for removing Git metadata after a linked directory disappeared. */
+    sourceDirectories?: readonly AbsolutePath[]
+  }) => Effect.Effect<void, unknown>
   readonly list: (directory: AbsolutePath) => Effect.Effect<readonly Worktree.ListEntry[], unknown>
 }
 
