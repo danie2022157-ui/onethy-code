@@ -23,7 +23,8 @@ const env = {
 }
 
 function command(args, timeout = 240_000) {
-  return spawnSync(process.execPath, [path.join(root, "packages/cli/src/index.ts"), ...args], {
+  // Match bin/onethy.js exactly: the CLI workspace's Bun config controls JSX import resolution.
+  return spawnSync(process.execPath, ["run", "--cwd", path.join(root, "packages/cli"), "src/index.ts", ...args], {
     env, cwd: root, encoding: "utf8", timeout, maxBuffer: 4 * 1024 * 1024, windowsHide: true,
   })
 }
