@@ -279,7 +279,7 @@ export function classifyProviderFailure(input: ProviderFailure): AIError["reason
     input.status === 402 ||
     codes.some((code) => QUOTA_CODES.has(code)) ||
     (input.status === 429 && QUOTA_TEXT.test(text)) ||
-    (input.status === undefined && STATUSLESS_USAGE_QUOTA.test(text))
+    STATUSLESS_USAGE_QUOTA.test(text)
   )
     return new QuotaExceededError({ ...details, retryAfterMs: input.retryAfterMs })
   if (

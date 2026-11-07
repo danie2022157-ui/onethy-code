@@ -181,7 +181,7 @@ export function antigravity429(error: unknown, model: { providerID: string; id: 
   // The current Antigravity OAuth adapter may omit HTTP status from SSE
   // failures. Only a precise provider-owned account-limit refusal is enough
   // to mark this model temporarily unhealthy; never parse user prompt text.
-  if (/^(?:Error:\s*)?(?:The\s+)?usage limit (?:has been )?(?:reached|exceeded)\.?$/i.test(text.trim())) {
+  if (/\b(?:the\s+)?usage limit (?:has been )?(?:reached|exceeded)\b/i.test(text)) {
     return new AIError({ reason: new QuotaExceededError({
       message: "Antigravity account usage limit reached. Choose a different authorized model.",
     }) })
