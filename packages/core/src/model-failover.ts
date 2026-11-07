@@ -1,5 +1,5 @@
 /** Conservative failover decisions. No string-search of user or event content. */
-import { AIError, HttpContext, RateLimitError } from "@opencode/ai/effect"
+import { AIError, HttpContext, QuotaExceededError, RateLimitError, type LLMRequest } from "@opencode/ai/effect"
 import type { Model } from "./model.js"
 import { ModelSelectionPolicy } from "./model-selection-policy.js"
 
@@ -135,9 +135,18 @@ export function antigravity429(error: unknown, model: { providerID: string; id: 
   if (error instanceof AIError &&
     (error.reason._tag === "RateLimit" || error.reason._tag === "QuotaExceeded")) return error
   const text = typeof error === "string" ? error :
+    error instanceof AIError ? error.reason.message :
     error instanceof Error ? error.message : undefined
   if (!text || text.length > 32_768) return
-  const individualQuota = /\bIndividual quota reached\b/i.test(text)
+  // The current Antigravity OAuth adapter may omit HTTP status from SSE
+  // failures. Only a precise provider-owned account-limit refusal is enough
+  // to mark this model temporarily unhealthy; never parse user prompt text.
+  if (/^(?:Error:\\s*)?(?:The\\s+)?usage limit (?:has been )?(?:reached|exceeded)\\.?$/i.test(text.trim())) {
+    return new AIError({ reason: new QuotaExceededError({
+      message: "Antigravity account usage limit reached. Choose a different authorized model.",
+    }) })
+  }
+  const individualQuota = /\\bIndividual quota reached\\b/i.test(text)
   const resourceExhausted = /\bResource has been exhausted\b/i.test(text)
   if ((!individualQuota && !resourceExhausted) ||
     !/\[Debug Info\]/i.test(text) ||
