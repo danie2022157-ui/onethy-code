@@ -36,6 +36,7 @@ import { DialogSelect } from "../ui/dialog-select"
 import { Link } from "../ui/link"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
+import { nativeAntigravityMissing } from "../util/native-antigravity-connection"
 import {
   formInitialValues,
   formLabel,
@@ -127,6 +128,7 @@ export function DialogIntegration(
     return integrations().map((integration) => {
       const methods = connectMethods(integration)
       const credentials = credentialConnections(integration)
+      const missingAntigravity = nativeAntigravityMissing(integration)
       let category = "Services"
       if (integration.id in INTEGRATION_PRIORITY) category = "Popular"
       if (integration.metadata?.source === "mcp") category = "MCP"
@@ -135,10 +137,12 @@ export function DialogIntegration(
         title: integration.name,
         value: integration.id,
         description: methods.length === 0 ? "Environment only" : undefined,
-        footer: status ? "Sign in required →" : connectionSummary(integration) || undefined,
+        footer: missingAntigravity
+          ? "⚠ Antigravity OAuth não carregado"
+          : status ? "Sign in required →" : connectionSummary(integration) || undefined,
         footerColor: status ? theme.text.feedback.warning.base : undefined,
         category,
-        disabled: methods.length === 0 && credentials.length === 0,
+        disabled: methods.length === 0 && credentials.length === 0 && !missingAntigravity,
         gutter:
           integration.connections.length > 0 && !status
             ? () => <text fg={theme.text.feedback.success.base}>✓</text>
@@ -294,18 +298,28 @@ function selectMethod(
   dialog: ReturnType<typeof useDialog>,
   onConnected?: OnIntegrationConnected,
 ) {
-  if (methods.length === 1) return openMethod(integration, methods[0], location, dialog, onConnected)
+  const missingAntigravity = nativeAntigravityMissing(integration)
+  if (methods.length === 1 && !missingAntigravity) return openMethod(integration, methods[0], location, dialog, onConnected)
   dialog.replace(() => {
     const newDesigns = useNewDesigns()
     return (
       <DialogSelect
         title={`Connect ${integration.name}`}
         renderFilter={!newDesigns()}
-        options={methods.map((method) => ({
-          title: method.type === "key" ? (method.label ?? "API key") : method.label,
-          value: method.type === "key" ? "key" : method.id,
-          onSelect: () => openMethod(integration, method, location, dialog, onConnected),
-        }))}
+        options={[
+          ...methods.map((method) => ({
+            title: method.type === "key" ? (method.label ?? "API key") : method.label,
+            value: method.type === "key" ? "key" : method.id,
+            onSelect: () => openMethod(integration, method, location, dialog, onConnected),
+          })),
+          ...(missingAntigravity ? [{
+            title: "⚠ Antigravity OAuth não carregou",
+            description: "No PowerShell: onethy plugin check; depois onethy service restart",
+            value: "__native_antigravity_missing__",
+            disabled: true,
+            onSelect: () => {},
+          }] : []),
+        ]}
       />
     )
   })
