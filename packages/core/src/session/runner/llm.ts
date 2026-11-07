@@ -8,7 +8,7 @@ import { Bus } from "../../bus.js"
 import { Model } from "../../model.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { agentModelRanking, efficiencyProfile } from "../../efficiency-profile.js"
-import { selectFailoverModel, allowedAutoModels, readAutoFailoverIntent, canFailover, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
+import { selectFailoverModel, allowedAutoModels, readAutoFailoverIntent, canFailover, rateLimitCooldown, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
 import { LocationLifecycle } from "../../location-lifecycle.js"
 import { InstructionState } from "../instruction-state.js"
 import { SessionCompaction } from "../compaction.js"
@@ -327,7 +327,12 @@ const layer = Layer.effect(
               agent: loaded.agent.id,
               model: loaded.model.ref,
               hook: prepared.retry,
-              retry: proposed,
+              // A quota-limited model must not be retried unchanged. Only the
+              // authorized automatic failover path may retry it on another model.
+              retry: proposed && (
+                rateLimitCooldown(cause, loaded.model.ref) === undefined ||
+                canFailover(Boolean(first.session.model), process.env, autoIntent?.enabled)
+              ),
             }),
           recoverContinuation,
           recoverOverflow: Effect.suspend(() =>
