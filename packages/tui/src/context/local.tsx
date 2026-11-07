@@ -26,6 +26,7 @@ import { useData } from "./data"
 import { usePermission } from "./permission"
 import { useLocation } from "./location"
 import { parse } from "../util/model"
+import { effectiveAllowedModels } from "../util/auto-model-allowlist"
 
 // Runtime policy for every OnethyCode agent. Individual MCPs, hooks and plugins
 // still require their own explicit activation and normal tool permissions.
@@ -686,14 +687,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           },
           connectedModels() {
             const raw = this.rawConnectedModels()
-            const allowed =
-              !autoStore.selectedModels || autoStore.selectedModels.length === 0
-                ? raw
-                : (() => {
-                    const set = new Set(autoStore.selectedModels)
-                    const f = raw.filter((m) => set.has(`${m.providerID}/${m.id}`))
-                    return f.length > 0 ? f : raw
-                  })()
+            const selected = effectiveAllowedModels(autoStore.selectedModels, raw)
+            const set = selected ? new Set(selected) : undefined
+            const allowed = set ? raw.filter((m) => set.has(`${m.providerID}/${m.id}`)) : raw
             const now = Date.now()
             const healthy = allowed.filter((m) => {
               const until = autoStore.cooldowns[`${m.providerID}/${m.id}`]
@@ -729,16 +725,18 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             })
           },
           selectedModels(): string[] | undefined {
-            return autoStore.selectedModels
+            return effectiveAllowedModels(autoStore.selectedModels, this.rawConnectedModels())
           },
           isModelAllowed(providerID: string, modelID: string): boolean {
-            if (!autoStore.selectedModels || autoStore.selectedModels.length === 0) return true
-            return autoStore.selectedModels.includes(`${providerID}/${modelID}`)
+            const selected = this.selectedModels()
+            if (!selected) return true
+            return selected.includes(`${providerID}/${modelID}`)
           },
           isAllModelsAllowed(): boolean {
             const raw = this.rawConnectedModels()
-            if (!autoStore.selectedModels || autoStore.selectedModels.length === 0) return true
-            return autoStore.selectedModels.length >= raw.length
+            const selected = this.selectedModels()
+            if (!selected) return true
+            return selected.length >= raw.length
           },
           toggleModelAllowed(providerID: string, modelID: string) {
             const raw = this.rawConnectedModels()
@@ -1082,6 +1080,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const model = createModel()
 
+    // Only typed provider errors are inspected; text from the conversation
+    // never changes model health. DNS failures get the same bounded model
+    // cooldown as a provider quota failure when the endpoint is unreachable.
+    const unavailableModel = (error: { type: string; status?: number; message?: string }) =>
+      error.type === "provider.rate-limit" || error.type === "provider.quota" ||
+      error.status === 429 ||
+      (error.type === "provider.transport" &&
+        /\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED)\b/i.test(error.message ?? ""))
     // A retry event is a typed provider error, not an arbitrary transcript.
     // Only announce the new model after a new physical step actually starts.
     const rateLimitPending = new Map<string, { from: string; recordedAt: number }>()
@@ -1091,7 +1097,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     onCleanup(event.on("session.retry.scheduled", (evt) => {
       if (!model.auto.enabled()) return
       if (route.data.type !== "session" || route.data.sessionID !== evt.data.sessionID) return
-      if (evt.data.error.type !== "provider.rate-limit" && evt.data.error.status !== 429) return
+      if (!unavailableModel(evt.data.error)) return
       const cur = latestStepModel.get(evt.data.sessionID) ?? model.current()
       if (!cur) return
       const duration = evt.data.error.retryAfterMs === undefined
@@ -1123,9 +1129,19 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       model.set(nextModel, { fromAuto: true })
       toast.show({
         variant: "info",
-        message: `⚡ Auto-Failover Anti-429: ${pending.from} → ${next}. Tentativa iniciada no novo modelo.`,
+        message: `⚡ Auto-Failover: ${pending.from} → ${next}. Tentativa iniciada no novo modelo.`,
         duration: 5000,
       })
+    }))
+    // A quota refusal without a safe backup still places the real failed model
+    // in local cooldown, so the next automatic prompt will not choose it again.
+    onCleanup(event.on("session.step.failed", (evt) => {
+      if (!model.auto.enabled()) return
+      if (route.data.type !== "session" || route.data.sessionID !== evt.data.sessionID) return
+      if (!unavailableModel(evt.data.error)) return
+      const failed = latestStepModel.get(evt.data.sessionID)
+      if (!failed) return
+      model.auto.markCooldown(failed.providerID, failed.modelID)
     }))
     onCleanup(event.on("session.execution.failed", (evt) => {
       rateLimitPending.delete(evt.data.sessionID)

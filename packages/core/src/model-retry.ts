@@ -38,11 +38,15 @@ const schedule = Schedule.max([
 // A timed-out attempt already waited minutes before failing, so the general allowance would let a
 // dead provider hold a call for most of an hour. Cap those attempts well below it.
 const MAX_TIMEOUT_RETRIES = 3
+// A deterministic DNS name lookup failure is not the same as transient throttling.
+// Allow one ordinary retry for a temporary resolver issue, then surface the error.
+const MAX_DNS_RETRIES = 1
 
 export const policy = Effect.gen(function* () {
   const step = yield* Schedule.toStep(schedule)
   let attempt = 1
   let timeouts = 0
+  let dnsFailures = 0
   return (input: Input) =>
     Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis
@@ -50,11 +54,14 @@ export const policy = Effect.gen(function* () {
       if (!next) return undefined
       const [, duration] = next
       attempt++
-      if (input.cause.reason._tag === "Transport" && input.cause.reason.code === "Timeout") timeouts++
+      if (input.cause.reason._tag === "Transport") {
+        if (input.cause.reason.code === "Timeout") timeouts++
+        if (input.cause.reason.code === "ENOTFOUND" || /\bgetaddrinfo ENOTFOUND\b/i.test(input.cause.reason.message)) dnsFailures++
+      }
       return {
         attempt,
         delay: Math.ceil(Duration.toMillis(duration)),
-        retry: input.retry && timeouts <= MAX_TIMEOUT_RETRIES,
+        retry: input.retry && timeouts <= MAX_TIMEOUT_RETRIES && dnsFailures <= MAX_DNS_RETRIES,
       }
     })
 })

@@ -5976,6 +5976,110 @@ describe("SessionRunnerLLM", () => {
     }
   })
 
+  scenario("Auto-Failover switches to another provider on statusless Antigravity usage limit", function* (s) {
+    const originalOmni = process.env.OMNICODE_ACTIVE
+    const originalAuto = process.env.OMNICODE_AUTO_MODEL
+    try {
+      process.env.OMNICODE_ACTIVE = "1"
+      process.env.OMNICODE_AUTO_MODEL = "0"
+      const antigravity = Model.Info.default(Provider.ID.make("google"), ID.make("antigravity-gemini-3.8-flash"))
+      const backup = Model.Info.default(Provider.ID.make("fake"), ID.make("replacement"))
+      s.modelCandidates = [
+        { ...antigravity, enabled: true, status: "active" as const,
+          capabilities: { ...Model.Capabilities.default(), tools: true,
+            input: ["text", "image", "pdf"], output: ["text"] },
+          limit: { context: 200_000, output: 32_000 } },
+        { ...backup, enabled: true, status: "active" as const,
+          capabilities: { ...Model.Capabilities.default(), tools: true,
+            input: ["text"], output: ["text"] },
+          limit: { context: 200_000, output: 32_000 } },
+      ]
+      s.currentModel = LanguageModel.make({
+        id: "antigravity-gemini-3.8-flash", provider: "google", route: OpenAIChat.route,
+      })
+      yield* s.bus.publish(SessionEvent.ModelSelected, {
+        sessionID, model: Model.Ref.make({
+          providerID: Provider.ID.make("google"), id: ID.make("antigravity-gemini-3.8-flash"),
+        }),
+      })
+      yield* s.session.prompt({
+        sessionID, text: "Recover a plain text question", resume: false,
+        metadata: { "onethy.autoFailover": { version: 1, enabled: true,
+          allowedModels: ["google/antigravity-gemini-3.8-flash", "fake/replacement"] } },
+      })
+      yield* s.llm.push(
+        [LLMEvent.providerError({ message: "The usage limit has been reached" })],
+        TestLLM.text("Cross-provider recovery completed", "recovered-statusless"),
+      )
+      const result = yield* Effect.exit(s.resume)
+      if (Exit.isFailure(result)) throw new Error("statusless quota recovery failed: " + Cause.pretty(result.cause))
+      expect(s.requests.map((request) => String(request.model.id))).toEqual([
+        "antigravity-gemini-3.8-flash", "replacement",
+      ])
+      expect(yield* recordedEventTypes(sessionID)).toContain("session.retry.scheduled.1")
+      expect(s.executions).toEqual([])
+    } finally {
+      if (originalOmni === undefined) delete process.env.OMNICODE_ACTIVE
+      else process.env.OMNICODE_ACTIVE = originalOmni
+      if (originalAuto === undefined) delete process.env.OMNICODE_AUTO_MODEL
+      else process.env.OMNICODE_AUTO_MODEL = originalAuto
+    }
+  })
+
+  scenario("Auto-Failover switches to another provider on unsent DNS failure", function* (s) {
+    const originalOmni = process.env.OMNICODE_ACTIVE
+    const originalAuto = process.env.OMNICODE_AUTO_MODEL
+    try {
+      process.env.OMNICODE_ACTIVE = "1"
+      process.env.OMNICODE_AUTO_MODEL = "0"
+      const antigravity = Model.Info.default(Provider.ID.make("google"), ID.make("antigravity-gemini-3.8-flash"))
+      const backup = Model.Info.default(Provider.ID.make("fake"), ID.make("replacement"))
+      s.modelCandidates = [
+        { ...antigravity, enabled: true, status: "active" as const,
+          capabilities: { ...Model.Capabilities.default(), tools: true,
+            input: ["text", "image", "pdf"], output: ["text"] },
+          limit: { context: 200_000, output: 32_000 } },
+        { ...backup, enabled: true, status: "active" as const,
+          capabilities: { ...Model.Capabilities.default(), tools: true,
+            input: ["text"], output: ["text"] },
+          limit: { context: 200_000, output: 32_000 } },
+      ]
+      s.currentModel = LanguageModel.make({
+        id: "antigravity-gemini-3.8-flash", provider: "google", route: OpenAIChat.route,
+      })
+      yield* s.bus.publish(SessionEvent.ModelSelected, {
+        sessionID, model: Model.Ref.make({
+          providerID: Provider.ID.make("google"), id: ID.make("antigravity-gemini-3.8-flash"),
+        }),
+      })
+      yield* s.session.prompt({
+        sessionID, text: "Recover a plain text question", resume: false,
+        metadata: { "onethy.autoFailover": { version: 1, enabled: true,
+          allowedModels: ["google/antigravity-gemini-3.8-flash", "fake/replacement"] } },
+      })
+      yield* s.llm.push(
+        Stream.fail(new AIError({ reason: new TransportError({
+          message: "getaddrinfo ENOTFOUND cloudcode-pa.googleapis.com",
+          transport: "http", operation: "request",
+          code: "ENOTFOUND", delivery: "not-sent", recovery: "retry-full",
+        }) })),
+        TestLLM.text("Cross-provider recovery completed", "recovered-dns"),
+      )
+      const result = yield* Effect.exit(s.resume)
+      if (Exit.isFailure(result)) throw new Error("DNS provider recovery failed: " + Cause.pretty(result.cause))
+      expect(s.requests.map((request) => String(request.model.id))).toEqual([
+        "antigravity-gemini-3.8-flash", "replacement",
+      ])
+      expect(yield* recordedEventTypes(sessionID)).toContain("session.retry.scheduled.1")
+      expect(s.executions).toEqual([])
+    } finally {
+      if (originalOmni === undefined) delete process.env.OMNICODE_ACTIVE
+      else process.env.OMNICODE_ACTIVE = originalOmni
+      if (originalAuto === undefined) delete process.env.OMNICODE_AUTO_MODEL
+      else process.env.OMNICODE_AUTO_MODEL = originalAuto
+    }
+  })
+
   scenario("uses a larger provider retry-after delay", function* (s) {
     yield* s.admit("Retry rate limit")
     yield* s.llm.push(Stream.fail(rateLimited(5_000)))
@@ -6544,6 +6648,18 @@ describe("SessionRunnerLLM", () => {
     expect(eventTypes.filter((type) => type === "session.step.started.1")).toHaveLength(3)
     expect(eventTypes.filter((type) => type === "session.retry.scheduled.1")).toHaveLength(1)
     expect((yield* s.context).filter((message) => message.type === "assistant")).toHaveLength(2)
+  })
+
+  scenario("a plugin cannot re-enable a forbidden retry", function* (s) {
+    const hooks = yield* PluginHooks.Service
+    yield* hooks.register("session", "retry", (event) =>
+      Effect.sync(() => { event.decision = { retry: true, delay: 0 } }),
+    )
+    const failure = invalidRequest()
+    yield* s.llm.push(Stream.fail(failure))
+    expect(yield* s.runPrompt("Do not retry invalid input").pipe(Effect.flip)).toBe(failure)
+    expect(s.requests).toHaveLength(1)
+    expect(yield* recordedEventTypes(sessionID)).not.toContain("session.retry.scheduled.1")
   })
 
   scenario("does not retry non-eligible provider failures", function* (s) {

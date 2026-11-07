@@ -14,7 +14,7 @@ import { Cause, Clock, Data, Effect, Exit, Fiber, Option, Stream } from "effect"
 import { SessionError } from "@opencode/schema/session-error"
 import { Bus } from "../../bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
-import { rateLimitCooldown, antigravity429 } from "../../model-failover.js"
+import { rateLimitCooldown, transportFailoverCooldown, antigravity429 } from "../../model-failover.js"
 import { Permission } from "../../permission.js"
 import { Snapshot } from "../../snapshot.js"
 import { Tool } from "../../tool.js"
@@ -198,8 +198,9 @@ export const make = Effect.gen(function* () {
         const llmError = llmFailure && !recorded.providerFailed ? toSessionError(llmFailure) : undefined
         // Only structured provider rate-limit errors or an actual HTTP 429
         // may affect model health. Never scan arbitrary event or user text.
-        const cooldownMs = llmFailure ? rateLimitCooldown(llmFailure, input.model.ref) : undefined
-        const isQuotaOrFreeLimit = cooldownMs !== undefined
+        const quotaCooldown = llmFailure ? rateLimitCooldown(llmFailure, input.model.ref) : undefined
+        const cooldownMs = quotaCooldown ?? (llmFailure ? transportFailoverCooldown(llmFailure) : undefined)
+        const isQuotaOrFreeLimit = quotaCooldown !== undefined
         if (cooldownMs !== undefined) {
           const orchestrator = yield* Effect.serviceOption(OmniOrchestrator.Service)
           if (Option.isSome(orchestrator))
@@ -209,7 +210,8 @@ export const make = Effect.gen(function* () {
           input.recoverContinuation &&
           llmFailure?.reason._tag === "Transport" &&
           (llmFailure.reason.recovery === "retry-full" || llmFailure.reason.recovery === "rotate-and-retry-full") &&
-          !recorded.outputStarted
+          !recorded.outputStarted &&
+          transportFailoverCooldown(llmFailure) === undefined
         )
           return Outcome.RecoverFull()
         const retry =

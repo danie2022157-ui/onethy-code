@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test"
-import { AIError, RateLimitError, InvalidProviderOutputError } from "@opencode/ai/effect"
+import { AIError, RateLimitError, InvalidProviderOutputError, Message, TransportError } from "@opencode/ai/effect"
 import { Model } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
-import { allowedAutoModels, canFailover, rateLimitCooldown, selectFailoverModel, antigravity429, readAutoFailoverIntent, AUTO_FAILOVER_KEY } from "../src/model-failover"
+import { allowedAutoModels, canFailover, rateLimitCooldown, selectFailoverModel, requestInputModalities, transportFailoverCooldown, antigravity429, readAutoFailoverIntent, AUTO_FAILOVER_KEY } from "../src/model-failover"
 
 const info = (provider: string, id: string, options: Partial<Model.Info> = {}): Model.Info => ({
   ...Model.Info.default(Provider.ID.make(provider), Model.ID.make(id)),
@@ -25,6 +25,20 @@ describe("provider failover decision", () => {
     expect(rateLimitCooldown(new AIError({ reason: new RateLimitError({ message: "external provider delay", retryAfterMs: 132 * 60 * 60_000 }) }), { providerID: "antigravity", id: "claude" })).toBe(300_000)
     expect(rateLimitCooldown(new AIError({ reason: new InvalidProviderOutputError({ message: "This text mentions HTTP 429", classification: "incomplete-stream" }) }))).toBeUndefined()
   })
+  it("only reroutes unsent DNS and connection failures, never accepted requests", () => {
+    const dns = (delivery: "not-sent" | "accepted" = "not-sent", code = "ENOTFOUND") =>
+      new AIError({ reason: new TransportError({
+        message: "getaddrinfo ENOTFOUND cloudcode-pa.googleapis.com",
+        transport: "http", operation: "request", delivery, code,
+      }) })
+    expect(transportFailoverCooldown(dns())).toBe(300_000)
+    expect(transportFailoverCooldown(dns("not-sent", "EAI_AGAIN"))).toBe(300_000)
+    expect(transportFailoverCooldown(dns("accepted"))).toBeUndefined()
+    expect(transportFailoverCooldown(new AIError({ reason: new InvalidProviderOutputError({
+      message: "User mentioned ENOTFOUND in a tool response",
+    }) }))).toBeUndefined()
+  })
+
   it("prefers another connected provider with compatible capabilities", () => {
     const selected = selectFailoverModel(options, { ...primary, capabilities: primary.capabilities },
       new Set(["openai/gpt-6-luna"]), undefined, 120_000)
@@ -53,6 +67,24 @@ describe("provider failover decision", () => {
       capabilities: { ...primary.capabilities, tools: false },
     })], primary, new Set(["openai/gpt-6-luna"]), undefined, 30_000)).toBeUndefined()
   })
+  it("can use a text-only backup even when the original advertises PDF support", () => {
+    const original = info("google", "antigravity-gemini-3.8-flash", {
+      capabilities: { ...primary.capabilities, input: ["text", "image", "pdf"] },
+    })
+    const backup = info("openai", "compatible-text", {
+      capabilities: { ...primary.capabilities, input: ["text"] },
+    })
+    const modalities = requestInputModalities({
+      messages: [Message.user("A coding question without images or PDFs")],
+    }, original.capabilities.input)
+    expect(modalities).toEqual(["text"])
+    expect(selectFailoverModel([original, backup], {
+      ...original, capabilities: { ...original.capabilities, input: modalities },
+    }, new Set(["google/antigravity-gemini-3.8-flash"]), undefined, 10_000)?.id).toBe("compatible-text")
+    expect(selectFailoverModel([original, backup], original,
+      new Set(["google/antigravity-gemini-3.8-flash"]), undefined, 10_000)).toBeUndefined()
+  })
+
   it("does not reroute a pinned user selection unless Omni Auto explicitly enabled", () => {
     expect(canFailover(true, { OMNICODE_ACTIVE: "1" })).toBe(false)
     expect(canFailover(true, { OMNICODE_ACTIVE: "1", OMNICODE_AUTO_MODEL: "1" })).toBe(true)
@@ -84,6 +116,18 @@ describe("provider failover decision", () => {
       providerID: "google", id: "antigravity-gemini-3.8-flash",
     })?.reason._tag).toBe("RateLimit")
   })
+  it("normalizes the new Antigravity statusless usage-limit error", () => {
+    const failure = antigravity429("Error: The usage limit has been reached", {
+      providerID: "google", id: "antigravity-gemini-3.8-flash",
+    })
+    expect(failure?.reason._tag).toBe("QuotaExceeded")
+    expect(rateLimitCooldown(failure!, { providerID: "google", id: "antigravity-gemini-3.8-flash" }))
+      .toBe(300_000)
+    expect(antigravity429("Error: The usage limit has been reached", {
+      providerID: "openai", id: "gpt-6",
+    })).toBeUndefined()
+  })
+
   it("detects daily Antigravity individual quota but uses five-minute router cooldown", () => {
     const message = [
       "Error: Individual quota reached. Please upgrade your subscription to increase your limits. quota resets in 132h 30m 27s.",

@@ -67,6 +67,20 @@ describe("provider error classification", () => {
     ).toEqual(["RateLimit", "RateLimit", "RateLimit"])
   })
 
+  test("recognizes an exhausted usage allowance even when a stream omits HTTP status", () => {
+    for (const message of [
+      "The usage limit has been reached",
+      "Usage limit reached",
+      "The usage limit has been exceeded",
+    ]) {
+      const reason = classifyProviderFailure({ message })
+      expect(reason._tag).toBe("QuotaExceeded")
+      expect(isRetryable(new AIError({ reason }))).toBe(false)
+    }
+    expect(classifyProviderFailure({ message: "Rate limit exceeded" })._tag).toBe("RateLimit")
+    expect(classifyProviderFailure({ message: "Token limit exceeded" })._tag).toBe("InvalidRequest")
+  })
+
   test("classifies V1 JSON rate limit fallbacks", () => {
     expect(
       [

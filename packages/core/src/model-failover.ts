@@ -1,5 +1,5 @@
 /** Conservative failover decisions. No string-search of user or event content. */
-import { AIError, HttpContext, RateLimitError } from "@opencode/ai/effect"
+import { AIError, HttpContext, QuotaExceededError, RateLimitError, type LLMRequest } from "@opencode/ai/effect"
 import type { Model } from "./model.js"
 import { ModelSelectionPolicy } from "./model-selection-policy.js"
 
@@ -22,6 +22,46 @@ export function rateLimitCooldown(
   return typeof after === "number" && Number.isFinite(after) && after >= 0
     ? Math.min(MAX_COOLDOWN_MS, Math.max(1_000, Math.ceil(after)))
     : DEFAULT_COOLDOWN_MS
+}
+
+/**
+ * A DNS/connect failure is local to the attempted endpoint, not an account
+ * quota. Switch away only when the transport definitively failed before the
+ * request was accepted. Never replay an accepted/ambiguous write on this basis.
+ */
+export function transportFailoverCooldown(error: AIError): number | undefined {
+  const reason = error.reason
+  if (reason._tag !== "Transport" || (reason.delivery !== undefined && reason.delivery !== "not-sent"))
+    return
+  if (reason.operation !== "request" && reason.operation !== "write") return
+  if (!["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED"].includes(reason.code ?? "") &&
+      !/\bgetaddrinfo (?:ENOTFOUND|EAI_AGAIN)\b/i.test(reason.message)) return
+  return DEFAULT_COOLDOWN_MS
+}
+
+/**
+ * A fallback only needs input modalities actually present in this request.
+ * Catalog features (e.g. PDF on the original model) are not requirements for
+ * a text-only conversation. Unknown media and rich tool payloads fail closed.
+ */
+export function requestInputModalities(
+  request: Pick<LLMRequest, "messages">,
+  supported: ReadonlyArray<string>,
+): string[] {
+  const required = new Set<string>(["text"])
+  for (const message of request.messages) {
+    for (const part of message.content) {
+      if (part.type === "tool-result" && part.result.type === "content") return [...supported]
+      if (part.type !== "media") continue
+      const mime = part.media.mediaType.toLowerCase()
+      if (mime.startsWith("image/")) required.add("image")
+      else if (mime.startsWith("audio/")) required.add("audio")
+      else if (mime.startsWith("video/")) required.add("video")
+      else if (mime === "application/pdf") required.add("pdf")
+      else return [...supported]
+    }
+  }
+  return [...required]
 }
 
 type Candidate = Pick<Model.Info,
@@ -135,8 +175,17 @@ export function antigravity429(error: unknown, model: { providerID: string; id: 
   if (error instanceof AIError &&
     (error.reason._tag === "RateLimit" || error.reason._tag === "QuotaExceeded")) return error
   const text = typeof error === "string" ? error :
+    error instanceof AIError ? error.reason.message :
     error instanceof Error ? error.message : undefined
   if (!text || text.length > 32_768) return
+  // The current Antigravity OAuth adapter may omit HTTP status from SSE
+  // failures. Only a precise provider-owned account-limit refusal is enough
+  // to mark this model temporarily unhealthy; never parse user prompt text.
+  if (/^(?:Error:\s*)?(?:The\s+)?usage limit (?:has been )?(?:reached|exceeded)\.?$/i.test(text.trim())) {
+    return new AIError({ reason: new QuotaExceededError({
+      message: "Antigravity account usage limit reached. Choose a different authorized model.",
+    }) })
+  }
   const individualQuota = /\bIndividual quota reached\b/i.test(text)
   const resourceExhausted = /\bResource has been exhausted\b/i.test(text)
   if ((!individualQuota && !resourceExhausted) ||
