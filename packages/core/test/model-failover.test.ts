@@ -53,6 +53,24 @@ describe("provider failover decision", () => {
       capabilities: { ...primary.capabilities, tools: false },
     })], primary, new Set(["openai/gpt-6-luna"]), undefined, 30_000)).toBeUndefined()
   })
+  it("can use a text-only backup even when the original advertises PDF support", () => {
+    const original = info("google", "antigravity-gemini-3.8-flash", {
+      capabilities: { ...primary.capabilities, input: ["text", "image", "pdf"] },
+    })
+    const backup = info("openai", "compatible-text", {
+      capabilities: { ...primary.capabilities, input: ["text"] },
+    })
+    const modalities = requestInputModalities({
+      messages: [Message.user("A coding question without images or PDFs")],
+    }, original.capabilities.input)
+    expect(modalities).toEqual(["text"])
+    expect(selectFailoverModel([original, backup], {
+      ...original, capabilities: { ...original.capabilities, input: modalities },
+    }, new Set(["google/antigravity-gemini-3.8-flash"]), undefined, 10_000)?.id).toBe("compatible-text")
+    expect(selectFailoverModel([original, backup], original,
+      new Set(["google/antigravity-gemini-3.8-flash"]), undefined, 10_000)).toBeUndefined()
+  })
+
   it("does not reroute a pinned user selection unless Omni Auto explicitly enabled", () => {
     expect(canFailover(true, { OMNICODE_ACTIVE: "1" })).toBe(false)
     expect(canFailover(true, { OMNICODE_ACTIVE: "1", OMNICODE_AUTO_MODEL: "1" })).toBe(true)
