@@ -9,6 +9,7 @@ import { useToast } from "../ui/toast"
 import { describeOS, describeTerminal } from "../util/system"
 import { useTuiApp } from "../context/runtime"
 import { useNewDesigns } from "../config"
+import { DialogLogs } from "./dialog-logs"
 
 export function DialogDebug() {
   const theme = useTheme()
@@ -50,7 +51,10 @@ export function DialogDebug() {
 
   Keymap.createLayer(() => ({
     mode: "modal",
-    commands: [{ bind: newDesigns() ? "c" : "return", title: "Copy debug info", group: "Dialog", run: copy }],
+    commands: [
+      { bind: newDesigns() ? "c" : "return", title: "Copy debug info", group: "Dialog", run: copy },
+      { bind: "l", title: "Open live logs", group: "Dialog", run: () => dialog.replace(() => <DialogLogs />) },
+    ],
   }))
 
   const copyAction = () => ({
@@ -64,7 +68,10 @@ export function DialogDebug() {
     <DialogLayout
       header={<DialogHeader title="Debug" description="Share this when reporting an issue" />}
       footer={{
-        actions: { primary: [copyAction()] },
+        actions: {
+          secondary: [{ title: "logs ao vivo", key: "l", onTrigger: () => dialog.replace(() => <DialogLogs />) }],
+          primary: [copyAction()],
+        },
         get children() {
           if (newDesigns()) return undefined
           return <text fg={theme.text.muted}>Share this when reporting an issue.</text>
