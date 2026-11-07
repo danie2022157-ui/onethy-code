@@ -345,6 +345,7 @@ export const Plugin = {
                     requiredTypes: ["chat"],
                     requiredCapabilities: { tools: true },
                     rankBy: agentModelRanking(agent.id, efficiencyProfile().mode),
+                    requireHealthy: true,
                     isCoolingDown: (ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
                   }),
                   catch: (error) => new ToolFailure({ message: "No connected model satisfies the selection policy.", error }),
