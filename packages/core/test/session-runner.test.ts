@@ -6546,6 +6546,18 @@ describe("SessionRunnerLLM", () => {
     expect((yield* s.context).filter((message) => message.type === "assistant")).toHaveLength(2)
   })
 
+  scenario("a plugin cannot re-enable a forbidden retry", function* (s) {
+    const hooks = yield* PluginHooks.Service
+    yield* hooks.register("session", "retry", (event) =>
+      Effect.sync(() => { event.decision = { retry: true, delay: 0 } }),
+    )
+    const failure = invalidRequest()
+    yield* s.llm.push(Stream.fail(failure))
+    expect(yield* s.runPrompt("Do not retry invalid input").pipe(Effect.flip)).toBe(failure)
+    expect(s.requests).toHaveLength(1)
+    expect(yield* recordedEventTypes(sessionID)).not.toContain("session.retry.scheduled.1")
+  })
+
   scenario("does not retry non-eligible provider failures", function* (s) {
     const failure = invalidRequest()
     yield* s.llm.push(Stream.fail(failure))
