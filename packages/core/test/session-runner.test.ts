@@ -6066,7 +6066,7 @@ describe("SessionRunnerLLM", () => {
         TestLLM.text("Cross-provider recovery completed", "recovered-dns"),
       )
       const result = yield* Effect.exit(s.resume)
-      if (Exit.isFailure(result)) throw new Error(""DNS provider recovery failed: " + Cause.pretty(result.cause))
+      if (Exit.isFailure(result)) throw new Error("DNS provider recovery failed: " + Cause.pretty(result.cause))
       expect(s.requests.map((request) => String(request.model.id))).toEqual([
         "antigravity-gemini-3.8-flash", "replacement",
       ])
