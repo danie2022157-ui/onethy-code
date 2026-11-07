@@ -81,7 +81,7 @@ describe("provider failover decision", () => {
       "Endpoint: https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
       "Status: 429",
       "Request ID: N/A",
-    ].join("\\n").replaceAll("\\n", "\n")
+    ].join("\n")
     const failure = antigravity429(new Error(message), {
       providerID: "antigravity", id: "antigravity-claude-sonnet-5-5",
     })
