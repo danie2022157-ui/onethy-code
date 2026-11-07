@@ -210,7 +210,8 @@ export const make = Effect.gen(function* () {
           input.recoverContinuation &&
           llmFailure?.reason._tag === "Transport" &&
           (llmFailure.reason.recovery === "retry-full" || llmFailure.reason.recovery === "rotate-and-retry-full") &&
-          !recorded.outputStarted
+          !recorded.outputStarted &&
+          transportFailoverCooldown(llmFailure) === undefined
         )
           return Outcome.RecoverFull()
         const retry =
