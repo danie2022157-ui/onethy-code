@@ -16,6 +16,8 @@ export interface Policy {
   readonly rankBy?: "id" | "cost" | "context" | "newest"
   readonly minimumContext?: number
   readonly isCoolingDown?: (ref: Model.Ref) => boolean
+  /** Automatic routing must not reuse a known cooled-down model when all are blocked. */
+  readonly requireHealthy?: boolean
 }
 
 export interface Decision {
@@ -30,6 +32,13 @@ export class ModelUnavailableError extends Error {
   readonly _tag = "ModelUnavailableError"
   constructor(readonly requested: Model.Ref) {
     super(`Requested model ${requested.providerID}/${requested.id} is unavailable`)
+  }
+}
+
+export class NoHealthyModelCandidateError extends Error {
+  readonly _tag = "NoHealthyModelCandidateError"
+  constructor() {
+    super("All eligible models are in local router cooldown")
   }
 }
 
@@ -88,6 +97,7 @@ export function select(catalog: ReadonlyArray<Model.Info>, policy: Policy, reque
   }
   const sorted = [...eligible].sort((left, right) => rank(left) - rank(right) || key(left).localeCompare(key(right)))
   const healthy = sorted.filter((model) => !policy.isCoolingDown?.(Model.Ref.make({ providerID: model.providerID, id: model.id })))
+  if (policy.requireHealthy && healthy.length === 0) throw new NoHealthyModelCandidateError()
   const selected = healthy[0] ?? sorted[0]
   return {
     selected,
