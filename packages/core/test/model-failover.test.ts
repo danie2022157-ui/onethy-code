@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { AIError, RateLimitError, InvalidProviderOutputError } from "@opencode/ai/effect"
 import { Model } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
-import { allowedAutoModels, canFailover, rateLimitCooldown, selectFailoverModel } from "../src/model-failover"
+import { allowedAutoModels, canFailover, rateLimitCooldown, selectFailoverModel, antigravity429, readAutoFailoverIntent, AUTO_FAILOVER_KEY } from "../src/model-failover"
 
 const info = (provider: string, id: string, options: Partial<Model.Info> = {}): Model.Info => ({
   ...Model.Info.default(Provider.ID.make(provider), Model.ID.make(id)),
@@ -47,4 +47,52 @@ describe("provider failover decision", () => {
     expect(allowedAutoModels('["openai/gpt-6-luna","antigravity/gemini-4-argon"]')).toHaveLength(2)
     expect(allowedAutoModels('["bad-model"]')).toEqual([])
   })
+  const antigravityDebug = [
+    "Error: Resource has been exhausted (e.g. check quota).",
+    "",
+    "[Debug Info]",
+    "Requested Model: antigravity-gemini-3.8-flash",
+    "Effective Model: gemini-3.8-flash-low",
+    "Project: aico****mers",
+    "Endpoint: https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+    "Status: 429",
+    "Request ID: N/A",
+  ].join("\n")
+  it("converts precisely identified Antigravity Google 429 envelopes without leaking project data", () => {
+    const failure = antigravity429(new Error(antigravityDebug), {
+      providerID: "antigravity", id: "antigravity-gemini-3.8-flash",
+    })
+    expect(failure?.reason._tag).toBe("RateLimit")
+    expect(failure?.reason.http?.status).toBe(429)
+    expect(rateLimitCooldown(failure!)).toBe(5 * 60_000)
+    expect(failure?.message).not.toContain("aico****mers")
+    expect(antigravity429(antigravityDebug, {
+      providerID: "google", id: "antigravity-gemini-3.8-flash",
+    })?.reason._tag).toBe("RateLimit")
+  })
+  it("does not classify messages or non-Antigravity responses as 429s", () => {
+    const model = { providerID: "antigravity", id: "gemini" }
+    expect(antigravity429(antigravityDebug, { providerID: "google", id: "gemini" })).toBeUndefined()
+    expect(antigravity429(antigravityDebug.replace("Status: 429", "Status: 400"), model)).toBeUndefined()
+    expect(antigravity429(antigravityDebug.replace("cloudcode-pa.googleapis.com", "malicious.example.com"), model)).toBeUndefined()
+    expect(antigravity429("User typed: HTTP 429, resource has been exhausted", model)).toBeUndefined()
+  })
+  it("authorizes the specific prompt's Omni Auto intent, never an older prompt's choice", () => {
+    const auto = {
+      type: "user", metadata: { [AUTO_FAILOVER_KEY]: {
+        version: 1, enabled: true, allowedModels: ["openai/gpt-6-luna", "antigravity/gemini-3.8-flash"],
+      } },
+    }
+    expect(readAutoFailoverIntent([auto])).toEqual({
+      enabled: true, allowedModels: ["openai/gpt-6-luna", "antigravity/gemini-3.8-flash"],
+    })
+    expect(canFailover(true, { OMNICODE_ACTIVE: "1", OMNICODE_AUTO_MODEL: "0" }, true)).toBe(true)
+    expect(canFailover(true, { OMNICODE_ACTIVE: "1", OMNICODE_AUTO_MODEL: "1" }, false)).toBe(false)
+    expect(canFailover(true, { OMNICODE_ACTIVE: "1", ONETHY_AUTO_FAILOVER: "off" }, true)).toBe(false)
+    expect(readAutoFailoverIntent([auto, { type: "assistant" }, { type: "user" }])).toBeUndefined()
+    expect(readAutoFailoverIntent([{ ...auto, metadata: { [AUTO_FAILOVER_KEY]: {
+      version: 1, enabled: true, allowedModels: ["not-a-model"],
+    } } }])).toEqual({ enabled: false })
+  })
+
 })
