@@ -45,7 +45,9 @@ export const policy = (sessionID: SessionSchema.ID) =>
           decision: next.retry ? { retry: true, delay: next.delay } : { retry: false },
         }
         yield* input.hook(event)
-        if (!event.decision.retry) return event.decision
+        // A plugin can veto the runner's retry, but cannot authorize a retry
+        // forbidden by core policy (exhausted quota, pinned model, no failover).
+        if (!next.retry || !event.decision.retry) return { retry: false as const }
         const normalized =
           Number.isFinite(event.decision.delay) && event.decision.delay >= 0
             ? Math.ceil(event.decision.delay)
