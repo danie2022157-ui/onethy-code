@@ -51,8 +51,8 @@ try {
       .slice(-5)
     const logTail = files.flatMap((entry) => {
       const body = readFileSync(path.join(entry.parentPath, entry.name), "utf8")
-      return body.split("\n").filter((line) => /plugin|antigravity|npm|install|error/i.test(line)).slice(-20)
-    }).join("\n").slice(-2200)
+      return body.split("\n").filter((line) => /onethycode native authentication source|opencode-antigravity-auth|failed to load plugin|pluginmodule|npm\.add/i.test(line)).slice(-35)
+    }).join("\n").slice(-4500)
     const diagnostics = [
       "server info: " + String(serverInfo.stdout + serverInfo.stderr).slice(0, 500),
       "recent plugin log: " + logTail,
