@@ -5914,6 +5914,68 @@ describe("SessionRunnerLLM", () => {
     }
   })
 
+  scenario("Auto-Failover recovers an Antigravity 429 provider-error event across process boundaries", function* (s) {
+    const originalOmni = process.env.OMNICODE_ACTIVE
+    const originalAuto = process.env.OMNICODE_AUTO_MODEL
+    const originalAllowed = process.env.OMNICODE_ALLOWED_MODELS
+    try {
+      process.env.OMNICODE_ACTIVE = "1"
+      // Simulate separate TUI/server processes. The server does not inherit
+      // the TUI's mutable local Omni Auto environment variables.
+      process.env.OMNICODE_AUTO_MODEL = "0"
+      delete process.env.OMNICODE_ALLOWED_MODELS
+      const antigravity = Model.Info.default(Provider.ID.make("antigravity"), ID.make("antigravity-gemini-3.8-flash"))
+      const backup = Model.Info.default(Provider.ID.make("fake"), ID.make("replacement"))
+      s.modelCandidates = [antigravity, backup].map((item) => ({
+        ...item, enabled: true, status: "active" as const,
+        capabilities: { ...Model.Capabilities.default(), tools: true,
+          input: ["text", "image"] as const, output: ["text"] as const },
+        limit: { context: 200_000, output: 32_000 },
+      }))
+      s.currentModel = LanguageModel.make({
+        id: "antigravity-gemini-3.8-flash", provider: "antigravity", route: OpenAIChat.route,
+      })
+      yield* s.bus.publish(SessionEvent.ModelSelected, {
+        sessionID, model: Model.Ref.make({
+          providerID: Provider.ID.make("antigravity"), id: ID.make("antigravity-gemini-3.8-flash"),
+        }),
+      })
+      const error = [
+        "Error: Resource has been exhausted (e.g. check quota).", "",
+        "[Debug Info]",
+        "Requested Model: antigravity-gemini-3.8-flash",
+        "Effective Model: gemini-3.8-flash-low",
+        "Project: aico****mers",
+        "Endpoint: https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+        "Status: 429",
+      ].join("\n")
+      yield* s.session.prompt({
+        sessionID, text: "Recover the request", resume: false,
+        metadata: { "onethy.autoFailover": { version: 1, enabled: true,
+          allowedModels: ["antigravity/antigravity-gemini-3.8-flash", "fake/replacement"] } },
+      })
+      yield* s.llm.push(
+        [LLMEvent.providerError({ message: error })],
+        TestLLM.text("Recovered on a different provider", "cross-provider-recovered"),
+      )
+      const result = yield* Effect.exit(s.resume)
+      if (Exit.isFailure(result)) throw new Error("Antigravity 429 recovery failed: " + Cause.pretty(result.cause))
+      expect(s.requests.map((request) => String(request.model.id))).toEqual([
+        "antigravity-gemini-3.8-flash", "replacement",
+      ])
+      expect(s.executions).toEqual([])
+      expect((yield* s.session.get(sessionID))?.model?.id).toBe("antigravity-gemini-3.8-flash")
+      expect((yield* s.context).some((entry) => entry.type === "assistant")).toBe(true)
+    } finally {
+      if (originalOmni === undefined) delete process.env.OMNICODE_ACTIVE
+      else process.env.OMNICODE_ACTIVE = originalOmni
+      if (originalAuto === undefined) delete process.env.OMNICODE_AUTO_MODEL
+      else process.env.OMNICODE_AUTO_MODEL = originalAuto
+      if (originalAllowed === undefined) delete process.env.OMNICODE_ALLOWED_MODELS
+      else process.env.OMNICODE_ALLOWED_MODELS = originalAllowed
+    }
+  })
+
   scenario("uses a larger provider retry-after delay", function* (s) {
     yield* s.admit("Retry rate limit")
     yield* s.llm.push(Stream.fail(rateLimited(5_000)))
