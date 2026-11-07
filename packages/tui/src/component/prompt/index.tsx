@@ -1388,6 +1388,15 @@ export function Prompt(props: PromptProps) {
           agents: entry.agents,
           skills: entry.skills?.length ? entry.skills : undefined,
           delivery,
+          // Request-scoped opt-in crosses the TUI/server process boundary.
+          // A manual model choice disables automatic replacement for this turn.
+          metadata: {
+            "onethy.autoFailover": {
+              version: 1,
+              enabled: local.model.auto.enabled(),
+              allowedModels: local.model.auto.enabled() ? (local.model.auto.selectedModels() ?? null) : null,
+            },
+          },
           gate: newSession?.gate,
           // Commit the captured selection after earlier admissions, including
           // compaction setup. Cached state may still precede their SSE echoes;
