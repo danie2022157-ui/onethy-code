@@ -1091,7 +1091,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     onCleanup(event.on("session.retry.scheduled", (evt) => {
       if (!model.auto.enabled()) return
       if (route.data.type !== "session" || route.data.sessionID !== evt.data.sessionID) return
-      if (evt.data.error.type !== "provider.rate-limit" && evt.data.error.status !== 429) return
+      if (evt.data.error.type !== "provider.rate-limit" &&
+          evt.data.error.type !== "provider.quota" && evt.data.error.status !== 429) return
       const cur = latestStepModel.get(evt.data.sessionID) ?? model.current()
       if (!cur) return
       const duration = evt.data.error.retryAfterMs === undefined
@@ -1126,6 +1127,17 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         message: `⚡ Auto-Failover Anti-429: ${pending.from} → ${next}. Tentativa iniciada no novo modelo.`,
         duration: 5000,
       })
+    }))
+    // A quota refusal without a safe backup still places the real failed model
+    // in local cooldown, so the next automatic prompt will not choose it again.
+    onCleanup(event.on("session.step.failed", (evt) => {
+      if (!model.auto.enabled()) return
+      if (route.data.type !== "session" || route.data.sessionID !== evt.data.sessionID) return
+      if (evt.data.error.type !== "provider.rate-limit" &&
+          evt.data.error.type !== "provider.quota" && evt.data.error.status !== 429) return
+      const failed = latestStepModel.get(evt.data.sessionID)
+      if (!failed) return
+      model.auto.markCooldown(failed.providerID, failed.modelID)
     }))
     onCleanup(event.on("session.execution.failed", (evt) => {
       rateLimitPending.delete(evt.data.sessionID)
