@@ -22,6 +22,7 @@ describe("provider failover decision", () => {
   it("recognizes structured rate limits and respects the provider retry-after", () => {
     expect(rateLimitCooldown(new AIError({ reason: new RateLimitError({ message: "wait", retryAfterMs: 610_000 }) }))).toBe(610_000)
     expect(rateLimitCooldown(new AIError({ reason: new RateLimitError({ message: "rate limited" }) }))).toBe(300_000)
+    expect(rateLimitCooldown(new AIError({ reason: new RateLimitError({ message: "external provider delay", retryAfterMs: 132 * 60 * 60_000 }) }), { providerID: "antigravity", id: "claude" })).toBe(300_000)
     expect(rateLimitCooldown(new AIError({ reason: new InvalidProviderOutputError({ message: "This text mentions HTTP 429", classification: "incomplete-stream" }) }))).toBeUndefined()
   })
   it("prefers another connected provider with compatible capabilities", () => {
@@ -70,7 +71,7 @@ describe("provider failover decision", () => {
       providerID: "google", id: "antigravity-gemini-3.8-flash",
     })?.reason._tag).toBe("RateLimit")
   })
-  it("detects daily Antigravity individual quota and honors its reset window", () => {
+  it("detects daily Antigravity individual quota but uses five-minute router cooldown", () => {
     const message = [
       "Error: Individual quota reached. Please upgrade your subscription to increase your limits. quota resets in 132h 30m 27s.",
       "",
@@ -87,7 +88,7 @@ describe("provider failover decision", () => {
     })
     expect(failure?.reason._tag).toBe("RateLimit")
     expect(failure?.reason.http?.status).toBe(429)
-    expect(rateLimitCooldown(failure!)).toBe(((132 * 60 + 30) * 60 + 27) * 1_000)
+    expect(rateLimitCooldown(failure!, { providerID: "antigravity", id: "antigravity-claude-sonnet-5-5" })).toBe(5 * 60_000)
     expect(failure?.message).not.toContain("aico****mers")
     expect(antigravity429(message.replace("Status: 429", "Status: 403"), {
       providerID: "antigravity", id: "claude-sonnet-5-5",
