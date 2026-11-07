@@ -12,7 +12,7 @@ import { Config } from "../../config.js"
 import { Watcher } from "../../filesystem/watcher.js"
 import { Location } from "../../location.js"
 import { PluginSourceDirectory } from "../../plugin/source-directory.js"
-import { withNativeAntigravity } from "./antigravity-native.js"
+import { withNativeAntigravity, antigravityEnabled, isAntigravityTarget } from "./antigravity-native.js"
 
 export type Operation =
   | {
@@ -76,6 +76,11 @@ export const layer = Layer.effect(
       operations: Effect.fn("ConfigPluginSource.operations")(function* () {
         const entries = yield* config.entries()
         const operations = withNativeAntigravity(yield* scan(fs, location, entries))
+        if (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")
+          yield* Effect.logInfo("OnethyCode native authentication source", {
+            active: antigravityEnabled(),
+            registered: operations.some((op) => op.type === "add" && isAntigravityTarget(op.target)),
+          })
         yield* watchConfiguredSources(entries, operations)
         return operations
       }),
