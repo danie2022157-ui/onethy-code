@@ -41,7 +41,23 @@ try {
   const methods = google?.methods ?? []
   if (!methods.some((method) => method.type === "oauth" && method.id === "antigravity-oauth")) {
     const check = command(["plugin", "check"], 60_000)
-    const diagnostics = (check.stdout + "\n" + check.stderr).slice(0, 2500)
+    const all = command(["plugin", "list", "--builtin"], 60_000)
+    const location = new URLSearchParams({ "location[directory]": root }).toString()
+    const scoped = command(["api", "get", "/api/plugin?" + location], 60_000)
+    const native = command(["api", "get", "/api/integration?" + location], 60_000)
+    const diagnostics = [
+      "plugin check: " + String(check.stdout + "\n" + check.stderr),
+      "plugin list: " + String(all.stdout + "\n" + all.stderr),
+      "scoped plugin inventory: " + String(scoped.stdout + "\n" + scoped.stderr),
+      "scoped google methods: " + (() => {
+        try {
+          const value = JSON.parse(native.stdout)
+          const google = (Array.isArray(value) ? value : value.data)?.find((x) => x.id === "google")
+          return JSON.stringify(google?.methods ?? null)
+        } catch { return String(native.stderr).slice(0, 250) }
+      })(),
+      "runtime: ONETHY_ACTIVE=" + env.ONETHY_ACTIVE + " OMNICODE_ACTIVE=" + env.OMNICODE_ACTIVE,
+    ].join("\n").slice(0, 6500)
     throw new Error("Antigravity OAuth method absent from Google /connect. " +
       "Methods: " + JSON.stringify(methods.map((item) => ({ id: item.id, type: item.type }))) +
       "\nPlugin diagnostics:\n" + diagnostics)
