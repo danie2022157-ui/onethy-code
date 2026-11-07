@@ -93,6 +93,7 @@ export default Runtime.handler(Commands, (input) =>
     const runFork = Effect.runForkWith(context)
     const runPromise = Effect.runPromiseWith(context)
     const service = server.service
+    yield* Effect.logDebug("tui initializing", { channel: OPENCODE_CHANNEL, local: requestedServer === undefined })
     yield* run({
       app: {
         name: process.env.OPENCODE_CLIENT ?? OPENCODE_ARTIFACT,
@@ -153,7 +154,7 @@ export default Runtime.handler(Commands, (input) =>
               : level === "error"
                 ? Effect.logError(message, tags)
                 : Effect.logInfo(message, tags)
-        runFork(effect)
+        runFork(effect.pipe(Effect.annotateLogs({ role: "tui" })))
       },
     }).pipe(Effect.provide(LayerNode.compile(Global.node)))
   }),
