@@ -36,6 +36,9 @@ export default Runtime.handler(
         offset = chunk.offset
         if (!chunk.text) continue
         const next = (partial + chunk.text).split(/\r?\n/)
+        // A bounded read can begin halfway through a line: never print an
+        // unredactable fragment of an earlier sensitive field.
+        if (chunk.truncated) next.shift()
         partial = next.pop() ?? ""
         const selected = filterLines(next, { ...filter, lines: 500 })
         if (selected.length) process.stdout.write(selected.join("\n") + "\n")
