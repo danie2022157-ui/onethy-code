@@ -8,7 +8,7 @@ import { OpenCode, type SessionInfo } from "@opencode/client"
 import { Global } from "@opencode/util/global"
 import { noTimeoutFetch } from "@opencode/util/no-timeout-fetch"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
-import { LogProvider, type LogSink } from "./context/log"
+import { LogProvider, useLog, type LogSink } from "./context/log"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
 import { epilogue, type SessionEpilogue } from "./util/presentation"
@@ -515,6 +515,19 @@ function App() {
   const keymap = Keymap.use()
   const event = useEvent()
   const client = useClient()
+  const log = useLog({ component: "tui-app" })
+  // Trace observable TUI state transitions without ever logging prompts,
+  // credentials, terminal contents or model responses.
+  createEffect(() => {
+    const current = route.data
+    log.debug("tui route changed", {
+      route: current.type,
+      ...(current.type === "session" ? { sessionID: current.sessionID } : {}),
+    })
+  })
+  createEffect(() => {
+    log.debug("tui connection changed", { status: client.connection.status() })
+  })
   const toast = useToast()
   const updater = useUpdateNotification()
   const theme = useTheme()
