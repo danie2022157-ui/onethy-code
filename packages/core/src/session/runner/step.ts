@@ -198,7 +198,7 @@ export const make = Effect.gen(function* () {
         const llmError = llmFailure && !recorded.providerFailed ? toSessionError(llmFailure) : undefined
         // Only structured provider rate-limit errors or an actual HTTP 429
         // may affect model health. Never scan arbitrary event or user text.
-        const cooldownMs = llmFailure ? rateLimitCooldown(llmFailure) : undefined
+        const cooldownMs = llmFailure ? rateLimitCooldown(llmFailure, input.model.ref) : undefined
         const isQuotaOrFreeLimit = cooldownMs !== undefined
         if (cooldownMs !== undefined) {
           const orchestrator = yield* Effect.serviceOption(OmniOrchestrator.Service)
