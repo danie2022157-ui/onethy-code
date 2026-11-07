@@ -24,6 +24,31 @@ export function rateLimitCooldown(
     : DEFAULT_COOLDOWN_MS
 }
 
+/**
+ * A fallback only needs input modalities actually present in this request.
+ * Catalog features (e.g. PDF on the original model) are not requirements for
+ * a text-only conversation. Unknown media and rich tool payloads fail closed.
+ */
+export function requestInputModalities(
+  request: Pick<LLMRequest, "messages">,
+  supported: ReadonlyArray<string>,
+): string[] {
+  const required = new Set<string>(["text"])
+  for (const message of request.messages) {
+    for (const part of message.content) {
+      if (part.type === "tool-result" && part.result.type === "content") return [...supported]
+      if (part.type !== "media") continue
+      const mime = part.media.mediaType.toLowerCase()
+      if (mime.startsWith("image/")) required.add("image")
+      else if (mime.startsWith("audio/")) required.add("audio")
+      else if (mime.startsWith("video/")) required.add("video")
+      else if (mime === "application/pdf") required.add("pdf")
+      else return [...supported]
+    }
+  }
+  return [...required]
+}
+
 type Candidate = Pick<Model.Info,
   "id" | "providerID" | "type" | "enabled" | "status" | "capabilities" | "limit">
 type Identity = Pick<Model.Ref, "providerID" | "id">
