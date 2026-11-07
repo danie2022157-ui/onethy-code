@@ -8,6 +8,8 @@ import { Hash } from "@opencode/util/hash"
 import { Npm } from "@opencode/util/npm"
 import { Deferred, Effect, FiberSet, PubSub, Schema, Stream } from "effect"
 import path from "path"
+import { existsSync } from "node:fs"
+import { ANTIGRAVITY_SPEC } from "../config/plugin/antigravity-native.js"
 import { readFile, stat } from "node:fs/promises"
 import { fileURLToPath, pathToFileURL } from "url"
 import type { ConfigPluginSource } from "../config/plugin/source.js"
@@ -111,10 +113,33 @@ const load = Effect.fn("PluginModule.load")(function* (
     : options?.install === false
       ? yield* npm.resolve(operation.target)
       : yield* npm.add(operation.target)
+  // The pinned Antigravity archive has no package exports and its published
+  // name is also present in Bun's global module cache at older versions.
+  // A bare package-name resolve can load that old copy rather than the exact
+  // installed revision. Use the archive's committed production JS directly.
+  const pinnedArchive = operation.target === ANTIGRAVITY_SPEC && installed !== undefined
+  const pinnedMain = pinnedArchive ? path.join(installed.directory, "dist", "index.js") : undefined
+  if (pinnedMain && !existsSync(pinnedMain)) {
+    if (options?.install === false) return { pending: true as const }
+    return yield* new LoadError({ message: "Pinned Antigravity archive has no dist/index.js" })
+  }
+  if (pinnedMain) {
+    const manifest = yield* Effect.tryPromise({
+      try: () => readFile(path.join(installed.directory, "package.json"), "utf8"),
+      catch: (cause) => new LoadError({ message: "Cannot inspect pinned Antigravity package", cause }),
+    })
+    const actual = yield* Effect.try({
+      try: () => JSON.parse(manifest) as { name?: string; version?: string },
+      catch: (cause) => new LoadError({ message: "Pinned Antigravity package has invalid manifest", cause }),
+    })
+    if (actual.name !== "opencode-antigravity-auth" || actual.version !== "2.5.4")
+      return yield* new LoadError({ message: "Pinned Antigravity package identity/version mismatch" })
+  }
   // Legacy auto-discovery still admits standalone server sources. Configured
   // local plugins always arrive here as directories.
-  const entrypoints: Host.Entrypoints =
-    local && (yield* Effect.promise(() => stat(operation.target))).isFile()
+  const entrypoints: Host.Entrypoints = pinnedMain
+    ? { server: pathToFileURL(pinnedMain).href }
+    : local && (yield* Effect.promise(() => stat(operation.target))).isFile()
       ? { server: pathToFileURL(operation.target).href }
       : yield* Effect.sync(() => Host.resolve(installed ?? { directory: operation.target }))
   const entrypoint = entrypoints.server
