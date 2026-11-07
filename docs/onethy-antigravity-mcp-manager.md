@@ -2,22 +2,17 @@
 
 ## Built-in Antigravity Auth
 
-The [CortexKit Antigravity Auth](https://github.com/cortexkit/antigravity-auth) package is now a **native, first-party-managed plugin source** in OnethyCode, loaded automatically in OnethyCode sessions without modifying `opencode.json` by hand.
+OnethyCode now uses the **[JoshRob297 Antigravity OAuth plugin](https://github.com/JoshRob297/opencode-antigravity-auth)** instead of the former CortexKit package.
 
-- OnethyCode loads `@cortexkit/opencode-antigravity-auth@^3.0.30` through its normal OpenCode 2 plugin host, including the upstream server and TUI entrypoints. It does **not** copy the upstream source tree or fork authentication logic.
-- The upstream `/antigravity` menu, account and quota features are provided by that plugin when successfully installed and activated on a compatible host.
-- The package's own login still requires **your explicit Google authorization**; no account is added and no credentials are stored by this native registration itself.
-- Reuse the usual OpenCode 2 **Auth login → Google → Google (antigravity-auth pool, browser)** method and choose the **Antigravity** saved connection. If the method is absent, inspect plugin status rather than substituting a Google API key.
-- Existing 2.x credential stores may require **offline migration**, which is deliberately not automated. Quit running OpenCode/Antigravity hosts and follow [upstream migration steps](https://github.com/cortexkit/antigravity-auth/blob/main/packages/opencode/docs/MIGRATION.md).
-- Disable the native integration if needed with `ONETHY_ANTIGRAVITY_AUTH=0`; or add a project plugin removal operation `-@cortexkit/opencode-antigravity-auth`. Existing manual registrations for the same package take precedence.
+- The host registers `github:JoshRob297/opencode-antigravity-auth#4e670a71080c16abeeac2aa5789b0e14f376c960` (upstream **v2.5.4**) when OnethyCode is active. The upstream JavaScript distribution is committed to that repository; OnethyCode loads it through its normal Git/npm plugin source and OpenCode v2 setup interface. The integration is **not** a fork or a copy of the OAuth implementation.
+- The legacy `@cortexkit/opencode-antigravity-auth` registration is filtered out of OnethyCode's configured plugin operations. Other plugins are left unchanged. Previously installed packages and credentials **are not deleted from your computer**, because that would require explicit local user action.
+- Using a fixed upstream Git commit avoids executing newly changed third-party authentication code without review. Upgrade by reviewing and bumping `ANTIGRAVITY_REVISION` in `packages/core/src/config/plugin/antigravity-native.ts`. **No automatic update of this OAuth plugin is performed.**
+- You must explicitly sign in with Google using the OpenCode auth interface after plugin activation: `onethy auth login`, choose **Google → OAuth with Google (Antigravity)**. Google access permissions and available models depend on your account. The OnethyCode host neither opens OAuth sessions automatically nor migrates prior credentials.
+- Existing CortexKit credentials may not be compatible with the new plugin's account store. Do **not** copy tokens between stores or share them in logs; authenticate anew through the plugin if required.
+- To disable the native integration, set `ONETHY_ANTIGRAVITY_AUTH=0`, or apply a plugin removal operation `-opencode-antigravity-auth`. OnethyCode mode is required for the built-in registration.
+- A failed dependency download, missing network/DNS access, missing Google entitlement, or exhausted quota can still prevent model requests. The plugin swap is not a workaround for account limits or DNS failures.
 
-### Automatic updates
-
-OnethyCode checks plugin versions every 24 hours during a running host lifecycle. For this specific native plugin, it automatically downloads newer **compatible 3.x versions** and reloads the plugin through the host's standard generation-based update handling. Installation uses a staged npm generation and retains prior generations in case a reload fails. Restart OnethyCode if a loaded plugin version remains unchanged.
-
-**Major versions are held intentionally.** The version specifier `^3.0.30` will not pull 4.x. Such releases may require an offline account migration, and automatically applying them could make the account store unreadable. Updates are not checked while OnethyCode is closed, network connectivity is required, and an unsuccessful update preserves the installed version.
-
-**Security and provider terms:** The upstream repository explicitly warns that using Antigravity Auth in this manner violates Google's Terms of Service and may cause account bans/suspensions. It is not endorsed by Google. OnethyCode does not bypass login prompts, modify provider authentication safeguards, or upload your OAuth secrets to GitHub. Using the native integration is a conscious choice with this risk. For terms-compliant access, use officially supported provider integrations.
+**Security and provider terms:** JoshRob297 explicitly documents that this is an unofficial integration, not endorsed by Google, which can violate Google's Terms of Service and result in account restrictions or bans. The plugin handles OAuth tokens; review its source and permissions before signing in. Prefer a supported Google provider integration if you need official access. OnethyCode does not enable options to weaken model safety settings.
 
 ## Native MCP Connection Manager improvements
 
