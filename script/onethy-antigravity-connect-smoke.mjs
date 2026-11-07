@@ -4,7 +4,7 @@
  * /connect. No Google login, tokens, API calls or user data are used.
  */
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -45,7 +45,17 @@ try {
     const location = new URLSearchParams({ "location[directory]": root }).toString()
     const scoped = command(["api", "get", "/api/plugin?" + location], 60_000)
     const native = command(["api", "get", "/api/integration?" + location], 60_000)
+    const serverInfo = command(["api", "get", "/api/server/info"], 60_000)
+    const files = readdirSync(path.join(sandbox, "data"), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".log"))
+      .slice(-5)
+    const logTail = files.flatMap((entry) => {
+      const body = readFileSync(path.join(entry.parentPath, entry.name), "utf8")
+      return body.split("\n").filter((line) => /plugin|antigravity|npm|install|error/i.test(line)).slice(-20)
+    }).join("\n").slice(-2200)
     const diagnostics = [
+      "server info: " + String(serverInfo.stdout + serverInfo.stderr).slice(0, 500),
+      "recent plugin log: " + logTail,
       "plugin check: " + String(check.stdout + "\n" + check.stderr),
       "plugin list: " + String(all.stdout + "\n" + all.stderr),
       "scoped plugin inventory: " + String(scoped.stdout + "\n" + scoped.stderr),
