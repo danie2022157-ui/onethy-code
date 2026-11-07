@@ -117,8 +117,8 @@ const load = Effect.fn("PluginModule.load")(function* (
   // name is also present in Bun's global module cache at older versions.
   // A bare package-name resolve can load that old copy rather than the exact
   // installed revision. Use the archive's committed production JS directly.
-  const pinnedArchive = operation.target === ANTIGRAVITY_SPEC && installed !== undefined
-  const pinnedMain = pinnedArchive ? path.join(installed.directory, "dist", "index.js") : undefined
+  const pinnedMain = installed && operation.target === ANTIGRAVITY_SPEC
+    ? path.join(installed.directory, "dist", "index.js") : undefined
   if (pinnedMain && !existsSync(pinnedMain)) {
     if (options?.install === false) return { pending: true as const }
     return yield* new LoadError({ message: "Pinned Antigravity archive has no dist/index.js" })
