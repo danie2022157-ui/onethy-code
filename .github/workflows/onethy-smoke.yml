@@ -136,6 +136,9 @@ jobs:
       - name: Statusless quota cross-provider session regression
         run: bun --cwd packages/core test test/session-runner.test.ts -t "Auto-Failover switches to another provider on statusless"
 
+      - name: DNS cross-provider session regression
+        run: bun --cwd packages/core test test/session-runner.test.ts -t "Auto-Failover switches to another provider on unsent DNS failure"
+
       - name: Plugin retry veto policy regression
         run: bun --cwd packages/core test test/session-runner.test.ts -t "a plugin cannot re-enable a forbidden retry"
 
