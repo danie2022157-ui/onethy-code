@@ -30,6 +30,19 @@ describe("provider failover decision", () => {
       new Set(["openai/gpt-6-luna"]), undefined, 120_000)
     expect(selected?.providerID).toBe("antigravity")
   })
+  it("selects a compatible fallback using workload-specific context ranking", () => {
+    const catalog = [
+      primary,
+      info("other", "small", { limit: { context: 80_000, output: 8_192 } }),
+      info("other", "large", { limit: { context: 256_000, output: 8_192 } }),
+    ]
+    const selected = selectFailoverModel(catalog, primary,
+      new Set(["openai/gpt-6-luna"]), undefined, 50_000, "context")
+    expect(selected?.id).toBe("large")
+    expect(selectFailoverModel(catalog, primary,
+      new Set(["openai/gpt-6-luna", "other/large", "other/small"]),
+      undefined, 50_000, "context")).toBeUndefined()
+  })
   it("honors strict allowed models and excludes cooled or incompatible models", () => {
     expect(selectFailoverModel(options, primary, new Set(["openai/gpt-6-luna"]), ["openai/gpt-6-sol"], 50_000)?.id).toBe("gpt-6-sol")
     expect(selectFailoverModel(options, primary,
