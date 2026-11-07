@@ -21,8 +21,7 @@ export default Runtime.handler(
     const server = yield* ServerConnection.resolve({
       // API inspection must see the same plugin generation as the TUI after
       // an OnethyCode update; upstream OpenCode retains its default policy.
-      mismatch: process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1"
-        ? "replace" : "ignore",
+      mismatch: ServerConnection.preferredMismatch(),
     })
     const endpoint = server.endpoint
     const params = Option.getOrElse(input.param, () => ({}))
