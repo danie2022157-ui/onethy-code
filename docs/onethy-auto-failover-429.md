@@ -7,7 +7,7 @@ The old TUI implementation scanned entire event JSON for terms such as "429", "q
 The new implementation separates the **provider error**, **bounded runner retry**, and **UI confirmation**:
 
 1. The actual session runner detects a typed \`RateLimit\` or \`QuotaExceeded\` failure, or HTTP status 429. Arbitrary text never triggers a cooldown.
-2. The affected model is marked unavailable for five minutes by default, or for the provider's valid \`retryAfterMs\` value (capped at fifteen minutes).
+2. Antigravity models have a fixed five-minute **OnethyCode routing cooldown** after a verified quota/429 failure. Other providers use five minutes by default or their valid `retryAfterMs` value (capped at fifteen minutes). This router cooldown does **not** override the Antigravity plugin's independent per-account/model quota hold.
 3. If the failed attempt produced **no output and executed no tools**, and OnethyCode has automatic model mode enabled, it selects a healthy replacement from the current connected catalog. A different provider is preferred, then a compatible model on the same provider.
 4. Candidate selection is limited to **allowed** models with matching input/output/tool capabilities, sufficient context capacity, active status and no cooldown.
 5. The real runner replays the failed, pre-output step through the replacement, retaining durable retry bookkeeping. For a successful replacement, subsequent steps in that same execution use it. The persistent user-pinned session choice is not modified.
@@ -28,6 +28,7 @@ The new implementation separates the **provider error**, **bounded runner retry*
 - No invisible retry after output or a tool call: replaying tool actions can duplicate external side effects.
 - A failed provider attempt may still count toward a provider's usage or bill; failover is not free.
 - A fixed five-minute timer cannot bypass actual provider quotas or reauthenticate an unavailable account.
+- If Antigravity reports a long quota reset (for example, 132 hours), OnethyCode may reconsider that model after five minutes, but the plugin still enforces all applicable account/model quota restrictions. Prefer a healthy authorized alternative rather than repeatedly requesting an exhausted account.
 - For long-lived quota blocks, manually check account limits or reduce request volume instead of repeating requests.
 - The UI message confirms a **new attempt started**, not a successful task completion.
 - Production validation should include actual API responses and account permissions, realistic cost and tool usage, cancellation, Windows/WSL installation, and provider-specific rate limits.
