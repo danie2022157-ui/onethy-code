@@ -67,6 +67,29 @@ describe("Host.resolve", () => {
     })
   }
 
+  it("uses the exact installed package revision instead of a shadowed older copy", async () => {
+    const root = await realpath(await mkdtemp(path.join(tmpdir(), "opencode-host-shadow-")))
+    try {
+      const old = path.join(root, "node_modules", "opencode-antigravity-auth")
+      const pinned = path.join(root, "cache", "npm", "revision", "node_modules", "opencode-antigravity-auth")
+      for (const [directory, version] of [[old, "2.1.2"], [pinned, "2.5.4"]] as const) {
+        await mkdir(path.join(directory, "dist"), { recursive: true })
+        await writeFile(path.join(directory, "package.json"), JSON.stringify({
+          name: "opencode-antigravity-auth", version, main: "./dist/index.js",
+        }))
+        await writeFile(path.join(directory, "dist/index.js"), source)
+      }
+      assert.deepEqual(Host.resolve({ directory: pinned, name: "opencode-antigravity-auth" }), {
+        server: pathToFileURL(path.join(pinned, "dist", "index.js")).href,
+        tui: undefined,
+        rpc: undefined,
+        gui: undefined,
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it("resolves local conventional entrypoints with package.json but no exports", async () => {
     await using plugin = await fixture({
       "package.json": JSON.stringify({ name, type: "module" }),
