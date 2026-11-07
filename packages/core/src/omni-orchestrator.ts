@@ -532,19 +532,22 @@ const layer = Layer.effect(
         model.enabled && model.status !== "deprecated" &&
         (model.type ?? "chat") === "chat" && model.capabilities.tools,
       )
+      // Automatic routing must not silently select a model already in cooldown.
+      // This is local router state only; the Antigravity plugin remains independent.
+      const healthyEligible = eligible.filter((model) => !coolingDown.has(model.providerID + "/" + model.id))
       const ranked = learnedModelOrder(
-        eligible.filter((model) => !coolingDown.has(model.providerID + "/" + model.id))
-          .map((model) => model.providerID + "/" + model.id),
+        healthyEligible.map((model) => model.providerID + "/" + model.id),
         observed, category,
       )
       // Never replace a user-pinned model: this selection is only for automatic subagents.
       // With sparse outcomes the existing deterministic policy remains authoritative.
       const learningPrimary = ranked.length
-        ? eligible.find((model) => model.providerID + "/" + model.id === ranked[0]) : undefined
-      const decision = !learningPrimary && eligible.length ? ModelSelectionPolicy.select(eligible, policy) : undefined
+        ? healthyEligible.find((model) => model.providerID + "/" + model.id === ranked[0]) : undefined
+      const decision = !learningPrimary && healthyEligible.length
+        ? ModelSelectionPolicy.select(healthyEligible, policy) : undefined
       const chosen = learningPrimary ?? decision?.selected
       const primary = chosen && { providerID: chosen.providerID, id: chosen.id }
-      const alternates = eligible.filter((model) => model.providerID !== primary?.providerID || model.id !== primary?.id)
+      const alternates = healthyEligible.filter((model) => model.providerID !== primary?.providerID || model.id !== primary?.id)
       const learningFallback = ranked.length > 1
         ? alternates.find((model) => model.providerID + "/" + model.id === ranked[1]) : undefined
       const secondary = learningFallback ??
