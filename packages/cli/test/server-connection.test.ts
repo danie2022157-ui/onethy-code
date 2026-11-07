@@ -13,6 +13,12 @@ import { ServerConnection } from "../src/services/server-connection"
 import { ServiceConfig } from "../src/services/service-config"
 import { isolatedEnv } from "./fixture/environment"
 
+test("OnethyCode server always checks its checkout revision before /connect", () => {
+  expect(ServerConnection.preferredMismatch({ ONETHY_ACTIVE: "1" })).toBe("replace")
+  expect(ServerConnection.preferredMismatch({ OMNICODE_ACTIVE: "1" })).toBe("replace")
+  expect(ServerConnection.preferredMismatch({})).toBe("ignore")
+})
+
 test("resolution groups Effect-native lifecycle operations only for the managed service", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-server-resolution-"))
   const id = "server-resolution-test"

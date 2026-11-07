@@ -154,6 +154,17 @@ describe("Npm.isInstallablePackage", () => {
 })
 
 describe("Npm.cacheKey", () => {
+  test("recognizes immutable GitHub codeload tarballs without Git preparation", async () => {
+    const pinned = "https://codeload.github.com/JoshRob297/opencode-antigravity-auth/tar.gz/" +
+      "4e670a71080c16abeeac2aa5789b0e14f376c960"
+    expect(await Npm.isInstallablePackage(pinned)).toBeTrue()
+    expect(await Npm.isRegistryPackage(pinned)).toBeFalse()
+    expect(await Npm.cacheKey(pinned)).toMatch(/^remote-JoshRob297-opencode-antigravity-auth-[0-9a-f]{12}$/)
+    expect(await Npm.cacheKey(pinned)).toBe(await Npm.cacheKey(pinned))
+    expect(await Npm.isInstallablePackage(pinned.replace("codeload.github.com", "example.com"))).toBeFalse()
+    expect(await Npm.isInstallablePackage(pinned.slice(0, -1) + "notasha")).toBeFalse()
+  })
+
   test("canonicalizes registry keys and hashes Git specs", async () => {
     expect(await Npm.cacheKey("@opencode/acme@1.0.0")).toBe(Npm.sanitize("@opencode/acme@1.0.0"))
     expect(await Npm.cacheKey("plugin")).toBe(Npm.sanitize("plugin@latest"))

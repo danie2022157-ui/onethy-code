@@ -25,14 +25,26 @@ export interface Entrypoints {
 export function resolve(input: Target): Entrypoints {
   // A local directory whose package.json names the package and maps `exports` resolves through them, like the
   // published package; without them it uses the conventional file names at its root.
-  const manifest = input.name ? undefined : packageManifest(input.directory)
+  const manifest = packageManifest(input.directory)
   const target =
     typeof manifest?.name === "string" && manifest.exports !== undefined ? { ...input, name: manifest.name } : input
   const entry = (subpaths: readonly string[]) => {
     for (const subpath of subpaths) {
-      const specifier = target.name
-        ? [target.name, subpath].filter(Boolean).join("/")
-        : path.resolve(target.directory, subpath || "index")
+      // npm installs can live in immutable versioned cache directories while
+      // Bun also has a different version with the same package name in its
+      // global module cache. Resolving the bare name can pick the *wrong*
+      // plugin revision (and silently register outdated OAuth methods).
+      // A package without exports has a concrete local main path: use it.
+      const noExports = target.name && manifest && manifest.exports === undefined
+      const main = typeof manifest?.main === "string" ? manifest.main : "index"
+      const root = path.resolve(target.directory)
+      const local = path.resolve(root, subpath || main)
+      const contained = local.startsWith(root + path.sep)
+      const specifier = noExports && contained
+        ? local
+        : target.name
+          ? [target.name, subpath].filter(Boolean).join("/")
+          : path.resolve(target.directory, subpath || "index")
       try {
         return resolveModule(specifier, target.directory)
       } catch (error) {
@@ -80,7 +92,11 @@ export function packageID(target: Target) {
 
 // The fields resolution reads from a local directory's package.json.
 const Manifest = Schema.fromJsonString(
-  Schema.Struct({ name: Schema.optional(Schema.Unknown), exports: Schema.optional(Schema.Unknown) }),
+  Schema.Struct({
+    name: Schema.optional(Schema.Unknown),
+    main: Schema.optional(Schema.Unknown),
+    exports: Schema.optional(Schema.Unknown),
+  }),
 )
 
 // A package.json that is not a JSON object counts as missing, so one broken plugin directory never stops the rest

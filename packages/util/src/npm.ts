@@ -55,6 +55,7 @@ export async function cacheKey(pkg: string) {
 type Target =
   | { readonly type: "registry"; readonly name: string; readonly spec: string; readonly mutable: boolean }
   | { readonly type: "git"; readonly name?: string; readonly slug: string; readonly mutable: boolean }
+  | { readonly type: "remote"; readonly name: string; readonly slug: string; readonly mutable: false }
 
 async function parse(pkg: string): Promise<Target | undefined> {
   const { default: npa } = await import("npm-package-arg")
@@ -67,6 +68,17 @@ async function parse(pkg: string): Promise<Target | undefined> {
         slug: gitSlug(pkg),
         mutable: !isCommit(result.gitCommittish),
       }
+    }
+    // GitHub's revision-pinned codeload archives are already packaged source
+    // trees. Install them as immutable tarballs: npm's Git dependency
+    // preparation runs upstream build hooks and can fail before plugin setup.
+    if (result.type === "remote") {
+      const url = new URL(result.fetchSpec)
+      const parts = url.pathname.split("/").filter(Boolean)
+      if (url.protocol !== "https:" || url.hostname !== "codeload.github.com" ||
+          url.search || url.hash || parts.length !== 4 || parts[2] !== "tar.gz" ||
+          !/^[a-f0-9]{40}$/i.test(parts[3]!)) return
+      return { type: "remote", name: parts[1]!, slug: parts[0] + "-" + parts[1], mutable: false }
     }
     if (!result.name || !["version", "range", "tag"].includes(result.type)) return
     return {
@@ -81,8 +93,8 @@ async function parse(pkg: string): Promise<Target | undefined> {
 }
 
 function key(pkg: string, target: Target | undefined) {
-  if (target?.type === "git")
-    return `git-${target.slug}-${createHash("sha256").update(pkg).digest("hex").slice(0, 12)}`
+  if (target?.type === "git" || target?.type === "remote")
+    return `${target.type}-${target.slug}-${createHash("sha256").update(pkg).digest("hex").slice(0, 12)}`
   if (target?.type === "registry") return sanitize(`${target.name}@${target.spec}`)
   return sanitize(pkg)
 }

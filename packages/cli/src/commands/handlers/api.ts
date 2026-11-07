@@ -19,7 +19,9 @@ export default Runtime.handler(
   Commands.commands.api,
   Effect.fn("cli.api")(function* (input) {
     const server = yield* ServerConnection.resolve({
-      mismatch: "ignore",
+      // API inspection must see the same plugin generation as the TUI after
+      // an OnethyCode update; upstream OpenCode retains its default policy.
+      mismatch: ServerConnection.preferredMismatch(),
     })
     const endpoint = server.endpoint
     const params = Option.getOrElse(input.param, () => ({}))
