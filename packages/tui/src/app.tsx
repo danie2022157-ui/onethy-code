@@ -69,6 +69,7 @@ import { DialogUsage } from "./component/usage"
 import { DialogStatus } from "./component/dialog-status"
 import { DialogConfig } from "./component/dialog-config"
 import { DialogDebug } from "./component/dialog-debug"
+import { DialogLogs } from "./component/dialog-logs"
 import { DialogPair } from "./component/dialog-pair"
 import { DialogHighlights } from "./component/dialog-highlights"
 import { claim } from "./util/highlights"
@@ -1343,6 +1344,13 @@ function App() {
             })
             .catch(toast.error)
         },
+        category: "System",
+      },
+      {
+        name: "onethy.logs",
+        title: "Visualizar logs de Core, servidor e TUI",
+        slash: { name: "logs", aliases: ["log"] },
+        run: () => dialog.replace(() => <DialogLogs />),
         category: "System",
       },
       {
