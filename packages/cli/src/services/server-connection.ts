@@ -48,7 +48,11 @@ export const resolve = Effect.fn("cli.server-connection.resolve")(function* (arg
     return { endpoint: yield* Standalone.start() } satisfies Resolved
   }
 
-  const mismatch = args.mismatch ?? "ignore"
+  // OnethyCode bundles and pins native provider plugins. Reusing a service from
+  // another checkout hides new OAuth methods and can keep old retry logic alive.
+  // Preserve upstream OpenCode semantics outside the OnethyCode launcher.
+  const mismatch = args.mismatch ?? (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1"
+    ? "replace" : "ignore")
   const options = yield* ServiceConfig.options({ checkVersion: mismatch !== "ignore" })
   return {
     endpoint: yield* resolveManaged({ ...options, onStart: args.onStart }, mismatch),
@@ -57,7 +61,11 @@ export const resolve = Effect.fn("cli.server-connection.resolve")(function* (arg
 })
 
 function managedService(options: EnsureOptions) {
-  const reconnectOptions = { ...options, version: undefined }
+  // In OnethyCode an unversioned reconnect can silently revive a stale daemon
+  // without the native OAuth plugin and with superseded model routing.
+  const reconnectOptions = process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1"
+    ? options
+    : { ...options, version: undefined }
   return {
     reconnect: () => Service.ensure(reconnectOptions),
     restart: () =>
