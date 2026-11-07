@@ -45,6 +45,9 @@ export function filterLines(input: readonly string[], filter: Filter = {}) {
 export async function readLogs(file: string, filter: Filter = {}): Promise<string[]> {
   const content = await readBytes(file, 0, true)
   const lines = content.text.split(/\r?\n/)
+  // Never display half-written records: their key names may be in a different
+  // write chunk, making otherwise recognizable secrets impossible to redact.
+  if (content.text && !content.text.endsWith("\n")) lines.pop()
   if (content.truncated) lines.shift()
   return filterLines(lines, filter)
 }
