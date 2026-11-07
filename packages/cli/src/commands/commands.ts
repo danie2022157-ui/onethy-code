@@ -124,6 +124,16 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
             ),
           },
         }),
+        Spec.make("logs", {
+          description: "Visualizar logs unificados de Core, TUI, servidor e plugins",
+          params: {
+            follow: Flag.Boolean("follow").pipe(Flag.withDescription("Acompanhar novas linhas (Ctrl+C para sair)"), Flag.withDefault(false)),
+            source: Flag.Literals("source", ["all", "cli", "tui", "server"]).pipe(Flag.withDefault("all")),
+            level: Flag.Literals("level", ["all", "DEBUG", "INFO", "WARN", "ERROR"]).pipe(Flag.withDefault("all")),
+            search: Flag.String("search").pipe(Flag.withDefault("")),
+            lines: Flag.Number("lines").pipe(Flag.withDescription("Quantidade de linhas (1 a 500)"), Flag.withDefault(150)),
+          },
+        }),
         Spec.make("paths", {
           description: "Exibir caminhos globais (dados, configurações, cache, estado)",
           params: {
