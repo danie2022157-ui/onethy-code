@@ -27,8 +27,13 @@ export default Runtime.handler(
     try {
       while (!controller.signal.aborted) {
         yield* Effect.promise(() => new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, 750)
-          controller.signal.addEventListener("abort", () => { clearTimeout(timer); resolve() }, { once: true })
+          const finish = () => {
+            clearTimeout(timer)
+            controller.signal.removeEventListener("abort", finish)
+            resolve()
+          }
+          const timer = setTimeout(finish, 750)
+          controller.signal.addEventListener("abort", finish, { once: true })
         }))
         if (controller.signal.aborted) break
         const chunk = yield* Effect.promise(() => readBytes(file, offset))
