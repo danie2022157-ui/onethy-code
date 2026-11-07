@@ -179,6 +179,9 @@ const RATE_LIMIT_TEXT = /rate increased too quickly|rate[-_\s]?limit|too[_\s]?ma
 // Cerebras reports its per-minute token throttle as `token_quota_exceeded`; that is a rate limit.
 const QUOTA_TEXT =
   /insufficient[-_\s]?(?:quota|balance)|(?<!token_)quota[-_\s]?exceeded|budget exceeded|usage limit|limit exhausted|package has expired|plan does not yet include/i
+// Some providers send an account-level refusal as a stream error without HTTP status.
+// Recognize only explicit exhausted-allowance wording, not generic token/request limits.
+const STATUSLESS_USAGE_QUOTA = /\b(?:the )?usage limit (?:has been )?(?:reached|exceeded)\b/i
 // Policy rejections without a dedicated code, matched against the provider's own
 // explanation only. OpenAI reuses `invalid_prompt` for usage-policy rejections while
 // Bedrock Mantle reuses it for schema validation; Anthropic reports blocked output
@@ -275,7 +278,8 @@ export function classifyProviderFailure(input: ProviderFailure): AIError["reason
   if (
     input.status === 402 ||
     codes.some((code) => QUOTA_CODES.has(code)) ||
-    (input.status === 429 && QUOTA_TEXT.test(text))
+    (input.status === 429 && QUOTA_TEXT.test(text)) ||
+    (input.status === undefined && STATUSLESS_USAGE_QUOTA.test(text))
   )
     return new QuotaExceededError({ ...details, retryAfterMs: input.retryAfterMs })
   if (
