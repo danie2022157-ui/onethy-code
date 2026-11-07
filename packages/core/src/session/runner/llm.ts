@@ -8,7 +8,7 @@ import { Bus } from "../../bus.js"
 import { Model } from "../../model.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { agentModelRanking, efficiencyProfile } from "../../efficiency-profile.js"
-import { selectFailoverModel, allowedAutoModels, readAutoFailoverIntent, canFailover, rateLimitCooldown, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
+import { selectFailoverModel, allowedAutoModels, readAutoFailoverIntent, canFailover, rateLimitCooldown, requestInputModalities, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
 import { LocationLifecycle } from "../../location-lifecycle.js"
 import { InstructionState } from "../instruction-state.js"
 import { SessionCompaction } from "../compaction.js"
@@ -367,7 +367,10 @@ const layer = Layer.effect(
               }
               const candidate = selectFailoverModel(connected, {
                 ...loaded.model.ref,
-                capabilities: loaded.model.capabilities,
+                capabilities: {
+                  ...loaded.model.capabilities,
+                  input: requestInputModalities(prepared.request, loaded.model.capabilities.input),
+                },
               }, excluded, allowedModels,
                 Math.max(0, estimate.measured + estimate.estimated),
                 agentModelRanking(String(loaded.agent.id), efficiencyProfile().mode))
