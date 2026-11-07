@@ -102,6 +102,18 @@ describe("provider failover decision", () => {
       providerID: "google", id: "antigravity-gemini-3.8-flash",
     })?.reason._tag).toBe("RateLimit")
   })
+  it("normalizes the new Antigravity statusless usage-limit error", () => {
+    const failure = antigravity429("Error: The usage limit has been reached", {
+      providerID: "google", id: "antigravity-gemini-3.8-flash",
+    })
+    expect(failure?.reason._tag).toBe("QuotaExceeded")
+    expect(rateLimitCooldown(failure!, { providerID: "google", id: "antigravity-gemini-3.8-flash" }))
+      .toBe(300_000)
+    expect(antigravity429("Error: The usage limit has been reached", {
+      providerID: "openai", id: "gpt-6",
+    })).toBeUndefined()
+  })
+
   it("detects daily Antigravity individual quota but uses five-minute router cooldown", () => {
     const message = [
       "Error: Individual quota reached. Please upgrade your subscription to increase your limits. quota resets in 132h 30m 27s.",
