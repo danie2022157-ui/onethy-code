@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { AIError, RateLimitError, InvalidProviderOutputError, Message } from "@opencode/ai/effect"
 import { Model } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
-import { allowedAutoModels, canFailover, rateLimitCooldown, selectFailoverModel, antigravity429, readAutoFailoverIntent, AUTO_FAILOVER_KEY } from "../src/model-failover"
+import { allowedAutoModels, canFailover, rateLimitCooldown, selectFailoverModel, requestInputModalities, antigravity429, readAutoFailoverIntent, AUTO_FAILOVER_KEY } from "../src/model-failover"
 
 const info = (provider: string, id: string, options: Partial<Model.Info> = {}): Model.Info => ({
   ...Model.Info.default(Provider.ID.make(provider), Model.ID.make(id)),
