@@ -7,7 +7,7 @@ import { Database } from "../../database/database.js"
 import { Bus } from "../../bus.js"
 import { Model } from "../../model.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
-import { selectFailoverModel, allowedAutoModels, canFailover, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
+import { selectFailoverModel, allowedAutoModels, readAutoFailoverIntent, canFailover, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
 import { LocationLifecycle } from "../../location-lifecycle.js"
 import { InstructionState } from "../instruction-state.js"
 import { SessionCompaction } from "../compaction.js"
@@ -247,6 +247,13 @@ const layer = Layer.effect(
       let initial: SessionContext.Loaded | undefined = first
       let recoverOverflow = true
       let recoverContinuation = true
+      // The prompt's immutable metadata is the authoritative Omni Auto
+      // opt-in. The server and terminal may run in different processes.
+      // A manual prompt explicitly disables automatic model substitution.
+      const autoIntent = readAutoFailoverIntent(first.messages)
+      const allowedModels = autoIntent === undefined
+        ? allowedAutoModels(process.env.OMNICODE_ALLOWED_MODELS)
+        : autoIntent.allowedModels
       const attemptedModels = new Set<string>([
         first.model.ref.providerID + "/" + first.model.ref.id,
       ])
@@ -342,7 +349,7 @@ const layer = Layer.effect(
           Retry: Effect.fnUntraced(function* (outcome) {
             // Only an actual typed 429/quota response *before any output or tool
             // execution* can trigger transparent cross-model replay.
-            if (outcome.cooldownMs !== undefined && canFailover(Boolean(first.session.model))) {
+            if (outcome.cooldownMs !== undefined && canFailover(Boolean(first.session.model), process.env, autoIntent?.enabled)) {
               if (failovers >= MAX_FAILOVERS_PER_STEP)
                 return yield* new StepFailedError({ error: outcome.error })
               const excluded = new Set(attemptedModels)
@@ -355,7 +362,7 @@ const layer = Layer.effect(
               const candidate = selectFailoverModel(connected, {
                 ...loaded.model.ref,
                 capabilities: loaded.model.capabilities,
-              }, excluded, allowedAutoModels(process.env.OMNICODE_ALLOWED_MODELS),
+              }, excluded, allowedModels,
                 Math.max(0, estimate.measured + estimate.estimated))
               if (!candidate) {
                 yield* Effect.logWarning("OnethyCode Auto-Failover: no safe, authorized model available", {
