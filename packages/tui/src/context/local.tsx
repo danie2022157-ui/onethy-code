@@ -1082,6 +1082,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const model = createModel()
 
+    // Only typed provider errors are inspected; text from the conversation
+    // never changes model health. DNS failures get the same bounded model
+    // cooldown as a provider quota failure when the endpoint is unreachable.
+    const unavailableModel = (error: { type: string; status?: number; message?: string }) =>
+      error.type === "provider.rate-limit" || error.type === "provider.quota" ||
+      error.status === 429 ||
+      (error.type === "provider.transport" &&
+        /\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED)\b/i.test(error.message ?? ""))
     // A retry event is a typed provider error, not an arbitrary transcript.
     // Only announce the new model after a new physical step actually starts.
     const rateLimitPending = new Map<string, { from: string; recordedAt: number }>()
@@ -1091,8 +1099,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     onCleanup(event.on("session.retry.scheduled", (evt) => {
       if (!model.auto.enabled()) return
       if (route.data.type !== "session" || route.data.sessionID !== evt.data.sessionID) return
-      if (evt.data.error.type !== "provider.rate-limit" &&
-          evt.data.error.type !== "provider.quota" && evt.data.error.status !== 429) return
+      if (!unavailableModel(evt.data.error)) return
       const cur = latestStepModel.get(evt.data.sessionID) ?? model.current()
       if (!cur) return
       const duration = evt.data.error.retryAfterMs === undefined
@@ -1124,7 +1131,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       model.set(nextModel, { fromAuto: true })
       toast.show({
         variant: "info",
-        message: `⚡ Auto-Failover Anti-429: ${pending.from} → ${next}. Tentativa iniciada no novo modelo.`,
+        message: `⚡ Auto-Failover: ${pending.from} → ${next}. Tentativa iniciada no novo modelo.`,
         duration: 5000,
       })
     }))
@@ -1133,8 +1140,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     onCleanup(event.on("session.step.failed", (evt) => {
       if (!model.auto.enabled()) return
       if (route.data.type !== "session" || route.data.sessionID !== evt.data.sessionID) return
-      if (evt.data.error.type !== "provider.rate-limit" &&
-          evt.data.error.type !== "provider.quota" && evt.data.error.status !== 429) return
+      if (!unavailableModel(evt.data.error)) return
       const failed = latestStepModel.get(evt.data.sessionID)
       if (!failed) return
       model.auto.markCooldown(failed.providerID, failed.modelID)
