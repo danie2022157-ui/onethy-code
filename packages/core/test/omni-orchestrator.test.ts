@@ -258,6 +258,19 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       expect(filtered.primary?.id).toBe("available")
       expect(filtered.fallback).toBeUndefined()
 
+      const routeCatalog = [
+        Model.Info.default(Provider.ID.make("test"), Model.ID.make("a-model")),
+        Model.Info.default(Provider.ID.make("test"), Model.ID.make("z-model")),
+      ]
+      yield* orchestrator.markModelCooldown("test", "a-model", 5 * 60_000)
+      const fallbackRoute = yield* orchestrator.selectModelForAgent("explore", "Buscar arquivos", routeCatalog)
+      expect(fallbackRoute.primary?.id).toBe("z-model")
+      expect(fallbackRoute.fallback).toBeUndefined()
+      yield* orchestrator.markModelCooldown("test", "z-model", 5 * 60_000)
+      const allCooledRoute = yield* orchestrator.selectModelForAgent("explore", "Buscar arquivos", routeCatalog)
+      expect(allCooledRoute.primary).toBeUndefined()
+      expect(allCooledRoute.fallback).toBeUndefined()
+
       const contract = orchestrator.formatBoomerangContract("coder")
       expect(contract.includes("PROTOCOLO BOOMERANG")).toBe(true)
 
