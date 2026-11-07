@@ -142,6 +142,9 @@ jobs:
       - name: Plugin retry veto policy regression
         run: bun --cwd packages/core test test/session-runner.test.ts -t "a plugin cannot re-enable a forbidden retry"
 
+      - name: Omni Auto stale-provider allowlist regression
+        run: bun --cwd packages/tui test test/util/auto-model-allowlist.test.ts
+
       - name: MCP configuration and connectivity regressions
         run: bun --cwd packages/core test test/config/normalization.test.ts test/mcp.test.ts test/mcp-lifecycle.test.ts test/mcp-usage.test.ts test/mcp-catalog-cache.test.ts test/omni-mcp-autonomy.test.ts
 
