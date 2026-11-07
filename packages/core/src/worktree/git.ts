@@ -5,7 +5,7 @@ import path from "path"
 import { Worktree } from "@opencode/schema/worktree"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Git } from "../git.js"
-import { canonical, DirectoryUnavailableError } from "./directory.js"
+import { canonical, confirmedMissing, DirectoryUnavailableError } from "./directory.js"
 import type { Strategy } from "./strategies.js"
 
 export const make = Effect.gen(function* () {
@@ -47,6 +47,8 @@ export const make = Effect.gen(function* () {
         if (!listed.some((entry) => entry.kind === "linked" && same(entry.directory, input.directory))) continue
         // git worktree remove also removes a stale registered link whose
         // physical directory is already absent. Never force an existing checkout.
+        if (!(yield* confirmedMissing(input.directory)))
+          return yield* new DirectoryUnavailableError({ directory: input.directory })
         yield* git.worktree.remove({ repository, directory: input.directory, force: false })
         return
       }
