@@ -8,7 +8,7 @@ import { Context, Effect, Layer, Schema } from "effect"
 import { Agent } from "../../agent.js"
 import { ModelResolver } from "../../model-resolver.js"
 import { ModelSelectionPolicy } from "../../model-selection-policy.js"
-import { efficiencyProfile } from "../../efficiency-profile.js"
+import { agentModelRanking, efficiencyProfile } from "../../efficiency-profile.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { SessionSchema } from "../schema.js"
 
@@ -118,10 +118,12 @@ const layer = Layer.effect(
               allowedModels: configuredAllowlist,
               requiredTypes: ["chat"],
               requiredCapabilities: { tools: true },
-              // Automatic mode is opt-in when users explicitly request economy.
-              // Explicit model and agent choices always bypass the economy ranking.
-              ...(agent ? {} : efficiencyProfile().mode === "economy" ? { rankBy: "cost" as const } :
-                efficiencyProfile().mode === "quality" ? { rankBy: "newest" as const } : {}),
+              // Only auto-selected models get task-aware ranking and strict cooldown.
+              // Pinned session and agent choices remain untouched.
+              ...(agent ? {} : {
+                rankBy: agentModelRanking(String(session.agent), efficiencyProfile().mode),
+                requireHealthy: true,
+              }),
               isCoolingDown: (ref) => coolingDown.has(`${ref.providerID}/${ref.id}`),
             }, agent).selected,
             catch: () => new ModelNotSelectedError({ sessionID: session.id }),
