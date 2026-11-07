@@ -70,6 +70,29 @@ describe("provider failover decision", () => {
       providerID: "google", id: "antigravity-gemini-3.8-flash",
     })?.reason._tag).toBe("RateLimit")
   })
+  it("detects daily Antigravity individual quota and honors its reset window", () => {
+    const message = [
+      "Error: Individual quota reached. Please upgrade your subscription to increase your limits. quota resets in 132h 30m 27s.",
+      "",
+      "[Debug Info]",
+      "Requested Model: antigravity-claude-sonnet-5-5",
+      "Effective Model: claude-sonnet-5-5-low",
+      "Project: aico****mers",
+      "Endpoint: https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+      "Status: 429",
+      "Request ID: N/A",
+    ].join("\\n").replaceAll("\\n", "\n")
+    const failure = antigravity429(new Error(message), {
+      providerID: "antigravity", id: "antigravity-claude-sonnet-5-5",
+    })
+    expect(failure?.reason._tag).toBe("RateLimit")
+    expect(failure?.reason.http?.status).toBe(429)
+    expect(rateLimitCooldown(failure!)).toBe(((132 * 60 + 30) * 60 + 27) * 1_000)
+    expect(failure?.message).not.toContain("aico****mers")
+    expect(antigravity429(message.replace("Status: 429", "Status: 403"), {
+      providerID: "antigravity", id: "claude-sonnet-5-5",
+    })).toBeUndefined()
+  })
   it("does not classify messages or non-Antigravity responses as 429s", () => {
     const model = { providerID: "antigravity", id: "gemini" }
     expect(antigravity429(antigravityDebug, { providerID: "google", id: "gemini" })).toBeUndefined()
