@@ -17,7 +17,7 @@ import { LocationServiceMap } from "./location-service-map.js"
 import { Project } from "./project.js"
 import { Worktree } from "@opencode/schema/worktree"
 import { WorktreeTable } from "./worktree/sql.js"
-import { canonical, DirectoryUnavailableError } from "./worktree/directory.js"
+import { canonical, confirmedMissing, DirectoryUnavailableError } from "./worktree/directory.js"
 import type { EffectDrizzleSqlite } from "./database/drizzle.js"
 import { ProjectTable } from "./project/sql.js"
 import { AppProcess } from "@opencode/util/process"
@@ -266,7 +266,7 @@ const layer = Layer.effect(
       if (!stored?.strategy) return yield* new InvalidDirectoryError({ directory: worktreeDirectory })
       // A file, inaccessible checkout or other object at this path is not proof
       // of a stale worktree. Do not silently unlink its registry record.
-      if (!present && (yield* fs.existsSafe(input.directory)))
+      if (!present && !(yield* confirmedMissing(input.directory)))
         return yield* new DirectoryUnavailableError({ directory: input.directory })
       const settings = yield* load(row.worktree, current)
       const strategy = yield* getStrategy(stored.strategy, settings.strategies)
