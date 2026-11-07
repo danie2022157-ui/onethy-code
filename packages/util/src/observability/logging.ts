@@ -169,7 +169,10 @@ export function minimumLogLevel() {
     WARN: "Warn",
     ERROR: "Error",
   } as const satisfies Record<string, LogLevel.LogLevel>
-  return value && value in levels ? levels[value as keyof typeof levels] : levels.INFO
+  return value && value in levels ? levels[value as keyof typeof levels] :
+    process.env.ONETHY_DEBUG === "1" && (process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1")
+      ? levels.DEBUG
+      : levels.INFO
 }
 
 export function loggers(local = true, channel = "local") {
