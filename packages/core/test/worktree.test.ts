@@ -249,6 +249,70 @@ describe("Worktree", () => {
     }),
   )
 
+
+  it.live("removes a tracked linked Git worktree after its directory was deleted externally", () =>
+    Effect.gen(function* () {
+      const input = yield* setup()
+      const worktree = yield* fixtureWorktree()
+      const git = yield* Git.Service
+      const root = yield* git.repo.discover(input.sourceDirectory)
+      if (!root) throw new Error("Missing fixture Git repository")
+      const target = yield* worktree.create({ name: "stale-outside-app" })
+      const healthy = yield* worktree.create({ name: "healthy-worktree" })
+      yield* Effect.promise(() => fs.rm(target.directory, { recursive: true, force: true }))
+      const before = yield* git.worktree.list(root)
+      expect(before.some((entry) => entry.directory === target.directory)).toBe(true)
+
+      // This is precisely the TUI failure: the database still has the entry,
+      // but canonical(target.directory) could not resolve the deleted folder.
+      yield* worktree.remove({ directory: target.directory, force: false })
+
+      expect((yield* stored(input.projectID)).some((entry) => entry.directory === target.directory)).toBe(false)
+      expect((yield* git.worktree.list(root)).some((entry) => entry.directory === target.directory)).toBe(false)
+      expect((yield* stored(input.projectID)).some((entry) => entry.directory === healthy.directory)).toBe(true)
+      expect(yield* Effect.promise(() => fs.stat(healthy.directory).then((stat) => stat.isDirectory()))).toBe(true)
+      yield* worktree.remove({ directory: healthy.directory, force: false })
+    }),
+  )
+
+  it.live("refuses to delete unregistered paths or a checkout replaced by a file", () =>
+    Effect.gen(function* () {
+      const input = yield* setup()
+      const worktree = yield* fixtureWorktree()
+      const outside = abs(path.join(input.root.path, "..", "not-a-registered-worktree"))
+      const missing = yield* worktree.remove({ directory: outside, force: true }).pipe(Effect.flip)
+      expect(missing).toBeInstanceOf(Worktree.InvalidDirectoryError)
+
+      const created = yield* worktree.create({ name: "guarded-stale" })
+      yield* Effect.promise(() => fs.rm(created.directory, { recursive: true, force: true }))
+      yield* Effect.promise(() => fs.writeFile(created.directory, "not a worktree"))
+      const occupied = yield* worktree.remove({ directory: created.directory, force: true }).pipe(Effect.flip)
+      expect(occupied).toBeInstanceOf(Worktree.DirectoryUnavailableError)
+      expect((yield* stored(input.projectID)).some((entry) => entry.directory === created.directory)).toBe(true)
+      expect(yield* Effect.promise(() => fs.readFile(created.directory, "utf8"))).toBe("not a worktree")
+
+      yield* Effect.promise(() => fs.rm(created.directory))
+      yield* worktree.remove({ directory: created.directory, force: false })
+      expect((yield* stored(input.projectID)).some((entry) => entry.directory === created.directory)).toBe(false)
+    }),
+  )
+
+  it.live("forgets a stale database entry when Git has already pruned its missing link", () =>
+    Effect.gen(function* () {
+      const input = yield* setup()
+      const worktree = yield* fixtureWorktree()
+      const created = yield* worktree.create({ name: "already-pruned" })
+      yield* Effect.promise(() => fs.rm(created.directory, { recursive: true, force: true }))
+      const pruned = yield* Effect.promise(() => Bun.spawn(
+        ["git", "worktree", "prune", "--expire=now"],
+        { cwd: input.sourceDirectory, stdout: "ignore", stderr: "ignore" },
+      ).exited)
+      expect(pruned).toBe(0)
+      yield* worktree.remove({ directory: created.directory, force: false })
+      expect((yield* stored(input.projectID)).some((entry) => entry.directory === created.directory)).toBe(false)
+    }),
+  )
+
   it.live("defaults to the TUI worktree directory and suffixes duplicate names", () =>
     Effect.gen(function* () {
       const input = yield* setup()
