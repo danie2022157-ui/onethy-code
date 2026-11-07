@@ -25,6 +25,21 @@ export function rateLimitCooldown(
 }
 
 /**
+ * A DNS/connect failure is local to the attempted endpoint, not an account
+ * quota. Switch away only when the transport definitively failed before the
+ * request was accepted. Never replay an accepted/ambiguous write on this basis.
+ */
+export function transportFailoverCooldown(error: AIError): number | undefined {
+  const reason = error.reason
+  if (reason._tag !== "Transport" || (reason.delivery !== undefined && reason.delivery !== "not-sent"))
+    return
+  if (reason.operation !== "request" && reason.operation !== "write") return
+  if (!["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED"].includes(reason.code ?? "") &&
+      !/\bgetaddrinfo (?:ENOTFOUND|EAI_AGAIN)\b/i.test(reason.message)) return
+  return DEFAULT_COOLDOWN_MS
+}
+
+/**
  * A fallback only needs input modalities actually present in this request.
  * Catalog features (e.g. PDF on the original model) are not requirements for
  * a text-only conversation. Unknown media and rich tool payloads fail closed.
