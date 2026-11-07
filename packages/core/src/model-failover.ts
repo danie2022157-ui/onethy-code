@@ -34,6 +34,7 @@ export function selectFailoverModel(
   excluded: ReadonlySet<string>,
   allowedModels: ReadonlyArray<string> | undefined,
   minimumContext: number,
+  rankBy: "cost" | "context" | "newest" = "cost",
 ): Model.Info | undefined {
   const key = (item: Identity) => String(item.providerID) + "/" + String(item.id)
   const safe = catalog.filter((candidate: Candidate) =>
@@ -59,7 +60,8 @@ export function selectFailoverModel(
         output: current.capabilities.output,
       },
       minimumContext,
-      rankBy: "cost" as const,
+      rankBy,
+      requireHealthy: true,
     }
     if (crossProvider.length) {
       try { return ModelSelectionPolicy.select(crossProvider, policy).selected } catch { /* same provider fallback */ }
