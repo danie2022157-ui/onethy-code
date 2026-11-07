@@ -26,6 +26,7 @@ import { useData } from "./data"
 import { usePermission } from "./permission"
 import { useLocation } from "./location"
 import { parse } from "../util/model"
+import { effectiveAllowedModels } from "../util/auto-model-allowlist"
 
 // Runtime policy for every OnethyCode agent. Individual MCPs, hooks and plugins
 // still require their own explicit activation and normal tool permissions.
@@ -686,14 +687,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           },
           connectedModels() {
             const raw = this.rawConnectedModels()
-            const allowed =
-              !autoStore.selectedModels || autoStore.selectedModels.length === 0
-                ? raw
-                : (() => {
-                    const set = new Set(autoStore.selectedModels)
-                    const f = raw.filter((m) => set.has(`${m.providerID}/${m.id}`))
-                    return f.length > 0 ? f : raw
-                  })()
+            const selected = effectiveAllowedModels(autoStore.selectedModels, raw)
+            const set = selected ? new Set(selected) : undefined
+            const allowed = set ? raw.filter((m) => set.has(`${m.providerID}/${m.id}`)) : raw
             const now = Date.now()
             const healthy = allowed.filter((m) => {
               const until = autoStore.cooldowns[`${m.providerID}/${m.id}`]
@@ -729,16 +725,18 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             })
           },
           selectedModels(): string[] | undefined {
-            return autoStore.selectedModels
+            return effectiveAllowedModels(autoStore.selectedModels, this.rawConnectedModels())
           },
           isModelAllowed(providerID: string, modelID: string): boolean {
-            if (!autoStore.selectedModels || autoStore.selectedModels.length === 0) return true
-            return autoStore.selectedModels.includes(`${providerID}/${modelID}`)
+            const selected = this.selectedModels()
+            if (!selected) return true
+            return selected.includes(`${providerID}/${modelID}`)
           },
           isAllModelsAllowed(): boolean {
             const raw = this.rawConnectedModels()
-            if (!autoStore.selectedModels || autoStore.selectedModels.length === 0) return true
-            return autoStore.selectedModels.length >= raw.length
+            const selected = this.selectedModels()
+            if (!selected) return true
+            return selected.length >= raw.length
           },
           toggleModelAllowed(providerID: string, modelID: string) {
             const raw = this.rawConnectedModels()
