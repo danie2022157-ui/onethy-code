@@ -36,6 +36,27 @@ describe("model selection policy", () => {
     expect(String(selected.selected?.id)).toBe("a")
   })
 
+  it("never silently selects a cooled-down model when strict routing is enabled", () => {
+    const available = [info("p", "a"), info("p", "b")]
+    expect(() => ModelSelectionPolicy.select(available, {
+      mode: "automatic",
+      requireHealthy: true,
+      isCoolingDown: () => true,
+    })).toThrow(ModelSelectionPolicy.NoHealthyModelCandidateError)
+    const selected = ModelSelectionPolicy.select(available, {
+      mode: "automatic",
+      requireHealthy: true,
+      isCoolingDown: (ref) => ref.id === "a",
+    })
+    expect(selected.selected.id).toBe("b")
+    const explicit = ModelSelectionPolicy.select(available, {
+      mode: "explicit",
+      requireHealthy: true,
+      isCoolingDown: () => true,
+    }, { providerID: Provider.ID.make("p"), id: Model.ID.make("a") })
+    expect(explicit.selected.id).toBe("a")
+  })
+
   it("avoids cooled models automatically but keeps an explicit session model pinned", () => {
     const available = [info("p", "a"), info("p", "b")]
     const isCoolingDown = (ref: Model.Ref) => ref.id === "a"
