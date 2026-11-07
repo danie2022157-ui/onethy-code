@@ -131,7 +131,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
             source: Flag.Literals("source", ["all", "cli", "tui", "server"]).pipe(Flag.withDefault("all")),
             level: Flag.Literals("level", ["all", "DEBUG", "INFO", "WARN", "ERROR"]).pipe(Flag.withDefault("all")),
             search: Flag.String("search").pipe(Flag.withDefault("")),
-            lines: Flag.Number("lines").pipe(Flag.withDescription("Quantidade de linhas (1 a 500)"), Flag.withDefault(150)),
+            lines: Flag.Int("lines").pipe(Flag.withDescription("Quantidade de linhas (1 a 500)"), Flag.withDefault(150)),
           },
         }),
         Spec.make("paths", {
