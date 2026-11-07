@@ -45,7 +45,7 @@ try {
     const location = new URLSearchParams({ "location[directory]": root }).toString()
     const scoped = command(["api", "get", "/api/plugin?" + location], 60_000)
     const native = command(["api", "get", "/api/integration?" + location], 60_000)
-    const serverInfo = command(["api", "get", "/api/server/info"], 60_000)
+    const serverInfo = command(["api", "get", "/api/info"], 60_000)
     const files = readdirSync(path.join(sandbox, "data"), { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.endsWith(".log"))
       .slice(-5)
