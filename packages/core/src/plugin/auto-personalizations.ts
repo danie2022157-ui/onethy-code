@@ -6,12 +6,14 @@ import { Effect } from "effect"
 import { Agent } from "../agent.js"
 import { Command } from "../command.js"
 import { Mcp } from "../mcp/index.js"
+import { Model } from "../model.js"
 import { Permission } from "../permission.js"
 import { Session } from "../session.js"
 import { Skill } from "../skill.js"
 import {
   selectAllowedSkillAttachments,
   selectAutoPersonalizations,
+  autoSkillContextBudget,
   renderAutoPersonalizationHints,
   type AutoPersonalizationSelection,
 } from "../auto-personalizations.js"
@@ -20,7 +22,7 @@ const METADATA = "onethy.personalizations"
 const enabled = () => process.env.OMNICODE_ACTIVE === "1" &&
   process.env.ONETHY_CUSTOMIZATION_AUTONOMY !== "off"
 
-type Saved = { version: 1; selection: AutoPersonalizationSelection; attached: string[] }
+type Saved = { version: 1; selection: AutoPersonalizationSelection; attached: string[]; budgetChars?: number }
 
 function asIDs(value: unknown, limit: number): string[] {
   if (!Array.isArray(value)) return []
@@ -37,9 +39,11 @@ function saved(value: unknown): Saved | undefined {
   const selection = record.selection as Record<string, unknown>
   return {
     version: 1,
-    attached: asIDs(record.attached, 2),
+    attached: asIDs(record.attached, 96),
+    budgetChars: typeof record.budgetChars === "number" && Number.isFinite(record.budgetChars)
+      ? record.budgetChars : undefined,
     selection: {
-      skills: asIDs(selection.skills, 4),
+      skills: asIDs(selection.skills, 96),
       agents: asIDs(selection.agents, 2),
       commands: asIDs(selection.commands, 2),
       mcpTools: asIDs(selection.mcpTools, 3),
@@ -60,6 +64,7 @@ export const Plugin = define({
     const skills = yield* Skill.Service
     const commands = yield* Command.Service
     const mcp = yield* Mcp.Service
+    const models = yield* Model.Service
 
     yield* ctx.session.hook("prompt", (event) =>
       Effect.gen(function* () {
@@ -97,11 +102,24 @@ export const Plugin = define({
             })),
         })
         const existing = (event.prompt.skills ?? []).map((item) => item.id)
+        // Use the chosen model's documented context window when possible;
+        // never replace a user-selected model or assume a context size exists.
+        const requestedModel = session.model ?? active.info.model
+        const modelInfo = requestedModel
+          ? yield* models.get(requestedModel.providerID, requestedModel.id)
+          : yield* models.default()
+        const options = {
+          prompt: event.prompt.text,
+          contextTokens: modelInfo?.limit.context,
+          reservedChars: event.prompt.text.length,
+        }
+        const budgetChars = autoSkillContextBudget(options, selection.skills.length)
         const attached = selectAllowedSkillAttachments(
           selection.skills,
           catalogSkills,
           (id) => Permission.evaluate("skill", id, permissions).effect === "allow",
           existing,
+          options,
         )
         if (attached.length) {
           event.prompt.skills = [
@@ -109,13 +127,14 @@ export const Plugin = define({
             ...attached.map((id) => ({ id: Skill.ID.make(id) })),
           ]
         }
-        const report: Saved = { version: 1, selection, attached }
+        const report: Saved = { version: 1, selection, attached, budgetChars }
         event.metadata = { ...(event.metadata ?? {}), [METADATA]: report }
         if (selection.skills.length || selection.agents.length || selection.commands.length ||
             selection.mcpTools.length)
           yield* Effect.logInfo("onethy.personalizations.selected", {
             sessionID: event.sessionID,
             attachedSkills: attached,
+            budgetChars, contextTokens: modelInfo?.limit.context ?? "unknown",
             recommendedSkills: selection.skills,
             suggestedAgents: selection.agents,
             suggestedCommands: selection.commands,
