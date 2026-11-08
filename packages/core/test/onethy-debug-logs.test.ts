@@ -8,7 +8,7 @@ describe("OnethyCode unified diagnostics", () => {
   test("keeps errors in a dedicated diagnostic file with the same channel and source labels", async () => {
     expect(errorLogPath()).not.toBe(logPath())
     expect(errorLogPath().endsWith("opencode-errors-local.log")).toBe(true)
-    expect(errorLogPath("production").endsWith("opencode-errors-production.log")).toBe(true)
+    expect(errorLogPath("production").endsWith("opencode-errors.log")).toBe(true)
     const dir = await mkdtemp(path.join(tmpdir(), "onethy-incidents-"))
     const incidentFile = path.join(dir, "errors.log")
     try {
