@@ -43,3 +43,22 @@ bun --cwd packages/tui run typecheck:tsc
 ~~~
 
 These checks are also included in the \`onethy-smoke\` Windows/Ubuntu GitHub Actions workflow.
+
+## Argon subagents and sandbox endpoint (November 2026)
+
+- Google Antigravity's `google/gemini-4-argon` alias and verified
+  `daily-cloudcode-pa.sandbox.googleapis.com` errors are recognized.
+  A distinctive Antigravity account-pool refusal (also when written in Spanish)
+  becomes a quota error; verified HTTP 400 invalid-key diagnostics become
+  authentication failures, not false rate limits.
+- The subagent inherits this prompt's Omni Auto opt-in and allowed models
+  (intersected with host-level constraints). An explicitly provided subagent
+  model is never silently substituted.
+- In Omni Auto, an existing child's saved model is checked against the
+  shared cooldown before a continuation is submitted. New children also
+  skip cooled configured/inherited defaults and select healthy candidates.
+- A rejected credential cannot be repaired by routing: when safe to replay
+  before any model output or tool execution, the runner tries a different
+  authorized provider. Without an eligible provider it returns the error.
+- Five-minute **router cooldown** never resets an Antigravity account's
+  actual quota. The plugin's account limits remain authoritative.
