@@ -60,7 +60,7 @@ describe("automatic contextual personalizations", () => {
   })
 
   test("caps auto context and excludes descriptor paths", () => {
-    expect(isExecutableSkill({ id: "custom-plugin", content: "test" })).toBe(false)
+    expect(isExecutableSkill({ id: "plugin-custom", content: "test" })).toBe(false)
     expect(isExecutableSkill({ id: "example", path: "/global/settings/onethy/ref.json" })).toBe(false)
     const huge = { id: "react-huge", description: "React", content: "x".repeat(MAX_SKILL_CHARS + 1) }
     expect(selectAllowedSkillAttachments(["react-huge"], [huge], () => true)).toEqual([])
