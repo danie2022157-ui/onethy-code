@@ -126,6 +126,8 @@ jobs:
       - name: Unified Core, TUI, server logs, filters and redaction
         run: |
           bun --cwd packages/core test test/onethy-debug-logs.test.ts
+          bun run --cwd packages/cli src/index.ts debug logs --level ERROR --lines 5
+          bun run --cwd packages/cli src/index.ts debug logs --level WARN --lines 5
           bun run --cwd packages/cli src/index.ts debug logs --lines 5
           bun run --cwd packages/cli src/index.ts debug logs --source tui --level DEBUG --lines 5
 

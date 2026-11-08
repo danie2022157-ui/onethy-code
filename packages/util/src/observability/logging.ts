@@ -2,12 +2,15 @@ import { Effect, FileSystem, Formatter, Logger, Option, Schedule, Stream, type L
 import path from "path"
 import { Global } from "../global.js"
 import { runID } from "./shared.js"
+import { redact } from "./log-redaction.js"
 
 // One log file is shared by every opencode process on the machine and only ever appended to, so it
 // is bounded by compacting in place instead of rotating: once it passes LOG_MAX_BYTES the head is
 // dropped so roughly LOG_KEEP_BYTES remain, rounded forward to the next line boundary.
 export const LOG_MAX_BYTES = 50 * 1024 * 1024
 export const LOG_KEEP_BYTES = 25 * 1024 * 1024
+export const ERROR_LOG_MAX_BYTES = 10 * 1024 * 1024
+export const ERROR_LOG_KEEP_BYTES = 5 * 1024 * 1024
 export const LOG_TRIM_INTERVAL = "1 hour"
 // A trim of a 1 GB log takes well under a second, so a lock older than this belongs to a dead process.
 export const LOG_TRIM_LOCK_STALE_MS = 5 * 60 * 1000
@@ -16,7 +19,7 @@ const LOG_TRIM_CHUNK = 64 * 1024
 function formatter(id: string = runID()) {
   return Logger.map(Logger.formatStructured, (output) => {
     const messages = Array.isArray(output.message) ? output.message : [output.message]
-    return [
+    return redact([
       ["timestamp", output.timestamp],
       ["level", output.level],
       ["run", id],
@@ -26,7 +29,7 @@ function formatter(id: string = runID()) {
       ...flatten(output.annotations),
     ]
       .map(([key, value]) => `${key}=${format(value)}`)
-      .join(" ")
+      .join(" "))
   })
 }
 
@@ -61,6 +64,12 @@ export function file(local = true, channel = "local") {
   return path.join(Global.Path.log, `opencode-${channel.replace(/[^a-zA-Z0-9._-]/g, "-")}.log`)
 }
 
+/** Error/WARN-only log stored next to the full log, with its own smaller retention limit. */
+export function errorFile(local = true, channel = "local") {
+  const full = file(local, channel)
+  return path.join(path.dirname(full), path.basename(full).replace(/^opencode/, "opencode-errors"))
+}
+
 export function fileLogger(target = file(), id: string = runID()) {
   // Do not set batchWindow to 0; it causes high idle CPU usage.
   return Effect.gen(function* () {
@@ -73,6 +82,28 @@ export function fileLogger(target = file(), id: string = runID()) {
       Effect.forkScoped({ startImmediately: true }),
     )
     return logger
+  })
+}
+
+/** Mirror only warnings, errors and fatal failures. Low-volume incidents remain readable
+ * even after a high-volume DEBUG session has compacted the full log.
+ * Uses Effect's scoped file writer so concurrent CLI/TUI/server instances share the same file.
+ */
+export function errorFileLogger(target = errorFile(), id: string = runID()) {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    yield* fs.makeDirectory(path.dirname(target), { recursive: true })
+    const backend = yield* Logger.toFile(formatter(id), target, { flag: "a" })
+    yield* trim(target, { max: ERROR_LOG_MAX_BYTES, keep: ERROR_LOG_KEEP_BYTES }).pipe(
+      Effect.ignore,
+      Effect.repeat(Schedule.spaced(LOG_TRIM_INTERVAL)),
+      Effect.forkScoped({ startImmediately: true }),
+    )
+    return Logger.make((options) => {
+      if (options.logLevel === "Warn" || options.logLevel === "Error" || options.logLevel === "Fatal") {
+        backend.log(options)
+      }
+    })
   })
 }
 
@@ -176,7 +207,7 @@ export function minimumLogLevel() {
 }
 
 export function loggers(local = true, channel = "local") {
-  return [fileLogger(file(local, channel)), stderrLogger]
+  return [fileLogger(file(local, channel)), errorFileLogger(errorFile(local, channel)), stderrLogger]
 }
 
 export * as Logging from "./logging.js"

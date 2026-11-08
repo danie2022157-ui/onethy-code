@@ -2,12 +2,15 @@ import { Effect } from "effect"
 import { Commands } from "../../commands"
 import { Runtime } from "../../../framework/runtime"
 import { OPENCODE_CHANNEL } from "../../../version"
-import { logPath, filterLines, readBytes, readLogs } from "@opencode/util/observability/log-view"
+import { logPath, errorLogPath, filterLines, readBytes, readLogs } from "@opencode/util/observability/log-view"
 
 export default Runtime.handler(
   Commands.commands.debug.commands.logs,
   Effect.fn("cli.debug.logs")(function* (input) {
-    const file = logPath(OPENCODE_CHANNEL)
+    // ERROR/WARN are read from their dedicated incident stream to survive high-volume DEBUG logs.
+    const file = input.level === "ERROR" || input.level === "WARN"
+      ? errorLogPath(OPENCODE_CHANNEL)
+      : logPath(OPENCODE_CHANNEL)
     const filter = {
       source: input.source,
       level: input.level,

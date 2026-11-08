@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, onCleanup, onMount } from "solid-js"
-import { logPath, readLogs, type Source, type Level } from "@opencode/util/observability/log-view"
+import { logPath, errorLogPath, readLogs, type Source, type Level } from "@opencode/util/observability/log-view"
 import { useTheme } from "../context/theme"
 import { useTuiApp } from "../context/runtime"
 import { Keymap } from "../context/keymap"
@@ -16,7 +16,7 @@ export function DialogLogs() {
   const app = useTuiApp()
   const clipboard = useClipboard()
   const toast = useToast()
-  const file = logPath(app.channel)
+  const file = createMemo(() => level() === "ERROR" || level() === "WARN" ? errorLogPath(app.channel) : logPath(app.channel))
   const [source, setSource] = createSignal<Source>("all")
   const [level, setLevel] = createSignal<Level>("all")
   const [lines, setLines] = createSignal<string[]>([])
@@ -30,7 +30,7 @@ export function DialogLogs() {
     if (disposed || loading || paused()) return
     loading = true
     try {
-      const result = await readLogs(file, { source: source(), level: level(), lines: 100 })
+      const result = await readLogs(file(), { source: source(), level: level(), lines: 100 })
       if (!disposed) {
         setLines(result)
         setError("")
@@ -94,7 +94,7 @@ export function DialogLogs() {
       } }}
     >
       <box flexDirection="column" gap={1}>
-        <text fg={theme.text.muted}>Origem: {source()} · Nível: {level()} · {paused() ? "pausado" : "ao vivo"} · {file}</text>
+        <text fg={theme.text.muted}>Origem: {source()} · Nível: {level()} · {paused() ? "pausado" : "ao vivo"} · {file()}</text>
         <scrollbox maxHeight={20} scrollbarOptions={{ visible: true }}>
           <box flexDirection="column">
             <For each={output()}>{(line) => (

@@ -5,6 +5,7 @@
  */
 import { open } from "node:fs/promises"
 import { Logging } from "./logging.js"
+import { redact } from "./log-redaction.js"
 
 export type Source = "all" | "cli" | "tui" | "server"
 export type Level = "all" | "DEBUG" | "INFO" | "WARN" | "ERROR"
@@ -22,13 +23,12 @@ export function logPath(channel = "local") {
   return Logging.file(channel === "local", channel)
 }
 
-export function redact(line: string) {
-  return line
-    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]{8,}/gi, "$1 [REDACTED]")
-    .replace(/\b(gh[opsru]_[a-zA-Z0-9_]{12,}|github_pat_[a-zA-Z0-9_]{12,}|sk-[a-zA-Z0-9_-]{12,}|AIza[0-9A-Za-z_-]{30,})\b/g, "[REDACTED]")
-    .replace(/\b(authorization|proxy-authorization|x-api-key|api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|id[_-]?token|password|passwd|secret|cookie|set-cookie|token|credential|session[_-]?key|key|code|state)\s*([=:])\s*(?:"(?:\\.|[^"\\])*"|'[^']*'|[^\s&,}\]]+)/gi, "$1$2[REDACTED]")
-    .replace(/(https?:\/\/)[^@/\s"']+:[^@/\s"']+@/gi, "$1[REDACTED]@")
+/** Dedicated low-volume incident stream, independent of noisy INFO/DEBUG messages. */
+export function errorLogPath(channel = "local") {
+  return Logging.errorFile(channel === "local", channel)
 }
+
+export { redact } from "./log-redaction.js"
 
 export function filterLine(line: string, filter: Filter = {}) {
   if (filter.source && filter.source !== "all" && !line.includes("role=" + filter.source)) return false
