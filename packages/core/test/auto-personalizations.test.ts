@@ -33,7 +33,9 @@ describe("automatic contextual personalizations", () => {
     expect(selected.skills).not.toContain("frameworks-react-blocked")
     expect(selected.agents).toEqual(["frameworks-react-specialist"])
     expect(selected.commands).toEqual(["frameworks-react-review"])
-    expect(selected.mcpTools).toContain("playwright/browser_navigate")
+    expect(selected.mcpTools).toEqual([])
+    const browserTask = selectAutoPersonalizations("Use Playwright para navegar no browser", catalog)
+    expect(browserTask.mcpTools).toContain("playwright/browser_navigate")
   })
 
   test("does not inject specializations for vague prompts", () => {
