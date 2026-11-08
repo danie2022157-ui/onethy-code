@@ -227,6 +227,7 @@ describe("SubagentTool", () => {
     expect(recoverCooledSubagentOnManualParentChoice(argon, flash, cool, false)).toBe(false)
     expect(recoverCooledSubagentOnManualParentChoice(argon, argon, cool, true)).toBe(false)
     expect(recoverCooledSubagentOnManualParentChoice(argon, flash, new Set(), true)).toBe(false)
+    expect(recoverCooledSubagentOnManualParentChoice(argon, flash, new Set(), true, true)).toBe(true)
     expect(recoverCooledSubagentOnManualParentChoice(argon, flash, new Set([...cool, "google/gemini-3.8-flash"]), true)).toBe(false)
   })
   test("inherits current Omni Auto without overriding an explicit tool model", () => {
