@@ -107,7 +107,7 @@ async function record(type, name, sourceFile, out, convert, prepared) {
   if (!inside(base, out) || !(await safeAncestors(base, out))) { report.rejected++; return }
   if (await exists(out)) { report.existing++; return }
   const input = convert ? await readFile(sourceFile, "utf8") : undefined
-  const result = prepared !== undefined ? { body: prepared } : convert ? (type === "agents" ? convertOnethyCodeAgent(input, name) : type === "commands" ? convertOnethyCodeCommand(input, name) : convertMarkdown(input, type, name)) : undefined
+  const result = prepared !== undefined ? { body: prepared } : convert ? (type === "agents" ? convertOnethyCodeAgent(input, name) : (type === "commands" || type === "loops") ? convertOnethyCodeCommand(input, name) : convertMarkdown(input, type, name)) : undefined
   if (result?.warning) {
     report.components[type].warnings.push({ name, warning: result.warning })
   }
@@ -186,7 +186,7 @@ try {
     }
     // Only file-based customizations are installed automatically. Settings
     // and unrelated plugins remain inventoried because they may conflict.
-    if (!["skills", "agents", "commands"].includes(type)) {
+    if (!["skills", "agents", "commands", "loops"].includes(type)) {
       for await (const file of traverse(root)) report.components[type].files++
       report.pending += report.components[type].files
       continue
@@ -211,7 +211,7 @@ try {
       continue
     }
     for await (const file of traverse(root)) {
-      if (!["agents", "commands"].includes(type) || extname(file).toLowerCase() !== ".md") continue
+      if (!["agents", "commands", "loops"].includes(type) || extname(file).toLowerCase() !== ".md") continue
       const name = slug(relative(root, file).slice(0, -3).split(sep).join("-"))
       const out = join(destination, type, name + ".md")
       report.components[type].files++
