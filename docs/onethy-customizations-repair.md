@@ -112,11 +112,18 @@ nativo `session.prompt` para avaliar **cada nova tarefa** (inclusive as de
 subagentes) contra o catálogo realmente registrado:
 
 - A pesquisa é local, determinística e limitada por relevância.
-- Até **duas skills** são anexadas automaticamente se corresponderem à
-  tarefa, forem próprias para autoinvocação, tiverem conteúdo pequeno
-  e a permissão efetiva `skill:<id>` estiver explicitamente em `allow`.
-  Skills que exigem confirmação (`ask`) permanecem sugestões e usam
-  normalmente a ferramenta `skill` com seu pedido de autorização.
+- **A quantidade de skills é determinada automaticamente**, sem o antigo limite de duas:
+  o motor combina relevância e diversidade das skills com uma reserva
+  proporcional à janela de contexto do modelo selecionado e à complexidade
+  da tarefa. Skills muito grandes, redundantes ou que não cabem são apenas
+  sugeridas para carregamento posterior, não anexadas silenciosamente.
+- Skills próprias para autoinvocação só entram automaticamente quando a
+  permissão efetiva `skill:<id>` é explicitamente `allow`. Skills com
+  permissão `ask` ou `deny` não são anexadas automaticamente; o fluxo
+  normal de autorização é preservado.
+- O orçamento é **uma estimativa conservadora**, pois o gancho de prompt ainda
+  não conhece com exatidão os tokens do histórico completo; há tetos de
+  tamanho total e individual para manter o modelo operacional.
 - Subagentes especializados são recomendados apenas quando a
   correspondência é inequívoca; a ferramenta `subagent agent=auto`
   continua selecionando o especialista na delegação real.
@@ -153,3 +160,16 @@ onethy
 A configuração de permissões, os modelos definidos pelo usuário e o estado
 real dos provedores continuam prevalecendo. Nenhuma aprovação é inferida
 a partir da simples instalação de um recurso.
+
+### Como a seleção dinâmica decide
+
+O planejamento é repetido no início de cada novo prompt, incluindo os dos subagentes.
+As sugestões são ordenadas por correspondência com a tarefa; skills quase idênticas
+não são anexadas juntas. A reserva usa a janela de contexto informada pelo
+modelo, caso conhecida, e desconta o tamanho do pedido e skills anexadas
+manualmente. O orçamento total para inclusão automática mantém um teto
+conservador de caracteres: **não há limite fixo de quantidade de skills**.
+
+Skills que não couberem continuam disponíveis para a ferramenta `skill` quando
+uma etapa posterior precisar delas. Isso não garante que o modelo vá escolher
+qualquer skill sugerida nem substitui a autorização de ferramentas.
