@@ -27,6 +27,7 @@ async function createGitFixture(directory: string) {
   await fs.mkdir(path.join(repository, "dependency"), { recursive: true })
   await writePackage(repository, {
     name: "fixture-git-plugin",
+    scripts: { build: "tsc -p tsconfig.build.json" },
     exports: "./index.js",
     dependencies: { "fixture-dependency": "file:./dependency" },
   })

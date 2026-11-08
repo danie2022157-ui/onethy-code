@@ -13,6 +13,7 @@ import { Provider } from "../provider.js"
 import { Command } from "../command.js"
 import { Config } from "../config.js"
 import { Credential } from "../credential.js"
+import { Database } from "../database/database.js"
 import { llmClient } from "../effect/app-node-platform.js"
 import { ConfigAgentPlugin } from "../config/plugin/agent.js"
 import { OnethyCustomizationPlugin } from "../config/plugin/onethy-customization.js"
@@ -135,6 +136,7 @@ const services = [
   Command.Service,
   Config.Service,
   Credential.Service,
+  Database.Service,
   Bus.Service,
   Environment.Service,
   FileAccess.Service,
@@ -197,6 +199,7 @@ export const requirements = LayerNode.group([
   Command.node,
   Config.node,
   Credential.node,
+  Database.node,
   Bus.node,
   Environment.node,
   FileAccess.node,

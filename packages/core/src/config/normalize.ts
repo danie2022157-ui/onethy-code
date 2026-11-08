@@ -283,7 +283,7 @@ function normalizeMcp(input: Record<string, unknown>, encoded: Record<string, un
           return
         }
         if (isEnabledOnlyMcp(value)) {
-          setOwn(enabledOverrides, name, value.enabled as boolean)
+          setOwn(enabledOverrides, name, value.enabled)
           return
         }
         if (name === "servers" && !isDirectLegacyMcp(value)) {
@@ -906,7 +906,7 @@ function isDirectLegacyMcp(value: unknown) {
   return isRecord(value) && (value.type === "local" || value.type === "remote")
 }
 
-function isEnabledOnlyMcp(value: unknown) {
+function isEnabledOnlyMcp(value: unknown): value is { enabled: boolean } {
   return isRecord(value) && !own(value, "type") && typeof value.enabled === "boolean"
 }
 

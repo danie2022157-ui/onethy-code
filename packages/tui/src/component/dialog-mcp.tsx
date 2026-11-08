@@ -27,7 +27,7 @@ function Status(props: { status: McpServer["status"]; loading: boolean }) {
   if (props.status.status === "connected") {
     return <span style={{ attributes: TextAttributes.BOLD }}>Connected ✓</span>
   }
-  if (props.status.status === "standby") return <>Standby · connects on use</>
+  if (String(props.status.status) === "standby") return <>Standby · connects on use</>
   if (props.status.status === "failed") {
     return <>Failed !</>
   }
@@ -173,7 +173,7 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
           server: name, location: { directory },
         }).catch(toast.error)
       } else {
-        setHidden(new Set())
+        setHidden(new Set<string>())
       }
       toast.show({ variant: "success", message })
       void data.location.mcp.server.sync(current()).catch(() => undefined)
@@ -267,7 +267,7 @@ export function DialogMcp(props: { initialServer?: string; details?: boolean } =
           <DialogErrorDetails
             title={`MCP server: ${server().name}`}
             error={server().status.status === "failed"
-              ? `${mcpFailureHelp(server().status.error)}\n\n${server().status.error}`
+              ? `${mcpFailureHelp(statusError(server().status) ?? "")}\n\n${statusError(server().status) ?? ""}`
               : statusError(server().status) ?? "Unknown MCP connection error"}
             context={`Status: ${server().status.status}\nConfiguration: mcp.servers.${server().name}${
               server().integrationID ? `\nIntegration: ${server().integrationID}` : ""

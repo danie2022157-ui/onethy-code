@@ -123,7 +123,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             if (route.data.type === "session") setAgentStore("draftBySession", route.data.sessionID, { agent: id })
             // Retain both selections while agent and model commits arrive separately.
             const selected = changed && route.data.type === "session" ? model.current() : undefined
-            if (selected) model.set(selected)
+            if (selected) model.set(selected, { fromAuto: true })
           })
         },
         move(direction: 1 | -1) {
@@ -1085,6 +1085,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     // cooldown as a provider quota failure when the endpoint is unreachable.
     const unavailableModel = (error: { type: string; status?: number; message?: string }) =>
       error.type === "provider.rate-limit" || error.type === "provider.quota" ||
+      error.type === "provider.chatgpt-limit" || error.type === "provider.free-limit" ||
       error.status === 429 ||
       (error.type === "provider.transport" &&
         /\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED)\b/i.test(error.message ?? ""))
@@ -1104,6 +1105,17 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         ? 5 * 60_000 : Math.max(1_000, Math.min(evt.data.error.retryAfterMs, 15 * 60_000))
       if (!model.auto.isModelInCooldown(cur.providerID, cur.modelID))
         model.auto.markCooldown(cur.providerID, cur.modelID, duration)
+      if (
+        (evt.data.error.type === "provider.quota" ||
+          evt.data.error.type === "provider.chatgpt-limit" ||
+          evt.data.error.type === "provider.free-limit") &&
+        !/antigravity/i.test(`${cur.providerID}/${cur.modelID}`)
+      ) {
+        for (const sibling of model.auto.rawConnectedModels()) {
+          if (sibling.providerID === cur.providerID && !model.auto.isModelInCooldown(sibling.providerID, sibling.id))
+            model.auto.markCooldown(sibling.providerID, sibling.id, duration)
+        }
+      }
       rateLimitPending.set(evt.data.sessionID, {
         from: cur.providerID + "/" + cur.modelID,
         recordedAt: Date.now(),
@@ -1142,6 +1154,17 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const failed = latestStepModel.get(evt.data.sessionID)
       if (!failed) return
       model.auto.markCooldown(failed.providerID, failed.modelID)
+      if (
+        (evt.data.error.type === "provider.quota" ||
+          evt.data.error.type === "provider.chatgpt-limit" ||
+          evt.data.error.type === "provider.free-limit") &&
+        !/antigravity/i.test(`${failed.providerID}/${failed.modelID}`)
+      ) {
+        for (const sibling of model.auto.rawConnectedModels()) {
+          if (sibling.providerID === failed.providerID && !model.auto.isModelInCooldown(sibling.providerID, sibling.id))
+            model.auto.markCooldown(sibling.providerID, sibling.id)
+        }
+      }
     }))
     onCleanup(event.on("session.execution.failed", (evt) => {
       rateLimitPending.delete(evt.data.sessionID)
@@ -1174,7 +1197,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         state.pending = false
         void writeJsonAtomic(filePath, {
           pinned: sessionStore.pinned,
-        })
+        }).catch(() => undefined)
       }
 
       readJson<unknown>(filePath)
@@ -1204,6 +1227,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       })
 
       function prune(sessionID: string) {
+        if (!sessionStore.pinned.includes(sessionID)) return
         batch(() => {
           if (sessionStore.pinned.includes(sessionID)) {
             setSessionStore(

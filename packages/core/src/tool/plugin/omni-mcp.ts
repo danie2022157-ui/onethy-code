@@ -102,9 +102,9 @@ export const Plugin = {
               return { output: { action, summary, recovered: false }, content: summary, metadata: { action, recovered: false } }
             }
             lastRecovery.set(server, now)
-            const connectError = yield* mcp.connect(server).pipe(
+            const connectError = yield* mcp.connect(Mcp.ServerName.make(server)).pipe(
               Effect.map(() => ""),
-              Effect.catchAll((error) => Effect.succeed(redactMcpError(String(error)))),
+              Effect.catch((error) => Effect.succeed(redactMcpError(String(error)))),
             )
             const after = (yield* mcp.servers()).find((entry) => entry.name === server)
             const recovered = after?.status.status === "connected"

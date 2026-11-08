@@ -78,7 +78,7 @@ export const Plugin = {
             if (!params.goal?.trim() || !params.tasks?.length)
               return yield* new ToolFailure({ message: "A goal and at least one task are required for create." })
             const created = yield* orchestrator.createMission(params.goal, missionID, params.tasks).pipe(
-              Effect.catchAllCause((cause) => new ToolFailure({
+              Effect.catchCause((cause) => new ToolFailure({
                 message: "Cannot create mission; check plan dependencies, uniqueness and IDs.",
                 error: cause,
               })),
@@ -153,7 +153,7 @@ export const Plugin = {
                     return { task, passed: false, summary: "Worker did not confirm completion." }
                   return { task, passed: true, summary: summary.slice(0, 7000) }
                 }).pipe(
-                  Effect.catchAllCause((cause) => Effect.succeed({
+                  Effect.catchCause((cause) => Effect.succeed({
                     task, passed: false, summary: "Worker execution failed; check permissions and model availability. " +
                       String(cause).slice(0, 1000),
                   })),

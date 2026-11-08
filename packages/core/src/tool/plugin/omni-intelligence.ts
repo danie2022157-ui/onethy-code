@@ -11,7 +11,9 @@ import { Command } from "../../command.js"
 import { Mcp } from "../../mcp/index.js"
 import { OmniBus } from "../../omni-bus.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
+import { Database } from "../../database/database.js"
 import { Session } from "../../session.js"
+import { SessionMessage } from "../../session/message.js"
 import { rankCatalog, reviewDiff, searchProjectHistory, searchWorkspace, type CatalogEntry } from "../../omni-intelligence.js"
 import { OmniEmbeddings } from "../../omni-embeddings.js"
 import { SessionStats } from "../../session/stats.js"
@@ -60,6 +62,7 @@ export const Plugin = {
     const mcp = yield* Mcp.Service
     const bus = yield* OmniBus.Service
     const orchestrator = yield* OmniOrchestrator.Service
+    const database = yield* Database.Service
     const sessions = yield* Session.Service
 
 
@@ -70,7 +73,7 @@ export const Plugin = {
       const rows = yield* Effect.forEach(selected, (session) =>
         sessions.messages({ sessionID: session.id, limit, order: "desc" }).pipe(
           Effect.map((messages) => ({ session, messages })),
-          Effect.catchAll(() => Effect.succeed({ session, messages: [] })),
+          Effect.catch(() => Effect.succeed({ session, messages: [] as SessionMessage.Info[] })),
         ), { concurrency: 4 })
       return rows
     })
@@ -328,7 +331,12 @@ export const Plugin = {
             ].join("\n")
           }
           return { output: { action, summary }, content: summary, metadata: { action } }
-        }),
+        }).pipe(
+          Effect.provideService(Database.Service, database),
+          Effect.catch((error) =>
+            error instanceof ToolFailure ? Effect.fail(error) : Effect.fail(new ToolFailure({ message: error.message, error })),
+          ),
+        ),
       })
     }).pipe(Effect.asVoid)
   }),

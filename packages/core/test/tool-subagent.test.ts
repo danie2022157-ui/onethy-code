@@ -123,6 +123,7 @@ const subagentPluginSupervisor = makeLocationNode({
   ),
   deps: [
     Agent.node,
+    Location.node,
     Config.node,
     Model.node,
     Permission.node,

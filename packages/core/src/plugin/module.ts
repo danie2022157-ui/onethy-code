@@ -123,7 +123,7 @@ const load = Effect.fn("PluginModule.load")(function* (
     if (options?.install === false) return { pending: true as const }
     return yield* new LoadError({ message: "Pinned Antigravity archive has no dist/index.js" })
   }
-  if (pinnedMain) {
+  if (pinnedMain && installed) {
     const manifest = yield* Effect.tryPromise({
       try: () => readFile(path.join(installed.directory, "package.json"), "utf8"),
       catch: (cause) => new LoadError({ message: "Cannot inspect pinned Antigravity package", cause }),

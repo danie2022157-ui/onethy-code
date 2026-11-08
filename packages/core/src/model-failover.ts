@@ -7,6 +7,24 @@ export const DEFAULT_COOLDOWN_MS = 5 * 60_000
 export const MAX_COOLDOWN_MS = 15 * 60_000
 export const MAX_FAILOVERS_PER_STEP = 2
 
+/**
+ * Account-level usage or billing exhaustion on a standard provider applies to
+ * every model sharing that provider credential. Antigravity buckets quota per
+ * model family (Flash, Argon, Claude) and rotates across pooled accounts.
+ */
+export function isAccountQuotaError(
+  error: AIError | { readonly type: string },
+  model: { readonly providerID: string; readonly id: string },
+): boolean {
+  if (/antigravity/i.test(model.providerID + "/" + model.id)) return false
+  if (error instanceof AIError) return error.reason._tag === "QuotaExceeded"
+  return (
+    error.type === "provider.quota" ||
+    error.type === "provider.chatgpt-limit" ||
+    error.type === "provider.free-limit"
+  )
+}
+
 export function rateLimitCooldown(
   error: AIError,
   model?: { readonly providerID: string; readonly id: string },

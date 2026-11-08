@@ -293,7 +293,7 @@ export const Plugin = {
                       },
                     },
                   }).pipe(
-                    Effect.catchAll((error) =>
+                    Effect.catch((error) =>
                       Effect.fail(new ToolFailure({
                         message: "Auto-repair subagent could not run. Tests remain failed; review permissions and agent availability.",
                         error,

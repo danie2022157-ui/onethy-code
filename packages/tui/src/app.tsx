@@ -816,7 +816,7 @@ function App() {
             ),
           })
           if (agent) local.agent.set(agent.id)
-          if (model) local.model.set(model)
+          if (model) local.model.set(model, { fromAuto: local.model.auto.enabled() })
           dialog.clear()
         },
       },
@@ -843,7 +843,7 @@ function App() {
             ),
           })
           if (agent) local.agent.set(agent.id)
-          if (model) local.model.set(model)
+          if (model) local.model.set(model, { fromAuto: local.model.auto.enabled() })
           dialog.clear()
         },
       },

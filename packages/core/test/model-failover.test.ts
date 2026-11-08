@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test"
-import { AIError, RateLimitError, InvalidProviderOutputError, Message, TransportError } from "@opencode/ai/effect"
+import { AIError, RateLimitError, QuotaExceededError, InvalidProviderOutputError, Message, TransportError } from "@opencode/ai/effect"
 import { Model } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
-import { allowedAutoModels, canFailover, rateLimitCooldown, selectFailoverModel, requestInputModalities, transportFailoverCooldown, antigravity429, readAutoFailoverIntent, AUTO_FAILOVER_KEY } from "../src/model-failover"
+import { allowedAutoModels, canFailover, isAccountQuotaError, rateLimitCooldown, selectFailoverModel, requestInputModalities, transportFailoverCooldown, antigravity429, readAutoFailoverIntent, AUTO_FAILOVER_KEY } from "../src/model-failover"
 
 const info = (provider: string, id: string, options: Partial<Model.Info> = {}): Model.Info => ({
   ...Model.Info.default(Provider.ID.make(provider), Model.ID.make(id)),
@@ -26,6 +26,13 @@ describe("provider failover decision", () => {
     expect(rateLimitCooldown(new AIError({ reason: new InvalidProviderOutputError({ message: "This text mentions HTTP 429", classification: "incomplete-stream" }) }))).toBeUndefined()
   })
   it("only reroutes unsent DNS and connection failures, never accepted requests", () => {
+    const quota = new AIError({ reason: new QuotaExceededError({ message: "The usage limit has been reached" }) })
+    expect(isAccountQuotaError(quota, { providerID: "openai", id: "gpt-6-luna" })).toBe(true)
+    expect(isAccountQuotaError({ type: "provider.chatgpt-limit" }, { providerID: "openai", id: "gpt-6-luna" })).toBe(true)
+    expect(isAccountQuotaError({ type: "provider.free-limit" }, { providerID: "opencode", id: "free-model" })).toBe(true)
+    expect(isAccountQuotaError(quota, { providerID: "google", id: "antigravity-gemini-3.8-flash" })).toBe(false)
+    expect(isAccountQuotaError(quota, { providerID: "antigravity", id: "claude-sonnet-4-6" })).toBe(false)
+    expect(isAccountQuotaError(new AIError({ reason: new RateLimitError({ message: "rate limited" }) }), { providerID: "openai", id: "gpt-6-luna" })).toBe(false)
     const dns = (delivery: "not-sent" | "accepted" = "not-sent", code = "ENOTFOUND") =>
       new AIError({ reason: new TransportError({
         message: "getaddrinfo ENOTFOUND cloudcode-pa.googleapis.com",
@@ -42,7 +49,7 @@ describe("provider failover decision", () => {
   it("prefers another connected provider with compatible capabilities", () => {
     const selected = selectFailoverModel(options, { ...primary, capabilities: primary.capabilities },
       new Set(["openai/gpt-6-luna"]), undefined, 120_000)
-    expect(selected?.providerID).toBe("antigravity")
+    expect(String(selected?.providerID)).toBe("antigravity")
   })
   it("selects a compatible fallback using workload-specific context ranking", () => {
     const catalog = [
@@ -52,13 +59,13 @@ describe("provider failover decision", () => {
     ]
     const selected = selectFailoverModel(catalog, primary,
       new Set(["openai/gpt-6-luna"]), undefined, 50_000, "context")
-    expect(selected?.id).toBe("large")
+    expect(String(selected?.id)).toBe("large")
     expect(selectFailoverModel(catalog, primary,
       new Set(["openai/gpt-6-luna", "other/large", "other/small"]),
       undefined, 50_000, "context")).toBeUndefined()
   })
   it("honors strict allowed models and excludes cooled or incompatible models", () => {
-    expect(selectFailoverModel(options, primary, new Set(["openai/gpt-6-luna"]), ["openai/gpt-6-sol"], 50_000)?.id).toBe("gpt-6-sol")
+    expect(String(selectFailoverModel(options, primary, new Set(["openai/gpt-6-luna"]), ["openai/gpt-6-sol"], 50_000)?.id)).toBe("gpt-6-sol")
     expect(selectFailoverModel(options, primary,
       new Set(["openai/gpt-6-luna", "openai/gpt-6-sol", "antigravity/gemini-4-argon"]), undefined, 50_000)).toBeUndefined()
     expect(selectFailoverModel(options, primary, new Set(["openai/gpt-6-luna"]), ["unavailable/missing"], 50_000)).toBeUndefined()
@@ -78,9 +85,9 @@ describe("provider failover decision", () => {
       messages: [Message.user("A coding question without images or PDFs")],
     }, original.capabilities.input)
     expect(modalities).toEqual(["text"])
-    expect(selectFailoverModel([original, backup], {
+    expect(String(selectFailoverModel([original, backup], {
       ...original, capabilities: { ...original.capabilities, input: modalities },
-    }, new Set(["google/antigravity-gemini-3.8-flash"]), undefined, 10_000)?.id).toBe("compatible-text")
+    }, new Set(["google/antigravity-gemini-3.8-flash"]), undefined, 10_000)?.id)).toBe("compatible-text")
     expect(selectFailoverModel([original, backup], original,
       new Set(["google/antigravity-gemini-3.8-flash"]), undefined, 10_000)).toBeUndefined()
   })

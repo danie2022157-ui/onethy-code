@@ -120,7 +120,7 @@ export const { use: useUpdateNotification, provider: UpdateNotificationProvider 
       }
       if (!props.updater) return
       const current = notification()
-      const known = current && (current.source === "client" || !current.remote) ? current : undefined
+      const known = current && (current.source !== "server" || !current.remote) ? current : undefined
       if (origin === "notification" && !known) return
       const active = state()
       // The notification can predate an installation through /update.

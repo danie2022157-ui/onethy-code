@@ -73,6 +73,7 @@ async function parse(pkg: string): Promise<Target | undefined> {
     // trees. Install them as immutable tarballs: npm's Git dependency
     // preparation runs upstream build hooks and can fail before plugin setup.
     if (result.type === "remote") {
+      if (!result.fetchSpec) return
       const url = new URL(result.fetchSpec)
       const parts = url.pathname.split("/").filter(Boolean)
       if (url.protocol !== "https:" || url.hostname !== "codeload.github.com" ||

@@ -8,7 +8,7 @@ import { Bus } from "../../bus.js"
 import { Model } from "../../model.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { agentModelRanking, efficiencyProfile } from "../../efficiency-profile.js"
-import { selectFailoverModel, allowedAutoModels, readAutoFailoverIntent, canFailover, rateLimitCooldown, requestInputModalities, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
+import { selectFailoverModel, allowedAutoModels, readAutoFailoverIntent, canFailover, rateLimitCooldown, isAccountQuotaError, requestInputModalities, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
 import { LocationLifecycle } from "../../location-lifecycle.js"
 import { InstructionState } from "../instruction-state.js"
 import { SessionCompaction } from "../compaction.js"
@@ -360,6 +360,16 @@ const layer = Layer.effect(
                 return yield* new StepFailedError({ error: outcome.error })
               const excluded = new Set(attemptedModels)
               const connected = yield* modelCatalog.available()
+              if (isAccountQuotaError(outcome.error, loaded.model.ref)) {
+                for (const sibling of connected) {
+                  if (sibling.providerID !== loaded.model.ref.providerID) continue
+                  const key = sibling.providerID + "/" + sibling.id
+                  attemptedModels.add(key)
+                  excluded.add(key)
+                  if (orchestrator._tag === "Some")
+                    yield* orchestrator.value.markModelCooldown(sibling.providerID, sibling.id, outcome.cooldownMs)
+                }
+              }
               if (orchestrator._tag === "Some") {
                 for (const model of connected)
                   if (yield* orchestrator.value.isModelInCooldown(model.providerID, model.id))

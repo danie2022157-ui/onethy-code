@@ -5,7 +5,17 @@ diff --git a/lib/git.js b/lib/git.js
 index 8faf125c6e5e572e980cfc8aaf4e6c9a21d740cf..b1ae3c8cdfa9cbdbd7573be7fa74197d158e6bcb 100644
 --- a/lib/git.js
 +++ b/lib/git.js
-@@ -247,15 +247,20 @@ class GitFetcher extends Fetcher {
+@@ -158,6 +158,9 @@ class GitFetcher extends Fetcher {
+   }
+ 
+   #prepareDir (dir) {
++    if (this.opts.ignoreScripts) {
++      return Promise.resolve()
++    }
+     return this[_.readPackageJson](dir).then(mani => {
+       // no need if we aren't going to do any preparation.
+       const scripts = mani.scripts
+@@ -247,15 +250,20 @@ class GitFetcher extends Fetcher {
        // if we're resolved, and have a tarball url, shell out to RemoteFetcher
        if (tarballOk) {
          const nameat = this.spec.name ? `${this.spec.name}@` : ''

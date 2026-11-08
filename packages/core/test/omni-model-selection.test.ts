@@ -48,13 +48,13 @@ describe("model selection policy", () => {
       requireHealthy: true,
       isCoolingDown: (ref) => ref.id === "a",
     })
-    expect(selected.selected.id).toBe("b")
+    expect(String(selected.selected.id)).toBe("b")
     const explicit = ModelSelectionPolicy.select(available, {
       mode: "explicit",
       requireHealthy: true,
       isCoolingDown: () => true,
     }, { providerID: Provider.ID.make("p"), id: Model.ID.make("a") })
-    expect(explicit.selected.id).toBe("a")
+    expect(String(explicit.selected.id)).toBe("a")
   })
 
   it("avoids cooled models automatically but keeps an explicit session model pinned", () => {
@@ -102,9 +102,9 @@ describe("model selection policy", () => {
     const balanced = info("p", "balanced", {
       cost: [{ input: amount(2), output: amount(2), cache: { read: amount(1), write: amount(2) } }],
     })
-    expect(ModelSelectionPolicy.select([cheapInput, balanced], {
+    expect(String(ModelSelectionPolicy.select([cheapInput, balanced], {
       mode: "automatic", rankBy: "cost",
-    }).selected.id).toBe("balanced")
+    }).selected.id)).toBe("balanced")
   })
 
   it("supports context requirements and context ranking", () => {

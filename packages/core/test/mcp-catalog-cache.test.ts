@@ -12,7 +12,7 @@ describe("safe local MCP catalog persistence", () => {
     roots.push(root)
     const one = await openMcpCatalogCache(path.join(root, "workspace"), root)
     const config = { type: "local" as const, command: ["node", "server.js"], environment: { TOKEN: "top-secret" } }
-    const tools = [{ name: "lookup", description: "Search", inputSchema: { type: "object", properties: {} } }]
+    const tools = [{ name: "lookup", description: "Search", inputSchema: { type: "object" as const, properties: {} } }]
     expect(await one.save("custom-server", config, tools)).toBe(true)
     expect(await one.load("custom-server", config)).toEqual(tools)
     const content = await fs.readFile(path.join(catalogCacheDirectory(path.join(root, "workspace"), root),

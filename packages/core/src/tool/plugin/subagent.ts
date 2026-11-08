@@ -351,9 +351,9 @@ export const Plugin = {
                   catch: (error) => new ToolFailure({ message: "No connected model satisfies the selection policy.", error }),
                 })
                 const recommended = chosen.primary
-                routedModel = recommended && permitted.some((model) =>
+                const recommendedMatch = recommended ? permitted.find((model) =>
                   model.providerID === recommended.providerID && model.id === recommended.id)
-                  ? recommended : { providerID: decision.selected.providerID, id: decision.selected.id }
+                  : undefined; routedModel = recommendedMatch ? { providerID: recommendedMatch.providerID, id: recommendedMatch.id } : { providerID: decision.selected.providerID, id: decision.selected.id }
               }
 
               if (
@@ -546,7 +546,7 @@ export const Plugin = {
                 status: "completed" as const,
                 output: isolatedDirectory ? finalOutput + "\n\nIsolated worktree: " + isolatedDirectory : finalOutput,
               }
-            }).pipe(
+            }).pipe(Effect.mapError((error) => error instanceof ToolFailure ? error : new ToolFailure({ message: error.message, error })),
               Effect.map((output) => ({
                 output,
                 content:

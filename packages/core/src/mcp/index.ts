@@ -7,7 +7,7 @@ import type { Session } from "@opencode/schema/session"
 import type { Transport } from "@modelcontextprotocol/client"
 import { createHash } from "node:crypto"
 import { isDeepStrictEqual } from "node:util"
-import { Cause, Context, Effect, Exit, FiberSet, Latch, Layer, Schema, Scope, Semaphore, Stream, Types } from "effect"
+import { Cause, Context, Duration, Effect, Exit, FiberSet, Latch, Layer, Schema, Scope, Semaphore, Stream, Types } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Credential } from "../credential.js"
 import { Bus } from "../bus.js"
@@ -742,13 +742,14 @@ export const layer = (options?: Options) =>
           }
           const sorted = plan ? enabled.sort(([a], [b]) =>
             (order.get(a) ?? Infinity) - (order.get(b) ?? Infinity)) : enabled
+          const isConnected = (entry: ServerEntry) => entry.status.status === "connected"
           const startup = ([name, entry]: [ServerName, ServerEntry]) =>
             Effect.gen(function* () {
               // A manual disconnect/disable always overrides an asynchronous startup.
               if (entries.get(name) !== entry || entry.status.status !== "pending")
                 return yield* entry.startup.open
               yield* startServer(name, entry)
-              if (!cold.has(name) || entry.status.status !== "connected" ||
+              if (!cold.has(name) || !isConnected(entry) ||
                 (entry.activeCalls ?? 0) !== 0 || entries.get(name) !== entry) return
               // Keep discovered schemas so a standby tool can still be selected
               // and the transport is started on demand before the next tool call.
@@ -906,7 +907,7 @@ export const layer = (options?: Options) =>
       // Explicitly opt out for non-Onethy OpenCode hosts; attached transports
       // belong to their owners and are never swept or disconnected by this job.
       if (process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1") {
-        yield* Stream.fromEffectRepeat(Effect.sleep(MCP_POLICY.tickMs + " millis")).pipe(
+        yield* Stream.fromEffectRepeat(Effect.sleep(Duration.millis(MCP_POLICY.tickMs))).pipe(
           Stream.runForEach(() =>
             Effect.forEach(
               [...entries],

@@ -21,7 +21,8 @@ test("MCP enable/disable writes only scoped overrides with no network requests",
     info = parse(await readFile(local, "utf8"))
     expect(info.mcp.overrides["onethy-git"]).toBe(false)
     expect((await managedMcpList(project, globalRoot)).find(item => item.name === "onethy-git")?.enabled).toBe(false)
-    expect((await readNativeBundle(globalRoot)).mcpServers["onethy-git"]).toBeDefined()
+    const bundle = await readNativeBundle(globalRoot)
+    expect(bundle?.mcpServers["onethy-git"]).toBeDefined()
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
@@ -35,10 +36,12 @@ test("MCP removal respects global scope and restores only a selected built-in", 
     await expect(manageMcp({ action: "remove", name: "onethy-git", cwd, globalRoot }))
       .rejects.toThrow("--global")
     await manageMcp({ action: "remove", name: "onethy-git", cwd, globalRoot, global: true })
-    expect((await readNativeBundle(globalRoot)).mcpServers["onethy-git"]).toBeUndefined()
-    expect(Object.keys((await readNativeBundle(globalRoot)).mcpServers)).toHaveLength(7)
+    const bundleAfterRemove = (await readNativeBundle(globalRoot)) as { mcpServers: Record<string, unknown> } | undefined;
+    expect(bundleAfterRemove?.mcpServers["onethy-git"]).toBeUndefined()
+    expect(Object.keys(bundleAfterRemove?.mcpServers ?? {})).toHaveLength(7)
     await manageMcp({ action: "restore", name: "onethy-git", cwd, globalRoot, global: true })
-    expect((await readNativeBundle(globalRoot)).mcpServers["onethy-git"].disabled).toBe(true)
+    const bundleAfterRestore = (await readNativeBundle(globalRoot)) as { mcpServers: Record<string, { disabled?: boolean }> } | undefined;
+    expect(bundleAfterRestore?.mcpServers["onethy-git"]?.disabled).toBe(true)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 

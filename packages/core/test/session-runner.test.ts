@@ -14,6 +14,7 @@ import {
   InvalidProviderOutputError,
   InvalidRequestError,
   RateLimitError,
+  QuotaExceededError,
   UnknownProviderError,
 } from "@opencode/ai/effect"
 import { OpenAIChat } from "@opencode/ai/protocols/openai-chat"
@@ -5897,7 +5898,7 @@ describe("SessionRunnerLLM", () => {
       const result = yield* Effect.exit(s.resume)
       if (Exit.isFailure(result)) throw new Error("Auto-Failover runner failed: " + Cause.pretty(result.cause))
       expect(Exit.isSuccess(result)).toBe(true)
-      expect(s.requests.map((request) => request.model.id)).toEqual(["fake-model", "replacement"])
+      expect(s.requests.map((request) => String(request.model.id))).toEqual(["fake-model", "replacement"])
       expect(s.executions).toEqual([])
       expect((yield* s.session.get(sessionID))?.model).toBeUndefined()
       expect(yield* s.context).toMatchObject([
@@ -5964,7 +5965,7 @@ describe("SessionRunnerLLM", () => {
         "antigravity-gemini-3.8-flash", "replacement",
       ])
       expect(s.executions).toEqual([])
-      expect((yield* s.session.get(sessionID))?.model?.id).toBe("antigravity-gemini-3.8-flash")
+      expect(String((yield* s.session.get(sessionID))?.model?.id)).toBe("antigravity-gemini-3.8-flash")
       expect((yield* s.context).some((entry) => entry.type === "assistant")).toBe(true)
     } finally {
       if (originalOmni === undefined) delete process.env.OMNICODE_ACTIVE
@@ -6072,6 +6073,55 @@ describe("SessionRunnerLLM", () => {
       ])
       expect(yield* recordedEventTypes(sessionID)).toContain("session.retry.scheduled.1")
       expect(s.executions).toEqual([])
+    } finally {
+      if (originalOmni === undefined) delete process.env.OMNICODE_ACTIVE
+      else process.env.OMNICODE_ACTIVE = originalOmni
+      if (originalAuto === undefined) delete process.env.OMNICODE_AUTO_MODEL
+      else process.env.OMNICODE_AUTO_MODEL = originalAuto
+    }
+  })
+
+  scenario("Auto-Failover excludes sibling models of the same provider when an account quota is exhausted", function* (s) {
+    const originalOmni = process.env.OMNICODE_ACTIVE
+    const originalAuto = process.env.OMNICODE_AUTO_MODEL
+    try {
+      process.env.OMNICODE_ACTIVE = "1"
+      process.env.OMNICODE_AUTO_MODEL = "0"
+      const sol = Model.Info.default(Provider.ID.make("openai"), ID.make("gpt-6.1-sol"))
+      const luna = Model.Info.default(Provider.ID.make("openai"), ID.make("gpt-6-luna"))
+      s.modelCandidates = [sol, luna].map((item) => ({
+        ...item,
+        enabled: true,
+        status: "active" as const,
+        capabilities: { ...Model.Capabilities.default(), tools: true, input: ["text"] as const, output: ["text"] as const },
+        limit: { context: 200_000, output: 32_000 },
+      }))
+      s.currentModel = LanguageModel.make({
+        id: "gpt-6.1-sol",
+        provider: "openai",
+        route: OpenAIChat.route,
+      })
+      yield* s.bus.publish(SessionEvent.ModelSelected, {
+        sessionID,
+        model: Model.Ref.make({ providerID: Provider.ID.make("openai"), id: ID.make("gpt-6.1-sol") }),
+      })
+      yield* s.session.prompt({
+        sessionID,
+        text: "Do not waste failover attempts on sibling models of an exhausted account",
+        resume: false,
+        metadata: {
+          "onethy.autoFailover": {
+            version: 1,
+            enabled: true,
+            allowedModels: ["openai/gpt-6.1-sol", "openai/gpt-6-luna"],
+          },
+        },
+      })
+      yield* s.llm.push(
+        Stream.fail(new AIError({ reason: new QuotaExceededError({ message: "The usage limit has been reached" }) })),
+      )
+      expect(Exit.isFailure(yield* Effect.exit(s.resume))).toBe(true)
+      expect(s.requests.map((request) => String(request.model.id))).toEqual(["gpt-6.1-sol"])
     } finally {
       if (originalOmni === undefined) delete process.env.OMNICODE_ACTIVE
       else process.env.OMNICODE_ACTIVE = originalOmni
