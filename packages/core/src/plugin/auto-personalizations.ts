@@ -26,7 +26,7 @@ function asIDs(value: unknown, limit: number): string[] {
   if (!Array.isArray(value)) return []
   return value
     .filter((item): item is string =>
-      typeof item === "string" && item.length < 160 && /^[a-zA-Z0-9._:@/-]+$/.test(item))
+      typeof item === "string" && item.length < 160 && /^[a-zA-Z0-9._:@\/-]+$/.test(item))
     .slice(0, limit)
 }
 function saved(value: unknown): Saved | undefined {
