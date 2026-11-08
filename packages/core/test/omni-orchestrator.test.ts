@@ -108,8 +108,11 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       const completed = yield* orchestrator.executeTask("mission-auth", tasks[0].id, "Rotas identificadas com sucesso")
       expect(completed.status).toBe("completed")
       expect(completed.result).toBe("Rotas identificadas com sucesso")
-      const statusMessage = (yield* bus.list()).find((message) => message.type === "status")
-      expect(statusMessage?.payload).toMatchObject({ missionID: "mission-auth", status: "completed" })
+      // A claimed task emits "running" before executeTask emits "completed".
+      // Assert the latest status event instead of taking the first transition.
+      const statusMessages = (yield* bus.list()).filter((message) => message.type === "status")
+      expect(statusMessages.map((message) => (message.payload as { status?: string }).status)).toEqual(["running", "completed"])
+      expect(statusMessages.at(-1)?.payload).toMatchObject({ missionID: "mission-auth", status: "completed" })
       const crossMission = yield* Effect.exit(orchestrator.executeTask("mission-other", tasks[1].id, "must not complete"))
       expect(crossMission._tag).toBe("Failure")
       expect((yield* orchestrator.getActiveTasks("mission-auth"))[1].status).toBe("pending")

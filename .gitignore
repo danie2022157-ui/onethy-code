@@ -40,3 +40,6 @@ tsconfig.tsbuildinfo
 .omnicode/
 **/.omnicode
 __pycache__/
+
+# Cloudflare Wrangler/Miniflare ephemeral local caches
+**/.wrangler/
