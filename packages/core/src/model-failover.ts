@@ -1,11 +1,25 @@
 /** Conservative failover decisions. No string-search of user or event content. */
-import { AIError, HttpContext, QuotaExceededError, RateLimitError, type LLMRequest } from "@opencode/ai/effect"
+import { AIError, AuthenticationError, HttpContext, QuotaExceededError, RateLimitError, type LLMRequest } from "@opencode/ai/effect"
 import type { Model } from "./model.js"
 import { ModelSelectionPolicy } from "./model-selection-policy.js"
 
 export const DEFAULT_COOLDOWN_MS = 5 * 60_000
 export const MAX_COOLDOWN_MS = 15 * 60_000
 export const MAX_FAILOVERS_PER_STEP = 2
+
+/** Google exposes the Antigravity Argon alias without "antigravity" in its model ID. */
+export function isAntigravityModel(model: { readonly providerID: string; readonly id: string }): boolean {
+  return /antigravity/i.test(model.providerID + "/" + model.id) ||
+    (model.providerID === "google" && /^gemini-4-argon(?:$|-)/i.test(model.id))
+}
+
+const ANTIGRAVITY_ENDPOINT =
+  /^\s*Endpoint:\s*https:\/\/(?:daily-)?cloudcode-pa(?:\.sandbox)?\.googleapis\.com\/v1internal(?::|\/)/mi
+
+function hasAntigravityDebugStatus(message: string, status: number): boolean {
+  return /\[Debug Info\]/i.test(message) && ANTIGRAVITY_ENDPOINT.test(message) &&
+    new RegExp("^\\s*Status:\\s*" + status + "\\s*$", "mi").test(message)
+}
 
 /**
  * Account-level usage or billing exhaustion on a standard provider applies to
@@ -16,7 +30,7 @@ export function isAccountQuotaError(
   error: AIError | { readonly type: string },
   model: { readonly providerID: string; readonly id: string },
 ): boolean {
-  if (/antigravity/i.test(model.providerID + "/" + model.id)) return false
+  if (isAntigravityModel(model)) return false
   if (error instanceof AIError) return error.reason._tag === "QuotaExceeded"
   return (
     error.type === "provider.quota" ||
@@ -34,12 +48,17 @@ export function rateLimitCooldown(
     return undefined
   // The Antigravity plugin manages per-account quota resets independently.
   // Only the OnethyCode model-routing cooldown is five minutes.
-  if (model && /antigravity/i.test(model.providerID + "/" + model.id))
+  if (model && isAntigravityModel(model))
     return DEFAULT_COOLDOWN_MS
   const after = "retryAfterMs" in reason ? reason.retryAfterMs : undefined
   return typeof after === "number" && Number.isFinite(after) && after >= 0
     ? Math.min(MAX_COOLDOWN_MS, Math.max(1_000, Math.ceil(after)))
     : DEFAULT_COOLDOWN_MS
+}
+
+/** An invalid credential may fail over to a different authorized provider, not retry the same key. */
+export function authenticationFailoverCooldown(error: AIError): number | undefined {
+  return error.reason._tag === "Authentication" ? DEFAULT_COOLDOWN_MS : undefined
 }
 
 /**
@@ -189,13 +208,20 @@ export function readAutoFailoverIntent(messages: ReadonlyArray<UserMessage>): Au
  * provider's precise diagnostic envelope, never transcript or arbitrary text.
  */
 export function antigravity429(error: unknown, model: { providerID: string; id: string }): AIError | undefined {
-  if (!/antigravity/i.test(model.providerID + "/" + model.id)) return
+  if (!isAntigravityModel(model)) return
   if (error instanceof AIError &&
     (error.reason._tag === "RateLimit" || error.reason._tag === "QuotaExceeded")) return error
   const text = typeof error === "string" ? error :
     error instanceof AIError ? error.reason.message :
     error instanceof Error ? error.message : undefined
   if (!text || text.length > 32_768) return
+  // The plugin can reject its entire Gemini account pool before a Google request begins.
+  // Only the distinctive provider diagnostic, never conversational text, is accepted.
+  if (/^(?:Error:\s*)?\[Antigravity\]\s+Todas (?:tus|las) cuentas \(\d+\) tienen la cuota agotada o bloqueada para gemini\b/i.test(text.trim())) {
+    return new AIError({ reason: new QuotaExceededError({
+      message: "Antigravity Gemini account pool is temporarily unavailable. Try another authorized model.",
+    }) })
+  }
   // The current Antigravity OAuth adapter may omit HTTP status from SSE
   // failures. Only a precise provider-owned account-limit refusal is enough
   // to mark this model temporarily unhealthy; never parse user prompt text.
@@ -206,10 +232,7 @@ export function antigravity429(error: unknown, model: { providerID: string; id: 
   }
   const individualQuota = /\bIndividual quota reached\b/i.test(text)
   const resourceExhausted = /\bResource has been exhausted\b/i.test(text)
-  if ((!individualQuota && !resourceExhausted) ||
-    !/\[Debug Info\]/i.test(text) ||
-    !/^\s*Endpoint:\s*https:\/\/(?:daily-)?cloudcode-pa\.googleapis\.com\/v1internal(?::|\/)/mi.test(text) ||
-    !/^\s*Status:\s*429\s*$/mi.test(text)) return
+  if ((!individualQuota && !resourceExhausted) || !hasAntigravityDebugStatus(text, 429)) return
   // Strip project identifiers, credentials and any untrusted provider detail.
   return new AIError({ reason: new RateLimitError({
     message: individualQuota
@@ -218,6 +241,28 @@ export function antigravity429(error: unknown, model: { providerID: string; id: 
     http: new HttpContext({
       url: "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent",
       status: 429,
+      headers: {},
+    }),
+  }) })
+}
+
+/** Confirmed HTTP 400 invalid-key diagnostic: an authentication failure, not exhausted quota. */
+export function antigravityAuthentication(
+  error: unknown,
+  model: { readonly providerID: string; readonly id: string },
+): AIError | undefined {
+  if (!isAntigravityModel(model)) return
+  const message = typeof error === "string" ? error :
+    error instanceof AIError ? error.reason.message :
+    error instanceof Error ? error.message : undefined
+  if (!message || message.length > 32_768 ||
+    !/^(?:Error:\s*)?API key not valid\. Please pass a valid API key\./i.test(message.trim()) ||
+    !hasAntigravityDebugStatus(message, 400)) return
+  return new AIError({ reason: new AuthenticationError({
+    message: "Antigravity Google credentials were rejected (HTTP 400). Reconnect the provider; trying another authorized provider if auto mode permits.",
+    http: new HttpContext({
+      url: "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent",
+      status: 400,
       headers: {},
     }),
   }) })
