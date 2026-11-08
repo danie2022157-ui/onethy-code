@@ -41,6 +41,19 @@ export function subagentAutoIntent(
     : undefined
 }
 
+/** A manually selected parent model can recover a cooled child without enabling unrestricted auto routing. */
+export function recoverCooledSubagentOnManualParentChoice(
+  child: Model.Ref | undefined,
+  parent: Model.Ref | undefined,
+  coolingDown: ReadonlySet<string>,
+  manualSelection: boolean,
+): boolean {
+  if (!manualSelection || !child || !parent) return false
+  const key = (ref: Model.Ref) => ref.providerID + "/" + ref.id
+  return key(child) !== key(parent) &&
+    coolingDown.has(key(child)) && !coolingDown.has(key(parent))
+}
+
 const backgroundResult = (sessionID: SessionSchema.ID, worktreeDirectory?: string) => ({
   sessionID,
   status: "running" as const,
@@ -371,6 +384,16 @@ export const Plugin = {
               let routedModel: typeof parent.model = undefined
               const parentCoolingDown = parent.model !== undefined &&
                 coolingDown.has(parent.model.providerID + "/" + parent.model.id)
+              // "Switched model to Flash" followed by "continue" must not blindly
+              // resume a child pinned to a known-exhausted Argon route.
+              const manualParentRecovery =
+                existing !== undefined && existing.agent === agent.id &&
+                override === undefined && inheritedIntent?.enabled === false &&
+                recoverCooledSubagentOnManualParentChoice(existing.model, parent.model, coolingDown, true) &&
+                isAllowed(parent.model) &&
+                availableList.some((candidate) =>
+                  candidate.providerID === parent.model?.providerID && candidate.id === parent.model.id)
+                  ? parent.model : undefined
               if (process.env.OMNICODE_ACTIVE === "1" && needsRoute && Option.isSome(orchestratorOpt)) {
                 const permitted = availableList.filter((candidate) =>
                   (!allowedSet || allowedSet.has(candidate.providerID + "/" + candidate.id)) &&
@@ -404,9 +427,11 @@ export const Plugin = {
               // where an explicit model wins over the agent's configured model, which wins over the inherited one.
               if (existing !== undefined) {
                 const switched = existing.agent !== agent.id
-                const needsModelFailover = !isAllowed(existing.model) || (autoEnabled && !isHealthy(existing.model))
+                const needsModelFailover = !isAllowed(existing.model) ||
+                  (autoEnabled && !isHealthy(existing.model)) || manualParentRecovery !== undefined
                 const model =
                   override ??
+                  manualParentRecovery ??
                   (switched || needsModelFailover
                     ? ((isHealthy(agent.model) ? agent.model : undefined) ?? routedModel)
                     : undefined)
@@ -422,6 +447,12 @@ export const Plugin = {
                     (error) => new ToolFailure({ message: `Failed to switch subagent session: ${existing.id}`, error }),
                   ),
                 )
+                if (manualParentRecovery)
+                  yield* Effect.logInfo("OnethyCode subagent recovery: resumed on manually selected parent model", {
+                    sessionID: existing.id,
+                    previous: existing.model?.providerID + "/" + existing.model?.id,
+                    next: manualParentRecovery.providerID + "/" + manualParentRecovery.id,
+                  })
               }
 
               const configuredModelInfo =
