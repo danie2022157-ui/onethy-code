@@ -7,8 +7,8 @@ import { MAX_READ_BYTES, filterLines, readBytes, readLogs, redact, logPath, erro
 describe("OnethyCode unified diagnostics", () => {
   test("keeps errors in a dedicated diagnostic file with the same channel and source labels", async () => {
     expect(errorLogPath()).not.toBe(logPath())
-    expect(errorLogPath()).toEndWith("opencode-errors-local.log")
-    expect(errorLogPath("production")).toEndWith("opencode-errors-production.log")
+    expect(errorLogPath().endsWith("opencode-errors-local.log")).toBe(true)
+    expect(errorLogPath("production").endsWith("opencode-errors-production.log")).toBe(true)
     const dir = await mkdtemp(path.join(tmpdir(), "onethy-incidents-"))
     const incidentFile = path.join(dir, "errors.log")
     try {
@@ -26,7 +26,6 @@ describe("OnethyCode unified diagnostics", () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
-
 
   test("redacts known auth tokens before filtering or sharing", () => {
     const input = [
