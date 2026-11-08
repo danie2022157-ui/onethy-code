@@ -1,0 +1,35 @@
+{
+  "name": "omnicode",
+  "version": "1.0.0",
+  "description": "OmniCode: The Autonomous Multi-Agent & Multi-Model OpenCode Fork with Intelligent Orchestration Layer",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "omnicode": "./bin/omnicode.js",
+    "omni": "./bin/omnicode.js"
+  },
+  "scripts": {
+    "start": "node bin/omnicode.js",
+    "omnicode": "node bin/omnicode.js",
+    "omni": "node bin/omnicode.js",
+    "test": "node --test tests/*.test.js",
+    "dev": "node --watch bin/omnicode.js"
+  },
+  "keywords": [
+    "omnicode",
+    "opencode",
+    "fork",
+    "ai",
+    "orchestrator",
+    "multi-agent",
+    "multi-model",
+    "claude",
+    "openai",
+    "gemini",
+    "deepseek",
+    "ollama",
+    "cli"
+  ],
+  "author": "Daniel",
+  "license": "MIT"
+}

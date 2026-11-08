@@ -1,0 +1,70 @@
+export * as WorktreeGit from "./git.js"
+
+import { Effect } from "effect"
+import path from "path"
+import { Worktree } from "@opencode/schema/worktree"
+import { FSUtil } from "@opencode/util/fs-util"
+import { Git } from "../git.js"
+import { canonical, confirmedMissing, DirectoryUnavailableError } from "./directory.js"
+import type { Strategy } from "./strategies.js"
+
+export const make = Effect.gen(function* () {
+  const fs = yield* FSUtil.Service
+  const git = yield* Git.Service
+
+  return {
+    id: Worktree.StrategyID.make("git"),
+    create: Effect.fn("Worktree.Git.create")(function* (input) {
+      const repository = yield* git.repo.discover(input.sourceDirectory)
+      if (!repository) return yield* new DirectoryUnavailableError({ directory: input.sourceDirectory })
+      yield* git.worktree.create({ repository, directory: input.directory, ref: input.branch })
+      return { directory: yield* canonical(fs, input.directory) }
+    }),
+    remove: Effect.fn("Worktree.Git.remove")(function* (input) {
+      if (yield* fs.isDir(input.directory)) {
+        const repository = yield* git.repo.discover(input.directory)
+        if (!repository) return yield* new DirectoryUnavailableError({ directory: input.directory })
+        yield* git.worktree.remove({ repository, directory: input.directory, force: input.force })
+        return
+      }
+
+      // A linked worktree may have been removed outside the app. Its .git pointer
+      // is gone, so discover the owner only through registered project roots.
+      // Never prune the entire repository: that could affect unrelated worktrees.
+      const same = (left: string, right: string) => {
+        const normalized = (value: string) => path.normalize(value)
+        return process.platform === "win32"
+          ? normalized(left).toLowerCase() === normalized(right).toLowerCase()
+          : normalized(left) === normalized(right)
+      }
+      let checked = false
+      for (const source of input.sourceDirectories ?? []) {
+        if (!(yield* fs.isDir(source))) continue
+        const repository = yield* git.repo.discover(source)
+        if (!repository) continue
+        checked = true
+        const listed = yield* git.worktree.list(repository)
+        if (!listed.some((entry) => entry.kind === "linked" && same(entry.directory, input.directory))) continue
+        // git worktree remove also removes a stale registered link whose
+        // physical directory is already absent. Never force an existing checkout.
+        if (!(yield* confirmedMissing(input.directory)))
+          return yield* new DirectoryUnavailableError({ directory: input.directory })
+        yield* git.worktree.remove({ repository, directory: input.directory, force: false })
+        return
+      }
+      if (!checked) return yield* new DirectoryUnavailableError({ directory: input.directory })
+      // Git already forgot this path; the caller can remove its stale DB row.
+    }),
+    list: Effect.fn("Worktree.Git.list")(function* (directory) {
+      const repository = yield* git.repo.discover(directory)
+      if (!repository) return yield* new DirectoryUnavailableError({ directory })
+      const entries = yield* git.worktree.list(repository)
+      return yield* Effect.forEach(entries, (entry) =>
+        canonical(fs, entry.directory).pipe(
+          Effect.map((directory) => ({ directory, type: entry.kind === "main" ? "root" : "worktree" }) as const),
+          Effect.catchTag("Worktree.DirectoryUnavailableError", () => Effect.undefined),
+        ),
+      ).pipe(Effect.map((items) => items.filter((item): item is Worktree.ListEntry => item !== undefined)))
+    }),
+  } satisfies Strategy
+})

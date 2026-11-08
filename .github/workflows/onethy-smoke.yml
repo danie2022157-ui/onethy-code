@@ -1,0 +1,184 @@
+name: onethy-smoke
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: onethy regressions (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      GITHUB_ACTIONS: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Windows install and global command smoke test (PowerShell 5.1)
+        if: runner.os == 'Windows'
+        shell: powershell
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $originalLocalAppData = $env:LOCALAPPDATA
+          $originalPath = $env:PATH
+          $sandbox = Join-Path $env:RUNNER_TEMP "onethy-installer-ci"
+          $env:LOCALAPPDATA = Join-Path $sandbox "AppData/Local"
+          $windowsApps = Join-Path $env:LOCALAPPDATA "Microsoft/WindowsApps"
+          try {
+            New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA | Out-Null
+            & ./install.ps1
+            if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw "Installer returned $LASTEXITCODE" }
+            foreach ($name in @("onethy.cmd", "onethy-code.cmd", "omni.cmd", "omnicode.cmd", "onethy.ps1", "onethy-config.json")) {
+              if (-not (Test-Path -LiteralPath (Join-Path $windowsApps $name) -PathType Leaf)) {
+                throw "Installer did not create $name"
+              }
+            }
+            $config = Get-Content -LiteralPath (Join-Path $windowsApps "onethy-config.json") -Raw | ConvertFrom-Json
+            if ([IO.Path]::GetFullPath($config.checkout) -ne [IO.Path]::GetFullPath((Get-Location).Path)) {
+              throw "Launcher checkout does not match repository"
+            }
+            $env:PATH = "$windowsApps;$originalPath"
+            $resolved = (Get-Command onethy -ErrorAction Stop).Source
+            if (-not $resolved.StartsWith($windowsApps, [StringComparison]::OrdinalIgnoreCase)) {
+              throw "onethy did not resolve from installed WindowsApps"
+            }
+            $output = & onethy --help 2>&1 | Out-String
+            $exitCode = $LASTEXITCODE
+            Write-Host $output
+            if ($exitCode -ne 0) { throw "onethy --help failed with exit code $exitCode" }
+            if ($output -notmatch 'onethy') { throw "onethy --help did not show OnethyCode CLI" }
+
+            # Reproduce a stale checkout saved by an older installer/update:
+            # the launcher pointed at duplicated "onethy-code" directory names.
+            $actualRoot = (Get-Location).Path
+            $config.checkout = Join-Path (Join-Path $actualRoot "onethy-code") "onethy-code"
+            [System.IO.File]::WriteAllText(
+              (Join-Path $windowsApps "onethy-config.json"),
+              ($config | ConvertTo-Json -Compress),
+              [System.Text.UTF8Encoding]::new($false)
+            )
+            $elsewhere = Join-Path $sandbox "unrelated-project"
+            New-Item -ItemType Directory -Force -Path $elsewhere | Out-Null
+            Push-Location $elsewhere
+            try {
+              $fixedOutput = & onethy --help 2>&1 | Out-String
+              $fixedCode = $LASTEXITCODE
+            } finally {
+              Pop-Location
+            }
+            Write-Host $fixedOutput
+            if ($fixedCode -ne 0) { throw "Stale-checkout repair failed with exit code $fixedCode" }
+            # Console.WriteLine from a nested .cmd/.ps1 may go directly to the
+            # runner log rather than the PowerShell pipeline variable.
+            # Assert the durable repaired config instead of relying on capture.
+            $fixed = Get-Content -LiteralPath (Join-Path $windowsApps "onethy-config.json") -Raw | ConvertFrom-Json
+            if ([IO.Path]::GetFullPath($fixed.checkout) -ne [IO.Path]::GetFullPath($actualRoot)) {
+              throw "Launcher did not persist the repaired checkout root"
+            }
+            # Subsequent launches must not repeat the repair.
+            $secondOutput = & onethy --help 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) { throw "Second launch after repair failed" }
+            if ($secondOutput -match 'Repaired stale checkout path') { throw "Path repair repeated" }
+          } finally {
+            $env:LOCALAPPDATA = $originalLocalAppData
+            $env:PATH = $originalPath
+            Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Native Antigravity /connect registration (real plugin, no login)
+        run: bun script/onethy-antigravity-connect-smoke.mjs
+
+      - name: Immutable package archive and exact plugin version regressions
+        run: |
+          bun --cwd packages/core test test/npm.test.ts -t "recognizes immutable GitHub"
+          bun --cwd packages/plugin test test/host.test.ts -t "uses the exact installed package revision"
+
+      - name: Unified Core, TUI, server logs, filters and redaction
+        run: |
+          bun --cwd packages/core test test/onethy-debug-logs.test.ts
+          bun run --cwd packages/cli src/index.ts debug logs --lines 5
+          bun run --cwd packages/cli src/index.ts debug logs --source tui --level DEBUG --lines 5
+
+      - name: Core regression tests
+        run: bun --cwd packages/core test test/omni-config.test.ts test/omni-memory-bank.test.ts test/omni-session.test.ts test/omni-model-selection.test.ts test/model-failover.test.ts test/onethy-agent-compat.test.ts test/specialist-router.test.ts test/omni-orchestrator.test.ts test/omni-mission-control.test.ts test/omni-intelligence.test.ts test/agent-desktop.test.ts test/antigravity-native.test.ts test/omni-task-graph.test.ts test/omni-embeddings.test.ts test/codemode/catalog.test.ts test/embedding-index.test.ts test/efficiency-profile.test.ts test/efficiency-benchmark.test.ts test/model-outcomes.test.ts test/memory-retrieval.test.ts test/session-generate.test.ts test/session-stats.test.ts test/tool-output.test.ts test/instructions/builtins.test.ts
+
+      - name: Stale worktree deletion regression (Git, Windows and Linux)
+        run: |
+          bun --cwd packages/core test test/worktree.test.ts -t "removes a tracked linked Git worktree"
+          bun --cwd packages/core test test/worktree.test.ts -t "refuses to delete unregistered paths"
+          bun --cwd packages/core test test/worktree.test.ts -t "forgets a stale database entry"
+
+      - name: Real SessionRunner 429 failover regression
+        run: bun --cwd packages/core test test/session-runner.test.ts -t "Auto-Failover retries real pre-output 429"
+
+      - name: Real Antigravity quota recovery regression (Windows and Ubuntu)
+        run: bun --cwd packages/core test test/session-runner.test.ts -t "Auto-Failover recovers an Antigravity 429"
+
+      - name: Statusless usage quota classification regression
+        run: bun --cwd packages/ai test test/provider-error.test.ts -t "recognizes an exhausted usage allowance"
+
+      - name: Statusless quota cross-provider session regression
+        run: bun --cwd packages/core test test/session-runner.test.ts -t "Auto-Failover switches to another provider on statusless"
+
+      - name: DNS cross-provider session regression
+        run: bun --cwd packages/core test test/session-runner.test.ts -t "Auto-Failover switches to another provider on unsent DNS failure"
+
+      - name: Plugin retry veto policy regression
+        run: bun --cwd packages/core test test/session-runner.test.ts -t "a plugin cannot re-enable a forbidden retry"
+
+      - name: Omni Auto stale-provider allowlist regression
+        run: bun --cwd packages/tui test test/util/auto-model-allowlist.test.ts
+
+      - name: MCP configuration and connectivity regressions
+        run: bun --cwd packages/core test test/config/normalization.test.ts test/mcp.test.ts test/mcp-lifecycle.test.ts test/mcp-usage.test.ts test/mcp-catalog-cache.test.ts test/omni-mcp-autonomy.test.ts
+
+      - name: Subagent integration tests
+        run: bun --cwd packages/core test test/tool-subagent.test.ts
+
+      - name: TUI regression tests
+        run: bun --cwd packages/tui test test/cli/tui/dialog-mcp.test.tsx test/cli/tui/plugins-dialog.test.tsx test/component/dialog-omni-update.test.tsx test/component/dialog-memory-bank.test.tsx test/util/onethy-update.test.ts test/util/onethy-projects.test.ts test/util/mcp-diagnostics.test.ts test/component/dialog-projects.test.tsx test/component/dialog-desktop.test.tsx test/component/review-bar-session.test.ts
+
+      - name: Core TypeScript check
+        if: runner.os == 'Linux'
+        run: bun --cwd packages/core run typecheck:tsc
+
+      - name: MCP CLI configuration regression
+        run: bun --cwd packages/cli test test/mcp-config-path.test.ts test/mcp-auth-choices.test.ts test/mcp-management.test.ts
+
+      - name: CLI TypeScript check
+        if: runner.os == 'Linux'
+        run: bun --cwd packages/cli run typecheck:tsc
+
+      - name: TUI TypeScript check
+        if: runner.os == 'Linux'
+        run: bun --cwd packages/tui run typecheck:tsc

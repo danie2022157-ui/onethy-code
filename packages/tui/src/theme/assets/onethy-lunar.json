@@ -1,0 +1,221 @@
+{
+  "$schema": "https://opencode.ai/theme.json",
+  "defs": {
+    "lunarVoid": "#030714",
+    "lunarPanel": "#080F24",
+    "lunarElement": "#0F1A3A",
+    "lunarBorder": "#1B2A52",
+    "starlightCyan": "#38BDF8",
+    "starlightIce": "#E0E7FF",
+    "lunarLavender": "#C084FC",
+    "lunarPurple": "#9333EA",
+    "moonGlow": "#F1F5F9",
+    "coralPink": "#FB7185",
+    "softMint": "#34D399",
+    "paleGold": "#FBBF24",
+    "skyMuted": "#94A3B8",
+    "skyDim": "#64748B"
+  },
+  "theme": {
+    "primary": {
+      "dark": "starlightCyan",
+      "light": "#0284C7"
+    },
+    "secondary": {
+      "dark": "lunarLavender",
+      "light": "#7C3AED"
+    },
+    "accent": {
+      "dark": "starlightIce",
+      "light": "#6366F1"
+    },
+    "error": {
+      "dark": "coralPink",
+      "light": "#E11D48"
+    },
+    "warning": {
+      "dark": "paleGold",
+      "light": "#D97706"
+    },
+    "success": {
+      "dark": "softMint",
+      "light": "#059669"
+    },
+    "info": {
+      "dark": "starlightCyan",
+      "light": "#0284C7"
+    },
+    "text": {
+      "dark": "moonGlow",
+      "light": "#0F172A"
+    },
+    "textMuted": {
+      "dark": "skyMuted",
+      "light": "#64748B"
+    },
+    "background": {
+      "dark": "lunarVoid",
+      "light": "#F8FAFC"
+    },
+    "backgroundPanel": {
+      "dark": "lunarPanel",
+      "light": "#F1F5F9"
+    },
+    "backgroundElement": {
+      "dark": "lunarElement",
+      "light": "#E2E8F0"
+    },
+    "border": {
+      "dark": "lunarBorder",
+      "light": "#CBD5E1"
+    },
+    "borderActive": {
+      "dark": "starlightCyan",
+      "light": "#0284C7"
+    },
+    "borderSubtle": {
+      "dark": "#0A132C",
+      "light": "#E2E8F0"
+    },
+    "diffAdded": {
+      "dark": "softMint",
+      "light": "#059669"
+    },
+    "diffRemoved": {
+      "dark": "coralPink",
+      "light": "#E11D48"
+    },
+    "diffContext": {
+      "dark": "skyMuted",
+      "light": "#64748B"
+    },
+    "diffHunkHeader": {
+      "dark": "lunarLavender",
+      "light": "#7C3AED"
+    },
+    "diffHighlightAdded": {
+      "dark": "#4ADE80",
+      "light": "#10B981"
+    },
+    "diffHighlightRemoved": {
+      "dark": "#F43F5E",
+      "light": "#E11D48"
+    },
+    "diffAddedBg": {
+      "dark": "#07281D",
+      "light": "#ECFDF5"
+    },
+    "diffRemovedBg": {
+      "dark": "#2B0B14",
+      "light": "#FFF1F2"
+    },
+    "diffContextBg": {
+      "dark": "lunarPanel",
+      "light": "#F8FAFC"
+    },
+    "diffLineNumber": {
+      "dark": "skyDim",
+      "light": "#94A3B8"
+    },
+    "diffAddedLineNumberBg": {
+      "dark": "#07281D",
+      "light": "#ECFDF5"
+    },
+    "diffRemovedLineNumberBg": {
+      "dark": "#2B0B14",
+      "light": "#FFF1F2"
+    },
+    "markdownText": {
+      "dark": "moonGlow",
+      "light": "#0F172A"
+    },
+    "markdownHeading": {
+      "dark": "starlightCyan",
+      "light": "#0284C7"
+    },
+    "markdownLink": {
+      "dark": "starlightCyan",
+      "light": "#0284C7"
+    },
+    "markdownLinkText": {
+      "dark": "lunarLavender",
+      "light": "#7C3AED"
+    },
+    "markdownCode": {
+      "dark": "softMint",
+      "light": "#059669"
+    },
+    "markdownBlockQuote": {
+      "dark": "skyMuted",
+      "light": "#64748B"
+    },
+    "markdownEmph": {
+      "dark": "paleGold",
+      "light": "#D97706"
+    },
+    "markdownStrong": {
+      "dark": "lunarLavender",
+      "light": "#7C3AED"
+    },
+    "markdownHorizontalRule": {
+      "dark": "starlightCyan",
+      "light": "#0284C7"
+    },
+    "markdownListItem": {
+      "dark": "starlightCyan",
+      "light": "#0284C7"
+    },
+    "markdownListEnumeration": {
+      "dark": "lunarLavender",
+      "light": "#7C3AED"
+    },
+    "markdownImage": {
+      "dark": "starlightCyan",
+      "light": "#0284C7"
+    },
+    "markdownImageText": {
+      "dark": "lunarLavender",
+      "light": "#7C3AED"
+    },
+    "markdownCodeBlock": {
+      "dark": "lunarPanel",
+      "light": "#F1F5F9"
+    },
+    "syntaxComment": {
+      "dark": "skyDim",
+      "light": "#94A3B8"
+    },
+    "syntaxKeyword": {
+      "dark": "lunarLavender",
+      "light": "#7C3AED"
+    },
+    "syntaxFunction": {
+      "dark": "starlightCyan",
+      "light": "#0284C7"
+    },
+    "syntaxVariable": {
+      "dark": "moonGlow",
+      "light": "#0F172A"
+    },
+    "syntaxString": {
+      "dark": "softMint",
+      "light": "#059669"
+    },
+    "syntaxNumber": {
+      "dark": "paleGold",
+      "light": "#D97706"
+    },
+    "syntaxType": {
+      "dark": "starlightIce",
+      "light": "#4F46E5"
+    },
+    "syntaxOperator": {
+      "dark": "coralPink",
+      "light": "#E11D48"
+    },
+    "syntaxPunctuation": {
+      "dark": "skyMuted",
+      "light": "#64748B"
+    }
+  }
+}

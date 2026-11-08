@@ -1,0 +1,39 @@
+# OnethyCode: integração Copilot (terminal)
+
+Este incremento reutiliza a arquitetura existente de serviços do OnethyCode. Não depende do VS Code e não incorpora código do Copilot.
+
+## Ferramenta nova: omni_intelligence
+
+Disponível para agentes quando OMNICODE_ACTIVE=1. A ferramenta tem as ações:
+
+- code: busca local lexical por intenção e tokens de identificadores, com caminhos e linhas. Funciona offline sem modelo.
+- semantic: **embeddings vetoriais reais locais** com Ollama em `127.0.0.1:11434` e modelo `nomic-embed-text`. Exige Ollama já instalado e modelo presente. Faz uma indexação limitada por consulta (até 350 arquivos Git), com cache em memória do processo. Falha explicitamente quando o Ollama não está disponível; não envia código para servidores externos.
+- tools: catálogo contextual das tools registradas, skills e MCPs conectados. Descobrir uma ferramenta não autoriza executá-la.
+- history: pesquisa nas conversas do próprio serviço de sessões (até 30 sessões recentes, 30 mensagens por sessão), além de .omnicode/sessions, missions, plans e memory-bank. A busca é limitada ao projeto atual e não cobre toda a conta.
+- review: mostra alterações staged e unstaged sem modificá-las. Arquivos untracked aparecem na lista, sem seu conteúdo no diff. Aprovação/rejeição é feita pela interface de revisão existente.
+- metrics: eventos recentes do barramento de agentes, estado de tarefas e somas dos registros de uso (tokens e custo em USD) até 30 sessões recentes e 50 mensagens por sessão. Não representa faturamento exato nem consumo em tempo real.
+
+Exemplos de solicitações ao agente:
+- "Use omni_intelligence action=code query='login do usuário' para achar a função de autenticação."
+- "Use omni_intelligence action=semantic query='onde a autenticação e sessão de usuário são validadas' para busca por embeddings locais."
+- "Use omni_intelligence action=tools query='automação no navegador' para localizar ferramentas disponíveis."
+- "Use omni_intelligence action=history query='decisão de arquitetura' para recuperar notas anteriores."
+- "Use omni_mission action=dispatch missionID=mission-123 maxParallel=3 isolateWorkers=true para executar os workers."
+- "Use omni_intelligence action=review antes de finalizar a implementação."
+- "Use omni_intelligence action=metrics missionID='mission-123' para verificar os eventos e tarefas."
+
+## Recursos existentes, preservados
+
+- Agentes e subagentes: ferramentas subagent, omni_mission e OmniOrchestrator.
+- Dependências reais: `omni_mission action=create` valida e persiste tarefas `id`, `title`, `assignedAgent`, `dependsOn`. `action=claim` reserva tarefas; `action=dispatch maxParallel=3 isolateWorkers=true` executa subagentes em paralelo e registra o retorno, liberando tarefas com pré-requisitos satisfeitos. São no máximo 40 rodadas por chamada, e há falha explícita caso um worker não termine.
+- Paralelismo: estágios paralelos planejados pelo orquestrador e sessões-filhas gerenciadas pelo serviço de jobs. A reserva de tarefa não equivale à execução.
+- Autocorreção: `omni_heal action=run_and_heal autoFix=true maxAttempts=3` delega a falha ao subagente `coder` e reexecuta os testes. Requer permissões para `shell` e `subagent`; não garante que toda falha possa ser corrigida. Sem `autoFix=true`, retorna diagnóstico sem editar.
+- Memória: omni_memory e OmniMemoryBank; escopos de projeto e global já existem.
+- Worktrees: `subagent worktree=true` cria Git worktree com infraestrutura nativa e move a nova sessão filha para lá, verificando a localização antes de programar. `ONETHY_AGENT_WORKTREES=1` ativa automaticamente para novos subagentes `coder` sob OMNICODE_ACTIVE. Requer permissões; worktrees não são apagadas automaticamente, pois as alterações exigem revisão. O caminho é informado no resultado.
+- Planejamento, políticas, aprovações e histórico: serviços nativos Plan, Permission, Session e Review UI.
+
+## Segurança e limites
+
+A busca lexical e a vetorial não seguem symlinks nem indexam .env, nomes de credenciais ou diretórios gerados conhecidos. A vetorial depende de Git para respeitar exclusões. Os limites são 1.200 arquivos e 8 MiB de texto por consulta, com 128 KiB por arquivo. Não há comando de shell dinâmico na busca. A revisão roda apenas git status e git diff com argumentos fixos. Nenhuma ação desta ferramenta concede permissões, executa ferramentas externas ou aprova mudanças.
+
+Para validar no checkout: `bun --cwd packages/core test test/omni-intelligence.test.ts test/omni-task-graph.test.ts test/omni-embeddings.test.ts`, `bun --cwd packages/core run typecheck:tsc` e suíte `onethy-smoke` em Linux e Windows. Há testes de utilitários e typecheck, mas o fluxo completo com modelos reais, subagentes e sessões/worktrees em múltiplos ambientes ainda exige testes de integração antes de produção. Relatório de subagente não substitui revisão independente e verificação por testes.

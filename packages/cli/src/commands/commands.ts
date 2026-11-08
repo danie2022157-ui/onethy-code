@@ -1,0 +1,645 @@
+import { Argument, Flag, GlobalFlag } from "effect/cli"
+import { Schema } from "effect"
+import { Spec } from "../framework/spec"
+import { Updater } from "../services/updater"
+
+export const PrintLogs = GlobalFlag.Setting("print-logs")({
+  flag: Flag.Boolean("print-logs").pipe(
+    Flag.withDescription("Print logs to stderr (server logs require --standalone)"),
+    Flag.withDefault(false),
+  ),
+})
+
+export const Standalone = GlobalFlag.Setting("standalone")({
+  flag: Flag.Boolean("standalone").pipe(
+    Flag.withDescription("Executar com servidor privado em vez do serviço em segundo plano"),
+    Flag.withDefault(false),
+  ),
+})
+
+export const Server = GlobalFlag.Setting("server")({
+  flag: Flag.String("server").pipe(
+    Flag.withDescription("Conectar a uma URL de servidor em vez do serviço em segundo plano"),
+    Flag.optional,
+  ),
+})
+
+const ServerFlags = [Standalone, Server] as const
+
+declare const OPENCODE_CLI_NAME: string | undefined
+
+const ServerParams = {
+  standalone: Standalone.flag,
+  server: Server.flag,
+}
+
+const PermissionParams = {
+  auto: Flag.Boolean("auto").pipe(
+    Flag.withDescription("Aprovar automaticamente permissões que não foram explicitamente negadas"),
+    Flag.withDefault(false),
+  ),
+  yolo: Flag.Boolean("yolo").pipe(Flag.withDefault(false), Flag.withHidden),
+  dangerouslySkipPermissions: Flag.Boolean("dangerously-skip-permissions").pipe(
+    Flag.withDefault(false),
+    Flag.withHidden,
+  ),
+}
+
+const isOmni = process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1";
+const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME : (isOmni ? "onethy" : "opencode"), {
+  description: "Interface de linha de comando do OnethyCode",
+  params: {
+    ...ServerParams,
+    ...PermissionParams,
+    directory: Argument.String("directory").pipe(
+      Argument.withDescription("Diretório para iniciar o OnethyCode"),
+      Argument.optional,
+    ),
+    continue: Flag.Boolean("continue").pipe(
+      Flag.withAlias("c"),
+      Flag.withDescription("Continuar a última sessão"),
+      Flag.withDefault(false),
+    ),
+    session: Flag.String("session").pipe(
+      Flag.withAlias("s"),
+      Flag.withDescription("ID da sessão para continuar, ou criar caso não exista"),
+      Flag.optional,
+    ),
+    prompt: Flag.String("prompt").pipe(Flag.withDescription("Prompt a ser executado"), Flag.optional),
+  },
+  commands: [
+    Spec.make("upgrade", {
+      description: "Atualizar o OnethyCode para a versão mais recente ou específica",
+      aliases: ["update"],
+      params: {
+        target: Argument.String("target").pipe(
+          Argument.withDescription("Version to upgrade to (with or without a leading v)"),
+          Argument.optional,
+        ),
+        method: Flag.Literals("method", Updater.methods).pipe(
+          Flag.withAlias("m"),
+          Flag.withDescription("Installation method to use"),
+          Flag.optional,
+        ),
+      },
+    }),
+    Spec.make("acp", {
+      description: "Iniciar um servidor Agent Client Protocol",
+      params: {
+        login: Flag.Boolean("login").pipe(
+          Flag.withDescription("Run auth login instead of starting the server"),
+          Flag.withDefault(false),
+        ),
+      },
+    }),
+    Spec.make("api", {
+      description: "Fazer uma requisição ao servidor em execução",
+      globalFlags: ServerFlags,
+      params: {
+        request: Argument.String("operation | method path").pipe(
+          Argument.withDescription("OpenAPI operation ID, or an HTTP method followed by a path"),
+          Argument.variadic({ min: 1, max: 2 }),
+        ),
+        data: Flag.String("data").pipe(Flag.withAlias("d"), Flag.withDescription("Request body"), Flag.optional),
+        header: Flag.String("header").pipe(
+          Flag.withAlias("H"),
+          Flag.withDescription("Request header in name:value form"),
+          Flag.atMost(100),
+        ),
+        param: Flag.KeyValuePair("param").pipe(Flag.withDescription("OpenAPI path or query parameter"), Flag.optional),
+      },
+    }),
+    Spec.make("debug", {
+      description: "Ferramentas de depuração e diagnóstico",
+      commands: [
+        Spec.make("agents", { description: "Listar todos os agentes", globalFlags: ServerFlags }),
+        Spec.make("config", { description: "Listar fontes de configuração", globalFlags: ServerFlags }),
+        Spec.make("heap-dump", {
+          description: "Write a heap snapshot of the running server and print its path",
+          globalFlags: [Server],
+          params: {
+            directory: Flag.String("directory").pipe(
+              Flag.withDescription("Directory to write the snapshot into instead of the server's log directory"),
+              Flag.optional,
+            ),
+          },
+        }),
+        Spec.make("logs", {
+          description: "Visualizar logs unificados de Core, TUI, servidor e plugins",
+          params: {
+            follow: Flag.Boolean("follow").pipe(Flag.withDescription("Acompanhar novas linhas (Ctrl+C para sair)"), Flag.withDefault(false)),
+            source: Flag.Literals("source", ["all", "cli", "tui", "server"]).pipe(Flag.withDefault("all")),
+            level: Flag.Literals("level", ["all", "DEBUG", "INFO", "WARN", "ERROR"]).pipe(Flag.withDefault("all")),
+            search: Flag.String("search").pipe(Flag.withDefault("")),
+            lines: Flag.Int("lines").pipe(Flag.withDescription("Quantidade de linhas (1 a 500)"), Flag.withDefault(150)),
+          },
+        }),
+        Spec.make("paths", {
+          description: "Exibir caminhos globais (dados, configurações, cache, estado)",
+          params: {
+            name: Argument.Literals("name", [
+              "db",
+              "home",
+              "data",
+              "config",
+              "cache",
+              "state",
+              "tmp",
+              "bin",
+              "log",
+              "repos",
+            ]).pipe(
+              Argument.withDescription(
+                "Print only one path: db, home, data, config, cache, state, tmp, bin, log, repos",
+              ),
+              Argument.optional,
+            ),
+          },
+        }),
+      ],
+    }),
+    Spec.make("auth", {
+      description: "Gerenciar integrações e credenciais de provedores",
+      globalFlags: ServerFlags,
+      commands: [
+        Spec.make("list", {
+          description: "Listar integrações e credenciais salvas",
+          params: {
+            format: Flag.Literals("format", ["default", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("default"),
+            ),
+          },
+        }),
+        Spec.make("login", {
+          description: "Conectar uma integração / provedor",
+          params: {
+            target: Argument.String("target").pipe(
+              Argument.withDescription("Integration ID, name, or well-known provider URL"),
+              Argument.optional,
+            ),
+            method: Flag.String("method").pipe(Flag.withDescription("Authentication method ID"), Flag.optional),
+            answer: Flag.String("answer").pipe(
+              Flag.withDescription("Provider form answer (key=value; repeat for multiple fields)"),
+              Flag.atMost(100),
+            ),
+          },
+        }),
+        Spec.make("logout", {
+          description: "Desconectar de uma conta salva",
+          params: {
+            target: Argument.String("target").pipe(
+              Argument.withDescription("Integration ID or name"),
+              Argument.optional,
+            ),
+            credential: Argument.String("credential").pipe(
+              Argument.withDescription("Credential ID or label (opens an account picker when omitted)"),
+              Argument.optional,
+            ),
+          },
+        }),
+        Spec.make("export", {
+          description: "print stored credentials, including secrets, as JSON",
+          params: {
+            target: Argument.String("target").pipe(
+              Argument.withDescription("Integration ID or name (exports every integration when omitted)"),
+              Argument.optional,
+            ),
+          },
+        }),
+        Spec.make("import", {
+          description: "import credentials exported by auth export",
+          params: {
+            file: Argument.String("file").pipe(
+              Argument.withDescription("JSON file to import (reads stdin when omitted)"),
+              Argument.optional,
+            ),
+          },
+        }),
+        Spec.make("switch", {
+          description: "switch the active account for an integration",
+          params: {
+            target: Argument.String("target").pipe(
+              Argument.withDescription("Integration ID or name"),
+              Argument.optional,
+            ),
+            credential: Argument.String("credential").pipe(
+              Argument.withDescription("Credential ID or label (opens an account picker when omitted)"),
+              Argument.optional,
+            ),
+          },
+        }),
+      ],
+    }),
+    Spec.make("mcp", {
+      description: "Gerenciar servidores MCP (Model Context Protocol)",
+      commands: [
+        Spec.make("list", {
+          description: "Listar servidores MCP configurados e seus status",
+          globalFlags: ServerFlags,
+        }),
+        Spec.make("doctor", {
+          description: "Diagnosticar MCPs desconectados e opcionalmente repetir conexões com falha",
+          globalFlags: ServerFlags,
+          params: {
+            retry: Flag.Boolean("retry").pipe(
+              Flag.withDescription("Retry failed MCP connections; never enables disabled servers or bypasses OAuth"),
+              Flag.withDefault(false),
+            ),
+            enable: Flag.String("enable").pipe(
+              Flag.withDescription("Approve and persistently enable one named MCP server in project config"),
+              Flag.optional,
+            ),
+          },
+        }),
+        Spec.make("add", {
+          description: "Adicionar um servidor MCP à configuração",
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Name of the MCP server")),
+            command: Argument.String("command").pipe(
+              Argument.withDescription("Command and arguments for a local server, passed after --"),
+              Argument.variadic({ min: 0 }),
+            ),
+            url: Flag.String("url").pipe(Flag.withDescription("URL for a remote MCP server"), Flag.optional),
+            header: Flag.KeyValuePair("header").pipe(
+              Flag.withDescription("HTTP header for a remote server, as name=value"),
+              Flag.optional,
+            ),
+            env: Flag.KeyValuePair("env").pipe(
+              Flag.withDescription("Environment variable for a local server, as name=value"),
+              Flag.optional,
+            ),
+            global: Flag.Boolean("global").pipe(
+              Flag.withDescription("Write to the global config instead of the project config"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
+        Spec.make("manage", {
+          description: "Abrir menu interativo para gerenciar MCPs nativos e personalizados",
+          params: {
+            global: Flag.Boolean("global").pipe(
+              Flag.withDescription("Gerenciar os servidores da configuração global"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
+        Spec.make("enable", {
+          description: "Ativar um MCP persistindo a autorização no escopo selecionado",
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Nome do servidor MCP")),
+            global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
+          },
+        }),
+        Spec.make("disable", {
+          description: "Desativar um MCP sem excluir sua configuração",
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Nome do servidor MCP")),
+            global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
+          },
+        }),
+        Spec.make("remove", {
+          description: "Excluir um MCP no escopo do projeto ou global (com confirmação)",
+          aliases: ["delete"],
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Nome do servidor MCP")),
+            global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
+            yes: Flag.Boolean("yes").pipe(
+              Flag.withAlias("y"),
+              Flag.withDescription("Confirmar exclusão em execução não interativa"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
+        Spec.make("restore", {
+          description: "Restaurar um MCP nativo, ou todos os oito com --all",
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Nome do MCP nativo"), Argument.optional),
+            all: Flag.Boolean("all").pipe(Flag.withDefault(false)),
+            global: Flag.Boolean("global").pipe(Flag.withDefault(false)),
+            yes: Flag.Boolean("yes").pipe(
+              Flag.withAlias("y"),
+              Flag.withDescription("Confirmar redefinição de todos os MCPs"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
+        Spec.make("auth", {
+          description: "Authenticate with an OAuth-capable remote MCP server",
+          globalFlags: ServerFlags,
+          params: {
+            name: Argument.String("name").pipe(Argument.withDescription("Name of the MCP server"), Argument.optional),
+          },
+        }),
+        Spec.make("logout", {
+          description: "Remove stored OAuth credentials for an MCP server",
+          globalFlags: ServerFlags,
+          params: { name: Argument.String("name").pipe(Argument.withDescription("Name of the MCP server")) },
+        }),
+      ],
+    }),
+    Spec.make("plugin", {
+      description: "Gerenciar plugins",
+      commands: [
+        Spec.make("list", {
+          description: "Listar plugins instalados",
+          globalFlags: ServerFlags,
+          params: {
+            builtin: Flag.Boolean("builtin").pipe(
+              Flag.withDescription("Include built-in server plugins"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
+        Spec.make("add", {
+          description: "Instalar um plugin e adicioná-lo à configuração global",
+          params: {
+            package: Argument.String("package").pipe(Argument.withDescription("npm registry or Git package specifier")),
+          },
+        }),
+        Spec.make("check", {
+          description: "Check package plugins for updates",
+          globalFlags: ServerFlags,
+          params: {
+            target: Argument.String("target").pipe(
+              Argument.withDescription("Configured package target"),
+              Argument.optional,
+            ),
+          },
+        }),
+        Spec.make("update", {
+          description: "Update package plugins",
+          globalFlags: ServerFlags,
+          params: {
+            target: Argument.String("target").pipe(
+              Argument.withDescription("Configured package target; omit to update all outdated plugins"),
+              Argument.optional,
+            ),
+          },
+        }),
+        Spec.make("remove", {
+          description: "Remover um plugin da configuração global",
+          params: {
+            package: Argument.String("package").pipe(Argument.withDescription("configured package specifier")),
+          },
+        }),
+      ],
+    }),
+    Spec.make("models", {
+      description: "Listar todos os modelos disponíveis",
+      globalFlags: ServerFlags,
+    }),
+    Spec.make("stats", {
+      description: "Exibir estatísticas de uso",
+      globalFlags: ServerFlags,
+      params: {
+        days: Flag.Int("days").pipe(
+          Flag.withSchema(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+          Flag.withDescription("Show the last N days; 0 means today"),
+          Flag.optional,
+        ),
+        year: Flag.Int("year").pipe(
+          Flag.withSchema(Schema.Int.check(Schema.isBetween({ minimum: 1970, maximum: 9_999 }))),
+          Flag.withDescription("Show a calendar year"),
+          Flag.optional,
+        ),
+        all: Flag.Boolean("all").pipe(Flag.withDescription("Show lifetime statistics"), Flag.withDefault(false)),
+        project: Flag.String("project").pipe(
+          Flag.withDescription('Filter by project ID, or use "." for the current project'),
+          Flag.optional,
+        ),
+        models: Flag.Boolean("models").pipe(Flag.withDescription("Show model usage"), Flag.withDefault(false)),
+        tools: Flag.Boolean("tools").pipe(Flag.withDescription("Show tool reliability"), Flag.withDefault(false)),
+        cost: Flag.Boolean("cost").pipe(Flag.withDescription("Show cost and token details"), Flag.withDefault(false)),
+        full: Flag.Boolean("full").pipe(Flag.withDescription("Show every detailed section"), Flag.withDefault(false)),
+        limit: Flag.Int("limit").pipe(
+          Flag.withSchema(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
+          Flag.withDescription("Number of rows in detailed sections"),
+          Flag.withDefault(5),
+        ),
+        json: Flag.Boolean("json").pipe(Flag.withDescription("Output statistics as JSON"), Flag.withDefault(false)),
+      },
+    }),
+    Spec.make("mini", {
+      description: "Iniciar a interface interativa minimalista",
+      globalFlags: ServerFlags,
+      params: {
+        continue: Flag.Boolean("continue").pipe(
+          Flag.withAlias("c"),
+          Flag.withDescription("Continuar a última sessão"),
+          Flag.withDefault(false),
+        ),
+        session: Flag.String("session").pipe(
+          Flag.withAlias("s"),
+          Flag.withDescription("ID da sessão para continuar, ou criar caso não exista"),
+          Flag.optional,
+        ),
+        fork: Flag.Boolean("fork").pipe(
+          Flag.withDescription("Fork the session when continuing"),
+          Flag.withDefault(false),
+        ),
+        replay: Flag.Boolean("replay").pipe(
+          Flag.withDescription("Restore session history on resume and resize (disable with --no-replay)"),
+          Flag.optional,
+        ),
+        replayLimit: Flag.Int("replay-limit").pipe(
+          Flag.withDescription("Limit replay to the newest N messages (default: 200)"),
+          Flag.optional,
+        ),
+        model: Flag.String("model").pipe(
+          Flag.withAlias("m"),
+          Flag.withDescription("Model to use in the format provider/model"),
+          Flag.optional,
+        ),
+        agent: Flag.String("agent").pipe(Flag.withDescription("Agent to use"), Flag.optional),
+        prompt: Flag.String("prompt").pipe(Flag.withDescription("Prompt a ser executado"), Flag.optional),
+        demo: Flag.Boolean("demo").pipe(Flag.withDefault(false), Flag.withHidden),
+      },
+    }),
+    Spec.make("run", {
+      description: "Executar o OmniCode com uma mensagem",
+      globalFlags: ServerFlags,
+      params: {
+        message: Argument.String("message").pipe(
+          Argument.withDescription("Message to send"),
+          Argument.variadic({ min: 0 }),
+        ),
+        continue: Flag.Boolean("continue").pipe(
+          Flag.withAlias("c"),
+          Flag.withDescription("Continuar a última sessão"),
+          Flag.withDefault(false),
+        ),
+        session: Flag.String("session").pipe(
+          Flag.withAlias("s"),
+          Flag.withDescription("ID da sessão para continuar, ou criar caso não exista"),
+          Flag.optional,
+        ),
+        fork: Flag.Boolean("fork").pipe(
+          Flag.withDescription("Fork the session before continuing"),
+          Flag.withDefault(false),
+        ),
+        model: Flag.String("model").pipe(
+          Flag.withAlias("m"),
+          Flag.withDescription("Model to use in the format provider/model#variant"),
+          Flag.optional,
+        ),
+        agent: Flag.String("agent").pipe(Flag.withDescription("Agent to use"), Flag.optional),
+        format: Flag.Literals("format", ["default", "json"]).pipe(
+          Flag.withDescription("Output format"),
+          Flag.withDefault("default"),
+        ),
+        file: Flag.String("file").pipe(
+          Flag.withAlias("f"),
+          Flag.withDescription("File to attach to the message"),
+          Flag.atMost(100),
+        ),
+        title: Flag.String("title").pipe(Flag.withDescription("Session title"), Flag.optional),
+        thinking: Flag.Boolean("thinking").pipe(Flag.withDescription("Show thinking blocks"), Flag.withDefault(false)),
+        ...PermissionParams,
+      },
+    }),
+    Spec.make("session", {
+      description: "Gerenciar sessões",
+      globalFlags: ServerFlags,
+      commands: [
+        Spec.make("list", {
+          description: "List top-level sessions in the current project, newest first",
+          params: {
+            maxCount: Flag.Int("max-count").pipe(
+              Flag.withAlias("n"),
+              Flag.withSchema(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
+              Flag.withDescription("Limit to N most recent sessions (default: 100)"),
+              Flag.optional,
+            ),
+            format: Flag.Literals("format", ["table", "json"]).pipe(
+              Flag.withDescription("Output format"),
+              Flag.withDefault("table"),
+            ),
+          },
+        }),
+        Spec.make("delete", {
+          description: "Delete a session and its child sessions",
+          params: {
+            sessionID: Argument.String("sessionID").pipe(Argument.withDescription("Session ID to delete")),
+          },
+        }),
+        Spec.make("export", {
+          description: "Export session data as JSON",
+          params: {
+            session: Argument.String("session").pipe(
+              Argument.withDescription("Session ID to export"),
+              Argument.optional,
+            ),
+            sanitize: Flag.Boolean("sanitize").pipe(
+              Flag.withDescription("Redact sensitive transcript and file data"),
+              Flag.withDefault(false),
+            ),
+          },
+        }),
+        Spec.make("import", {
+          description: "Import session data from a JSON file or URL",
+          params: {
+            file: Argument.String("file").pipe(Argument.withDescription("JSON file or URL to import")),
+            directory: Flag.String("directory").pipe(
+              Flag.withDescription("Directory in which to import the session"),
+              Flag.optional,
+            ),
+          },
+        }),
+      ],
+    }),
+    Spec.make("service", {
+      description: "Gerenciar o servidor em segundo plano",
+      commands: [
+        Spec.make("start", { description: "Start the background server" }),
+        Spec.make("restart", { description: "Restart the background server" }),
+        Spec.make("status", { description: "Show background server status" }),
+        Spec.make("stop", { description: "Stop the background server" }),
+        Spec.make("get", {
+          description: "Get service configuration",
+          params: {
+            key: Argument.String("key").pipe(Argument.withDescription("Service setting or env"), Argument.optional),
+            name: Argument.String("name").pipe(
+              Argument.withDescription("Environment variable name"),
+              Argument.optional,
+            ),
+          },
+        }),
+        Spec.make("set", {
+          description: "Set service configuration",
+          params: {
+            key: Argument.String("key").pipe(Argument.withDescription("Service setting or env")),
+            value: Argument.String("value").pipe(
+              Argument.withDescription("Setting value or environment variable name"),
+            ),
+            nestedValue: Argument.String("env-value").pipe(
+              Argument.withDescription("Environment variable value"),
+              Argument.optional,
+            ),
+          },
+        }),
+        Spec.make("unset", {
+          description: "Unset service configuration",
+          params: {
+            key: Argument.String("key").pipe(Argument.withDescription("Service setting or env")),
+            name: Argument.String("name").pipe(
+              Argument.withDescription("Environment variable name"),
+              Argument.optional,
+            ),
+          },
+        }),
+      ],
+    }),
+    Spec.make("reload", {
+      description: "Recarregar configurações",
+      globalFlags: ServerFlags,
+    }),
+    Spec.make("pair", {
+      description: "Exibir links de pareamento para conectar navegador ou app",
+      params: {
+        url: Flag.String("url").pipe(
+          Flag.withDescription("Use an external HTTP(S) server URL in pairing links"),
+          Flag.mapTryCatch(
+            (value) => {
+              const url = new URL(value)
+              if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash)
+                throw new Error("Invalid pairing URL")
+              return url.href.replace(/\/+$/, "")
+            },
+            () => "Expected an HTTP(S) server URL without credentials, query parameters, or a fragment",
+          ),
+          Flag.optional,
+        ),
+        remote: Flag.Boolean("remote").pipe(
+          Flag.withDescription(
+            "Pair through the OpenTunnel remote address, enabling remote access if needed (exposes the server to the internet)",
+          ),
+          Flag.withDefault(false),
+        ),
+        yes: Flag.Boolean("yes").pipe(
+          Flag.withAlias("y"),
+          Flag.withDescription(
+            "Accept exposing the server to the internet when --remote enables remote access for the first time (required without an interactive terminal)",
+          ),
+          Flag.withDefault(false),
+        ),
+      },
+    }),
+    Spec.make("serve", {
+      description: "Iniciar o servidor v2 da API e web",
+      params: {
+        hostname: Flag.String("hostname").pipe(Flag.optional),
+        port: Flag.Int("port").pipe(Flag.optional),
+        cors: Flag.String("cors").pipe(
+          Flag.withSchema(Schema.NonEmptyString),
+          Flag.withDescription("Additional allowed CORS origin (repeat for multiple origins)"),
+          Flag.atLeast(0),
+        ),
+        service: Flag.Boolean("service").pipe(Flag.withDefault(false)),
+        stdio: Flag.Boolean("stdio").pipe(Flag.withDefault(false)),
+      },
+    }),
+  ],
+})
+
+export const Commands = Root

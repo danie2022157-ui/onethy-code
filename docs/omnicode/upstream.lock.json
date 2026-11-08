@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/anomalyco/opencode.git",
+  "tag": "v2.2.2",
+  "commit": "098aa7fd6e02b03d6fc410f0b052038c7d4c5e81",
+  "packageManager": "bun@1.4.4",
+  "license": "MIT",
+  "product": "OmniCode",
+  "affiliation": "Independent fork; not an official OpenCode distribution"
+}

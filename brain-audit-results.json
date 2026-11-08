@@ -1,0 +1,2048 @@
+{
+  "nestedYields": [
+    {
+      "file": "packages\\core\\src\\config\\plugin\\agent.ts",
+      "line": 56,
+      "code": "return yield* Effect.forEach(yield* config.entries(), loadEntry).pipe(Effect.map((documents) => documents.flat()))"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\command.ts",
+      "line": 39,
+      "code": "return yield* Effect.forEach(yield* config.entries(), loadEntry).pipe(Effect.map((documents) => documents.flat()))"
+    },
+    {
+      "file": "packages\\core\\src\\credential.ts",
+      "line": 75,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\database\\database.ts",
+      "line": 76,
+      "code": "const file = isAbsolute(filename) ? filename : join((yield* Global.Service).data, filename)"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 243,
+      "code": "return yield* this.mapCachedResult(yield* query, mapResult)"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 251,
+      "code": "return yield* this.mapCachedResult(yield* query, mapResult)"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 262,
+      "code": "return yield* this.mapCachedResult(yield* query, mapResult)"
+    },
+    {
+      "file": "packages\\core\\src\\database\\v1-migration.bun.ts",
+      "line": 502,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\database\\v1-migration.bun.ts",
+      "line": 546,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\git.ts",
+      "line": 632,
+      "code": "return yield* updateIndex({ ...input, changes: yield* listChanges(input.repository, input.scope) })"
+    },
+    {
+      "file": "packages\\core\\src\\git.ts",
+      "line": 914,
+      "code": "if (!(yield* isIndexUnreadable(input.repository))) return yield* error"
+    },
+    {
+      "file": "packages\\core\\src\\kv.ts",
+      "line": 39,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\models-dev.ts",
+      "line": 659,
+      "code": "Schema.decodeUnknownOption(CacheMeta)((yield* kv.get(metaKey)) ?? (yield* kv.get(key))),"
+    },
+    {
+      "file": "packages\\core\\src\\omni-bus.ts",
+      "line": 129,
+      "code": "const relevant = sessionID ? yield* listBySession(sessionID) : yield* list()"
+    },
+    {
+      "file": "packages\\core\\src\\permission\\saved.ts",
+      "line": 57,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\goal.ts",
+      "line": 77,
+      "code": "yield* replace(sessionID, goal, { ...goal, status, reason, updatedAt: yield* Clock.currentTimeMillis })"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\goal.ts",
+      "line": 268,
+      "code": "if (yield* FiberMap.has(timers, current)) return yield* watch(current)"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\snowflake-cortex.ts",
+      "line": 239,
+      "code": "yield* credentials.update(current.id, { value: yield* refresh(current.value).pipe(Effect.orDie) })"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\vcs\\git.ts",
+      "line": 119,
+      "code": "return yield* track(ctx, (yield* git.hasHead(ctx.directory)) ? \"HEAD\" : undefined, options)"
+    },
+    {
+      "file": "packages\\core\\src\\project.ts",
+      "line": 125,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\session\\background.ts",
+      "line": 18,
+      "code": "const owned = yield* Effect.filter(yield* jobs.runningBackground, (recovery) =>"
+    },
+    {
+      "file": "packages\\core\\src\\session\\compaction.ts",
+      "line": 253,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\session\\context.ts",
+      "line": 79,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\session\\execution.ts",
+      "line": 61,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\session\\history.ts",
+      "line": 157,
+      "code": "return yield* Effect.forEach(yield* SessionBlob.hydrate(db, yield* withParts(db, rows)), decodeMessageRow, {"
+    },
+    {
+      "file": "packages\\core\\src\\session\\history.ts",
+      "line": 167,
+      "code": "const kept = yield* SessionBlob.keepRefs(db, yield* withParts(db, rows))"
+    },
+    {
+      "file": "packages\\core\\src\\session\\history.ts",
+      "line": 206,
+      "code": "yield* SessionBlob.hydrate(db, yield* withParts(db, rows)),"
+    },
+    {
+      "file": "packages\\core\\src\\session\\history.ts",
+      "line": 262,
+      "code": "const kept = yield* Effect.forEach(yield* withParts(db, rows), decodeStoredRow, { concurrency: 1 })"
+    },
+    {
+      "file": "packages\\core\\src\\session\\inbox.ts",
+      "line": 184,
+      "code": "(yield* find(db, request.id)) ?? (yield* promotedFromMessage(db, request.sessionID, request.id, request.delivery))"
+    },
+    {
+      "file": "packages\\core\\src\\session\\inbox.ts",
+      "line": 437,
+      "code": "return (yield* SessionBlob.hydrateInbox(db, yield* listRows(db, sessionID))).map(fromRow)"
+    },
+    {
+      "file": "packages\\core\\src\\session\\inbox.ts",
+      "line": 445,
+      "code": "const kept = yield* SessionBlob.keepInboxRefs(db, yield* listRows(db, sessionID))"
+    },
+    {
+      "file": "packages\\core\\src\\session\\instruction-state.ts",
+      "line": 86,
+      "code": "yield* commit(db, bus, instructions, yield* observe(db, instructions, sessionID))"
+    },
+    {
+      "file": "packages\\core\\src\\session\\instructions.ts",
+      "line": 34,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\session\\projector.ts",
+      "line": 540,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\session\\revert.ts",
+      "line": 43,
+      "code": "? yield* snapshot.diff({ from: original, to: (yield* snapshot.capture()) ?? original, paths })"
+    },
+    {
+      "file": "packages\\core\\src\\session\\runner\\llm.ts",
+      "line": 51,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\session\\session.ts",
+      "line": 325,
+      "code": "if (input.resume !== false && !(yield* get(sessionID)).revert) yield* execution.wake(sessionID)"
+    },
+    {
+      "file": "packages\\core\\src\\session\\session.ts",
+      "line": 339,
+      "code": "if (yield* execution.isActive(sessionID)) return yield* new BusyError({ sessionID })"
+    },
+    {
+      "file": "packages\\core\\src\\session\\session.ts",
+      "line": 348,
+      "code": "if (yield* execution.isActive(sessionID)) return yield* new BusyError({ sessionID })"
+    },
+    {
+      "file": "packages\\core\\src\\session\\session.ts",
+      "line": 357,
+      "code": "if (yield* execution.isActive(sessionID)) return yield* new BusyError({ sessionID })"
+    },
+    {
+      "file": "packages\\core\\src\\session\\stats.ts",
+      "line": 81,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\session\\store.ts",
+      "line": 189,
+      "code": "return yield* SessionHistory.decodeMessageRows(db, yield* messageRows(input))"
+    },
+    {
+      "file": "packages\\core\\src\\session\\store.ts",
+      "line": 192,
+      "code": "return yield* SessionHistory.decodeMessageRowsWithRefs(db, yield* messageRows(input))"
+    },
+    {
+      "file": "packages\\core\\src\\session\\title.ts",
+      "line": 51,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\session.ts",
+      "line": 435,
+      "code": "if (!(yield* mediaBlob(session))) return yield* store.messages(input)"
+    },
+    {
+      "file": "packages\\core\\src\\session.ts",
+      "line": 441,
+      "code": "if (!(yield* mediaBlob(session.value))) return yield* result.message(input)"
+    },
+    {
+      "file": "packages\\core\\src\\session.ts",
+      "line": 463,
+      "code": "if (!(yield* mediaBlob(session))) return yield* result.inbox(sessionID)"
+    },
+    {
+      "file": "packages\\core\\src\\shell.ts",
+      "line": 198,
+      "code": "return yield* Deferred.await((yield* require(id)).done)"
+    },
+    {
+      "file": "packages\\core\\src\\vcs.ts",
+      "line": 179,
+      "code": "if (!(yield* fs.isDir(location.project.directory))) return yield* new InitializeError({ kind: \"missing\" })"
+    },
+    {
+      "file": "packages\\core\\src\\vcs.ts",
+      "line": 180,
+      "code": "if (yield* Project.root(fs, location.project.directory)) return yield* new InitializeError({ kind: \"conflict\" })"
+    },
+    {
+      "file": "packages\\core\\src\\websearch.ts",
+      "line": 174,
+      "code": "const provider = yield* defaultProvider(yield* selection())"
+    },
+    {
+      "file": "packages\\core\\src\\workspace.ts",
+      "line": 85,
+      "code": "const db = (yield* Database.Service).db"
+    },
+    {
+      "file": "packages\\core\\src\\workspace.ts",
+      "line": 269,
+      "code": "yield* Ref.set(connection.lastActivity, yield* Clock.currentTimeMillis)"
+    },
+    {
+      "file": "packages\\core\\src\\workspace.ts",
+      "line": 280,
+      "code": "yield* Ref.set(connection.lastActivity, yield* Clock.currentTimeMillis)"
+    },
+    {
+      "file": "packages\\core\\src\\worktree\\directory.ts",
+      "line": 14,
+      "code": "if (!(yield* fs.isDir(resolved))) return yield* new DirectoryUnavailableError({ directory: input })"
+    },
+    {
+      "file": "packages\\core\\src\\worktree.ts",
+      "line": 122,
+      "code": "if (!(yield* fs.isDir(directory))) return yield* new DirectoryUnavailableError({ directory })"
+    },
+    {
+      "file": "packages\\core\\src\\worktree.ts",
+      "line": 270,
+      "code": "yield* changed(input.projectID, yield* ops.remove(input.projectID, worktreeDirectory))"
+    }
+  ],
+  "starImports": [
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\effect-sqlite\\driver.ts",
+      "line": 2,
+      "code": "import * as Effect from \"effect/Effect\""
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\effect-sqlite\\driver.ts",
+      "line": 3,
+      "code": "import * as Layer from \"effect/Layer\""
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\effect-sqlite\\session.ts",
+      "line": 2,
+      "code": "import * as Context from \"effect/Context\""
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\effect-sqlite\\session.ts",
+      "line": 3,
+      "code": "import * as Effect from \"effect/Effect\""
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\effect-sqlite\\session.ts",
+      "line": 4,
+      "code": "import * as Exit from \"effect/Exit\""
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\effect-sqlite\\session.ts",
+      "line": 5,
+      "code": "import * as Scope from \"effect/Scope\""
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 2,
+      "code": "import * as Cause from \"effect/Cause\""
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 3,
+      "code": "import * as Effect from \"effect/Effect\""
+    }
+  ],
+  "aliasedImports": [
+    {
+      "file": "packages\\core\\src\\database\\v1-migration.bun.ts",
+      "line": 17,
+      "code": "import type { Database as SQLiteDatabase } from \"bun:sqlite\""
+    },
+    {
+      "file": "packages\\core\\src\\omni-config.ts",
+      "line": 8,
+      "code": "import { Path as GlobalPath } from \"@opencode/util/global\""
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\service.ts",
+      "line": 6,
+      "code": "import type { Plugin as PluginDefinition } from \"@opencode/plugin/effect/plugin\""
+    },
+    {
+      "file": "packages\\core\\src\\schedule\\check.ts",
+      "line": 5,
+      "code": "import type { Schedule as ScheduleSchema } from \"@opencode/schema/schedule\""
+    },
+    {
+      "file": "packages\\core\\src\\session\\stored.ts",
+      "line": 6,
+      "code": "import { UserPayload as InboxUserPayload } from \"@opencode/schema/session-inbox\""
+    }
+  ],
+  "inlineTypeImports": [
+    {
+      "file": "packages\\core\\src\\bus.ts",
+      "line": 196,
+      "code": "const { Location } = yield* Effect.promise(() => import(\"./location.js\"))"
+    },
+    {
+      "file": "packages\\core\\src\\bus.ts",
+      "line": 197,
+      "code": "const { SessionTable } = yield* Effect.promise(() => import(\"./session/sql.js\"))"
+    },
+    {
+      "file": "packages\\core\\src\\database\\v1-migration.bun.ts",
+      "line": 808,
+      "code": "const sqlite = yield* Effect.promise(() => import(\"bun:sqlite\"))"
+    },
+    {
+      "file": "packages\\core\\src\\filesystem\\fff.node.ts",
+      "line": 5,
+      "code": "const { FileFinder } = await import(\"@ff-labs/fff-node\").catch(() => ({ FileFinder: undefined }))"
+    },
+    {
+      "file": "packages\\core\\src\\image\\photon-normalize.ts",
+      "line": 12,
+      "code": "export type Photon = typeof import(\"@silvia-odwyer/photon-node\")"
+    },
+    {
+      "file": "packages\\core\\src\\image\\photon-normalize.ts",
+      "line": 41,
+      "code": "return await import(\"@silvia-odwyer/photon-node\")"
+    },
+    {
+      "file": "packages\\core\\src\\image\\photon.ts",
+      "line": 25,
+      "code": "const { Worker } = await import(\"node:worker_threads\")"
+    },
+    {
+      "file": "packages\\core\\src\\image.ts",
+      "line": 80,
+      "code": "try: () => import(\"./image/photon.js\"),"
+    },
+    {
+      "file": "packages\\core\\src\\mcp\\client.ts",
+      "line": 315,
+      "code": "const { McpOAuth } = yield* Effect.promise(() => import(\"./oauth.js\"))"
+    },
+    {
+      "file": "packages\\core\\src\\mcp\\index.ts",
+      "line": 232,
+      "code": "const { McpOAuth } = yield* Effect.promise(() => import(\"./oauth.js\"))"
+    },
+    {
+      "file": "packages\\core\\src\\mcp\\index.ts",
+      "line": 249,
+      "code": "const { McpOAuth } = yield* Effect.promise(() => import(\"./oauth.js\"))"
+    },
+    {
+      "file": "packages\\core\\src\\mcp\\index.ts",
+      "line": 460,
+      "code": "const { McpClient } = yield* Effect.promise(() => import(\"./client.js\"))"
+    },
+    {
+      "file": "packages\\core\\src\\mcp\\index.ts",
+      "line": 596,
+      "code": "const { McpClient } = yield* Effect.promise(() => import(\"./client.js\"))"
+    },
+    {
+      "file": "packages\\core\\src\\mcp\\oauth.ts",
+      "line": 360,
+      "code": "const { createServer } = yield* Effect.promise(() => import(\"node:http\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\chatgpt.ts",
+      "line": 113,
+      "code": "const { createServer } = yield* Effect.promise(() => import(\"node:http\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\chatgpt.ts",
+      "line": 470,
+      "code": "const { createRemoteJWKSet, jwtVerify } = await import(\"jose\")"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\digitalocean.ts",
+      "line": 52,
+      "code": "const { createServer } = yield* Effect.promise(() => import(\"node:http\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\github-copilot.ts",
+      "line": 275,
+      "code": "const mod = yield* Effect.promise(() => import(\"../../github-copilot/copilot-provider.js\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\gitlab.ts",
+      "line": 94,
+      "code": "const { discoverWorkflowModels } = await import(\"gitlab-ai-provider\")"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\gitlab.ts",
+      "line": 191,
+      "code": "const { createServer } = yield* Effect.promise(() => import(\"node:http\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\gitlab.ts",
+      "line": 306,
+      "code": "const mod = yield* Effect.promise(() => import(\"gitlab-ai-provider\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\gitlab.ts",
+      "line": 335,
+      "code": "const gitlab = yield* Effect.promise(() => import(\"gitlab-ai-provider\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\openai.ts",
+      "line": 68,
+      "code": "const { createServer } = yield* Effect.promise(() => import(\"node:http\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\poe.ts",
+      "line": 49,
+      "code": "const { createServer } = yield* Effect.promise(() => import(\"node:http\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\poe.ts",
+      "line": 50,
+      "code": "const { EventEmitter } = yield* Effect.promise(() => import(\"node:events\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\snowflake-cortex.ts",
+      "line": 114,
+      "code": "const { createServer } = yield* Effect.promise(() => import(\"node:http\"))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\snowflake-cortex.ts",
+      "line": 115,
+      "code": "const { EventEmitter } = yield* Effect.promise(() => import(\"node:events\"))"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 49,
+      "code": "[\"@opencode/ai/providers/alibaba\", () => import(\"@opencode/ai/providers/alibaba\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 50,
+      "code": "[\"@opencode/ai/providers/alibaba/chat\", () => import(\"@opencode/ai/providers/alibaba/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 51,
+      "code": "[\"@opencode/ai/providers/alibaba/messages\", () => import(\"@opencode/ai/providers/alibaba/messages\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 52,
+      "code": "[\"@opencode/ai/providers/alibaba/responses\", () => import(\"@opencode/ai/providers/alibaba/responses\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 53,
+      "code": "[\"@opencode/ai/providers/alibaba/images\", () => import(\"@opencode/ai/providers/alibaba/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 54,
+      "code": "[\"@opencode/ai/providers/amazon-bedrock\", () => import(\"@opencode/ai/providers/amazon-bedrock\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 55,
+      "code": "[\"@opencode/ai/providers/amazon-bedrock/mantle\", () => import(\"@opencode/ai/providers/amazon-bedrock/mantle\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 58,
+      "code": "() => import(\"@opencode/ai/providers/amazon-bedrock/mantle/chat\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 62,
+      "code": "() => import(\"@opencode/ai/providers/amazon-bedrock/mantle/messages\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 66,
+      "code": "() => import(\"@opencode/ai/providers/amazon-bedrock/mantle/responses\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 68,
+      "code": "[\"@opencode/ai/providers/anthropic\", () => import(\"@opencode/ai/providers/anthropic\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 69,
+      "code": "[\"@opencode/ai/providers/anthropic-compatible\", () => import(\"@opencode/ai/providers/anthropic-compatible\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 70,
+      "code": "[\"@opencode/ai/providers/azure\", () => import(\"@opencode/ai/providers/azure\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 71,
+      "code": "[\"@opencode/ai/providers/azure/chat\", () => import(\"@opencode/ai/providers/azure/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 72,
+      "code": "[\"@opencode/ai/providers/azure/responses\", () => import(\"@opencode/ai/providers/azure/responses\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 73,
+      "code": "[\"@opencode/ai/providers/azure/images\", () => import(\"@opencode/ai/providers/azure/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 74,
+      "code": "[\"@opencode/ai/providers/baseten\", () => import(\"@opencode/ai/providers/baseten\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 75,
+      "code": "[\"@opencode/ai/providers/baseten/decisions\", () => import(\"@opencode/ai/providers/baseten/decisions\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 76,
+      "code": "[\"@opencode/ai/providers/cerebras\", () => import(\"@opencode/ai/providers/cerebras\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 77,
+      "code": "[\"@opencode/ai/providers/cloudflare-ai-gateway\", () => import(\"@opencode/ai/providers/cloudflare-ai-gateway\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 80,
+      "code": "() => import(\"@opencode/ai/providers/cloudflare-ai-gateway/decisions\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 82,
+      "code": "[\"@opencode/ai/providers/cloudflare-workers-ai\", () => import(\"@opencode/ai/providers/cloudflare-workers-ai\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 85,
+      "code": "() => import(\"@opencode/ai/providers/cloudflare-workers-ai/decisions\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 89,
+      "code": "() => import(\"@opencode/ai/providers/cloudflare-workers-ai/images\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 91,
+      "code": "[\"@opencode/ai/providers/cohere\", () => import(\"@opencode/ai/providers/cohere\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 92,
+      "code": "[\"@opencode/ai/providers/cohere/chat\", () => import(\"@opencode/ai/providers/cohere/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 93,
+      "code": "[\"@opencode/ai/providers/deepinfra\", () => import(\"@opencode/ai/providers/deepinfra\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 94,
+      "code": "[\"@opencode/ai/providers/deepseek\", () => import(\"@opencode/ai/providers/deepseek\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 95,
+      "code": "[\"@opencode/ai/providers/digitalocean\", () => import(\"@opencode/ai/providers/digitalocean\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 96,
+      "code": "[\"@opencode/ai/providers/digitalocean/decisions\", () => import(\"@opencode/ai/providers/digitalocean/decisions\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 97,
+      "code": "[\"@opencode/ai/providers/digitalocean/images\", () => import(\"@opencode/ai/providers/digitalocean/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 98,
+      "code": "[\"@opencode/ai/providers/digitalocean/responses\", () => import(\"@opencode/ai/providers/digitalocean/responses\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 99,
+      "code": "[\"@opencode/ai/providers/fireworks\", () => import(\"@opencode/ai/providers/fireworks\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 100,
+      "code": "[\"@opencode/ai/providers/google\", () => import(\"@opencode/ai/providers/google\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 101,
+      "code": "[\"@opencode/ai/providers/google/interactions\", () => import(\"@opencode/ai/providers/google/interactions\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 102,
+      "code": "[\"@opencode/ai/providers/google/images\", () => import(\"@opencode/ai/providers/google/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 103,
+      "code": "[\"@opencode/ai/providers/google-vertex\", () => import(\"@opencode/ai/providers/google-vertex\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 104,
+      "code": "[\"@opencode/ai/providers/google-vertex/chat\", () => import(\"@opencode/ai/providers/google-vertex/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 105,
+      "code": "[\"@opencode/ai/providers/google-vertex/gemini\", () => import(\"@opencode/ai/providers/google-vertex/gemini\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 108,
+      "code": "() => import(\"@opencode/ai/providers/google-vertex/interactions\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 110,
+      "code": "[\"@opencode/ai/providers/google-vertex/messages\", () => import(\"@opencode/ai/providers/google-vertex/messages\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 111,
+      "code": "[\"@opencode/ai/providers/google-vertex/mistral\", () => import(\"@opencode/ai/providers/google-vertex/mistral\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 112,
+      "code": "[\"@opencode/ai/providers/google-vertex/responses\", () => import(\"@opencode/ai/providers/google-vertex/responses\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 113,
+      "code": "[\"@opencode/ai/providers/google-vertex/images\", () => import(\"@opencode/ai/providers/google-vertex/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 114,
+      "code": "[\"@opencode/ai/providers/google-vertex-messages\", () => import(\"@opencode/ai/providers/google-vertex-messages\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 115,
+      "code": "[\"@opencode/ai/providers/groq\", () => import(\"@opencode/ai/providers/groq\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 116,
+      "code": "[\"@opencode/ai/providers/meta\", () => import(\"@opencode/ai/providers/meta\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 117,
+      "code": "[\"@opencode/ai/providers/meta/chat\", () => import(\"@opencode/ai/providers/meta/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 118,
+      "code": "[\"@opencode/ai/providers/meta/images\", () => import(\"@opencode/ai/providers/meta/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 119,
+      "code": "[\"@opencode/ai/providers/meta/messages\", () => import(\"@opencode/ai/providers/meta/messages\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 120,
+      "code": "[\"@opencode/ai/providers/meta/responses\", () => import(\"@opencode/ai/providers/meta/responses\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 121,
+      "code": "[\"@opencode/ai/providers/minimax\", () => import(\"@opencode/ai/providers/minimax\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 122,
+      "code": "[\"@opencode/ai/providers/minimax/chat\", () => import(\"@opencode/ai/providers/minimax/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 123,
+      "code": "[\"@opencode/ai/providers/minimax/images\", () => import(\"@opencode/ai/providers/minimax/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 124,
+      "code": "[\"@opencode/ai/providers/minimax/messages\", () => import(\"@opencode/ai/providers/minimax/messages\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 125,
+      "code": "[\"@opencode/ai/providers/minimax/responses\", () => import(\"@opencode/ai/providers/minimax/responses\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 126,
+      "code": "[\"@opencode/ai/providers/mistral\", () => import(\"@opencode/ai/providers/mistral\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 127,
+      "code": "[\"@opencode/ai/providers/moonshot\", () => import(\"@opencode/ai/providers/moonshot\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 128,
+      "code": "[\"@opencode/ai/providers/moonshot/chat\", () => import(\"@opencode/ai/providers/moonshot/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 129,
+      "code": "[\"@opencode/ai/providers/moonshot/messages\", () => import(\"@opencode/ai/providers/moonshot/messages\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 130,
+      "code": "[\"@opencode/ai/providers/moonshot/responses\", () => import(\"@opencode/ai/providers/moonshot/responses\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 131,
+      "code": "[\"@opencode/ai/providers/openai\", () => import(\"@opencode/ai/providers/openai\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 132,
+      "code": "[\"@opencode/ai/providers/openai/chat\", () => import(\"@opencode/ai/providers/openai/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 133,
+      "code": "[\"@opencode/ai/providers/openai/responses\", () => import(\"@opencode/ai/providers/openai/responses\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 134,
+      "code": "[\"@opencode/ai/providers/openai/images\", () => import(\"@opencode/ai/providers/openai/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 135,
+      "code": "[\"@opencode/ai/providers/openai-compatible\", () => import(\"@opencode/ai/providers/openai-compatible\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 138,
+      "code": "() => import(\"@opencode/ai/providers/openai-compatible/responses\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 140,
+      "code": "[\"@opencode/ai/providers/openai-compatible/images\", () => import(\"@opencode/ai/providers/openai-compatible/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 143,
+      "code": "() => import(\"@opencode/ai/providers/openai-compatible-responses\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 145,
+      "code": "[\"@opencode/ai/providers/opencode/decisions\", () => import(\"@opencode/ai/providers/opencode/decisions\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 146,
+      "code": "[\"@opencode/ai/providers/openrouter\", () => import(\"@opencode/ai/providers/openrouter\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 147,
+      "code": "[\"@opencode/ai/providers/openrouter/decisions\", () => import(\"@opencode/ai/providers/openrouter/decisions\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 148,
+      "code": "[\"@opencode/ai/providers/openrouter/images\", () => import(\"@opencode/ai/providers/openrouter/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 149,
+      "code": "[\"@opencode/ai/providers/openrouter/responses\", () => import(\"@opencode/ai/providers/openrouter/responses\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 150,
+      "code": "[\"@opencode/ai/providers/togetherai\", () => import(\"@opencode/ai/providers/togetherai\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 151,
+      "code": "[\"@opencode/ai/providers/typesafe-ai/decisions\", () => import(\"@opencode/ai/providers/typesafe-ai/decisions\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 152,
+      "code": "[\"@opencode/ai/providers/venice\", () => import(\"@opencode/ai/providers/venice\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 153,
+      "code": "[\"@opencode/ai/providers/venice/responses\", () => import(\"@opencode/ai/providers/venice/responses\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 154,
+      "code": "[\"@opencode/ai/providers/vercel-ai-gateway\", () => import(\"@opencode/ai/providers/vercel-ai-gateway\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 155,
+      "code": "[\"@opencode/ai/providers/vercel-ai-gateway/chat\", () => import(\"@opencode/ai/providers/vercel-ai-gateway/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 158,
+      "code": "() => import(\"@opencode/ai/providers/vercel-ai-gateway/messages\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 162,
+      "code": "() => import(\"@opencode/ai/providers/vercel-ai-gateway/responses\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 166,
+      "code": "() => import(\"@opencode/ai/providers/vercel-ai-gateway/decisions\"),"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 168,
+      "code": "[\"@opencode/ai/providers/vercel-ai-gateway/images\", () => import(\"@opencode/ai/providers/vercel-ai-gateway/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 169,
+      "code": "[\"@opencode/ai/providers/xai\", () => import(\"@opencode/ai/providers/xai\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 170,
+      "code": "[\"@opencode/ai/providers/xai/images\", () => import(\"@opencode/ai/providers/xai/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 171,
+      "code": "[\"@opencode/ai/providers/zai\", () => import(\"@opencode/ai/providers/zai\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 172,
+      "code": "[\"@opencode/ai/providers/zai/chat\", () => import(\"@opencode/ai/providers/zai/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 173,
+      "code": "[\"@opencode/ai/providers/zai/images\", () => import(\"@opencode/ai/providers/zai/images\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 174,
+      "code": "[\"@opencode/ai/providers/zai-coding-plan\", () => import(\"@opencode/ai/providers/zai-coding-plan\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 175,
+      "code": "[\"@opencode/ai/providers/zai-coding-plan/chat\", () => import(\"@opencode/ai/providers/zai-coding-plan/chat\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 176,
+      "code": "[\"@opencode/ai/providers/zai-coding-plan/messages\", () => import(\"@opencode/ai/providers/zai-coding-plan/messages\")],"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 179,
+      "code": "() => import(\"@opencode/ai/providers/zai-coding-plan/responses\"),"
+    },
+    {
+      "file": "packages\\core\\src\\pty.ts",
+      "line": 16,
+      "code": "const pty = lazy(() => import(\"#pty\"))"
+    },
+    {
+      "file": "packages\\core\\src\\shell\\parse.ts",
+      "line": 211,
+      "code": "try: () => import(\"./scan.js\"),"
+    },
+    {
+      "file": "packages\\core\\src\\shell\\parse.ts",
+      "line": 392,
+      "code": "const { Parser, Language } = await import(\"web-tree-sitter\")"
+    },
+    {
+      "file": "packages\\core\\src\\shell.ts",
+      "line": 145,
+      "code": "const { mkdir, unlink } = yield* Effect.promise(() => import(\"fs/promises\"))"
+    },
+    {
+      "file": "packages\\core\\src\\shell.ts",
+      "line": 146,
+      "code": "const { createWriteStream, createReadStream } = yield* Effect.promise(() => import(\"fs\"))"
+    },
+    {
+      "file": "packages\\core\\src\\worktree.ts",
+      "line": 124,
+      "code": "const { Plugin } = yield* Effect.promise(() => import(\"./plugin.js\"))"
+    }
+  ],
+  "anyUsagesCount": 64,
+  "anyUsages": [
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\db.ts",
+      "line": 242,
+      "code": "export type AnySQLiteEffectDatabase = SQLiteEffectDatabase<any, any, any>"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\db.ts",
+      "line": 243,
+      "code": "export type AnySQLiteEffectSelectBase = SQLiteEffectSelectBase<any, any, any, any, any, any, any, any, any, any>"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\delete.ts",
+      "line": 90,
+      "code": ": any[][]"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\delete.ts",
+      "line": 110,
+      "code": "export type AnySQLiteEffectDelete = SQLiteEffectDeleteBase<any, any, any, any, any, any>"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\delete.ts",
+      "line": 165,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\delete.ts",
+      "line": 182,
+      "code": ") as any,"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\delete.ts",
+      "line": 186,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\delete.ts",
+      "line": 190,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\delete.ts",
+      "line": 195,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\delete.ts",
+      "line": 206,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\delete.ts",
+      "line": 257,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\insert.ts",
+      "line": 114,
+      "code": ": any[][]"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\insert.ts",
+      "line": 127,
+      "code": "export type AnySQLiteEffectInsert = SQLiteEffectInsertBase<any, any, any, any, any, any>"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\insert.ts",
+      "line": 237,
+      "code": "this.config = { table, values: values as any, withList, select }"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\insert.ts",
+      "line": 248,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\insert.ts",
+      "line": 336,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\select.ts",
+      "line": 41,
+      "code": "values: any[][]"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\select.ts",
+      "line": 130,
+      "code": "session: this.session as any,"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\select.ts",
+      "line": 134,
+      "code": "}) as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\select.ts",
+      "line": 278,
+      "code": "export type AnySQLiteEffectSelect = SQLiteEffectSelectBase<any, any, any, any, any, any, any, any, any, any>"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 40,
+      "code": "private jitMapper?: RowsMapper<any> | RelationalRowsMapper<any>"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 79,
+      "code": "run(placeholderValues?: Record<string, unknown>): any {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 84,
+      "code": "all(placeholderValues?: Record<string, unknown>): any {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 99,
+      "code": "get(placeholderValues?: Record<string, unknown>): any {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 114,
+      "code": "values(placeholderValues?: Record<string, unknown>): any {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 119,
+      "code": "execute(placeholderValues?: Record<string, unknown>): any {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 266,
+      "code": "const fromCache: any[] | undefined = yield* this.cache.get(key, tables, isTag, autoInvalidate)"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 357,
+      "code": "run(query: SQL): any {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 366,
+      "code": "all<T = unknown>(query: SQL): any {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 375,
+      "code": "get<T = unknown>(query: SQL): any {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 384,
+      "code": "values<T extends unknown[] = unknown[]>(query: SQL): any {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\session.ts",
+      "line": 393,
+      "code": "count(query: SQL): any {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 119,
+      "code": ": any[][]"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 141,
+      "code": "export type AnySQLiteEffectUpdate = SQLiteEffectUpdateBase<any, any, any, any, any, any, any>"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 191,
+      "code": ") as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 254,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 284,
+      "code": ") as any,"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 286,
+      "code": "(new Proxy(from, new SelectionProxyHandler({ sqlAliasedBehavior: \"sql\", sqlBehavior: \"sql\" })) as any),"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 292,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 293,
+      "code": "}) as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 306,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 323,
+      "code": ") as any,"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 327,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 331,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 336,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 347,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\sqlite-core\\effect\\update.ts",
+      "line": 398,
+      "code": "return this as any"
+    },
+    {
+      "file": "packages\\core\\src\\github-copilot\\chat\\openai-compatible-chat-language-model.ts",
+      "line": 39,
+      "code": "errorStructure?: ProviderErrorStructure<any>"
+    },
+    {
+      "file": "packages\\core\\src\\github-copilot\\responses\\tool\\file-search.ts",
+      "line": 14,
+      "code": "const compoundFilterSchema: z.ZodType<any> = z.object({"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\dynamic.ts",
+      "line": 15,
+      "code": "evt.sdk = ((yield* loadSDKFactory(npm, evt.package)) as (options: any) => any)(evt.options)"
+    }
+  ],
+  "tryCatchesCount": 73,
+  "tryCatches": [
+    {
+      "file": "packages\\core\\src\\aisdk.ts",
+      "line": 912,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\config\\markdown.ts",
+      "line": 9,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\config\\markdown.ts",
+      "line": 17,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\mcp.ts",
+      "line": 50,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\skill-file.ts",
+      "line": 40,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\drizzle\\internal\\drizzle-utils.ts",
+      "line": 31,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\sqlite.bun.ts",
+      "line": 32,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\sqlite.bun.ts",
+      "line": 48,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\sqlite.node.ts",
+      "line": 33,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\database\\sqlite.node.ts",
+      "line": 49,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\environment\\local.ts",
+      "line": 31,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\filesystem\\search.ts",
+      "line": 123,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\filesystem\\watcher.ts",
+      "line": 17,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\form.ts",
+      "line": 318,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\image\\photon-normalize.ts",
+      "line": 64,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\image\\photon-normalize.ts",
+      "line": 69,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\image\\photon-normalize.ts",
+      "line": 123,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\image\\photon.ts",
+      "line": 31,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\instructions\\builtins.ts",
+      "line": 34,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\mime.ts",
+      "line": 55,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\oauth\\page.ts",
+      "line": 112,
+      "code": "const AUTO_CLOSE_SCRIPT = `setTimeout(function(){try{window.close()}catch(e){}},2500)`"
+    },
+    {
+      "file": "packages\\core\\src\\oauth\\page.ts",
+      "line": 120,
+      "code": "function ok(){card.dataset.status=\"success\";headline.textContent=\"Authorization successful\";message.textContent=PROVIDER?(\"OpenCode is now connected to \"+PROVIDER+\".\"):\"OpenCode is now authorized.\";detail.hidden=true;footnote.textContent=\"You can close this window.\";setTimeout(function(){try{window.close()}catch(e){}},2500)}"
+    },
+    {
+      "file": "packages\\core\\src\\oauth\\page.ts",
+      "line": 121,
+      "code": "try{"
+    },
+    {
+      "file": "packages\\core\\src\\omni-bus.ts",
+      "line": 54,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-bus.ts",
+      "line": 65,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-config.ts",
+      "line": 66,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-orchestrator.ts",
+      "line": 29,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-orchestrator.ts",
+      "line": 46,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-orchestrator.ts",
+      "line": 58,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-orchestrator.ts",
+      "line": 78,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-orchestrator.ts",
+      "line": 125,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-orchestrator.ts",
+      "line": 141,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-orchestrator.ts",
+      "line": 166,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-path.ts",
+      "line": 38,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-path.ts",
+      "line": 77,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-session.ts",
+      "line": 56,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-session.ts",
+      "line": 112,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-session.ts",
+      "line": 131,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\omni-session.ts",
+      "line": 152,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\persistent-pty\\binary.bun.ts",
+      "line": 30,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\persistent-pty\\binary.bun.ts",
+      "line": 32,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\persistent-pty\\binary.bun.ts",
+      "line": 59,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\persistent-pty\\daemon.ts",
+      "line": 455,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\persistent-pty\\daemon.ts",
+      "line": 466,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\persistent-pty\\daemon.ts",
+      "line": 514,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\persistent-pty\\daemon.ts",
+      "line": 559,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\persistent-pty\\daemon.ts",
+      "line": 588,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 192,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\pty\\protocol.ts",
+      "line": 32,
+      "code": "try {"
+    },
+    {
+      "file": "packages\\core\\src\\pty\\pty.bun.ts",
+      "line": 12,
+      "code": "try {"
+    }
+  ],
+  "fiberUsages": [
+    {
+      "file": "packages\\core\\src\\config\\plugin\\agent.ts",
+      "line": 73,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\agent.ts",
+      "line": 77,
+      "code": ".pipe(Stream.runForEach(notify), Effect.forkScoped({ startImmediately: true }))"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\agent.ts",
+      "line": 82,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\command.ts",
+      "line": 56,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\command.ts",
+      "line": 60,
+      "code": ".pipe(Stream.runForEach(notify), Effect.forkScoped({ startImmediately: true }))"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\command.ts",
+      "line": 65,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\compatibility.ts",
+      "line": 68,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\compatibility.ts",
+      "line": 75,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\entry-observer.ts",
+      "line": 19,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\instruction.ts",
+      "line": 61,
+      "code": "yield* updates.pipe(Stream.runForEach(publish), Effect.forkScoped({ startImmediately: true }))"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\instruction.ts",
+      "line": 217,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\instruction.ts",
+      "line": 222,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\mcp.ts",
+      "line": 111,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\mcp.ts",
+      "line": 124,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\skill.ts",
+      "line": 184,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\skill.ts",
+      "line": 198,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config\\plugin\\source.ts",
+      "line": 69,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config.ts",
+      "line": 367,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config.ts",
+      "line": 379,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config.ts",
+      "line": 385,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\config.ts",
+      "line": 404,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\credential.ts",
+      "line": 108,
+      "code": "Effect.forkIn(scope),"
+    },
+    {
+      "file": "packages\\core\\src\\database\\v1-migration.bun.ts",
+      "line": 526,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\filesystem\\file-watch.ts",
+      "line": 113,
+      "code": "return Scope.close(child, Exit.void).pipe(Effect.forkIn(scope), Effect.asVoid)"
+    },
+    {
+      "file": "packages\\core\\src\\filesystem\\file-watch.ts",
+      "line": 117,
+      "code": "Effect.forkIn(child, { startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\filesystem\\file-watch.ts",
+      "line": 131,
+      "code": "yield* sweep.pipe(Effect.repeat(Schedule.spaced(SWEEP_INTERVAL)), Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\filesystem\\location-watcher.ts",
+      "line": 76,
+      "code": "Effect.forkIn(scope, { startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\filesystem\\location-watcher.ts",
+      "line": 98,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\filesystem\\search.ts",
+      "line": 101,
+      "code": "Effect.forkIn(scope),"
+    },
+    {
+      "file": "packages\\core\\src\\integration.ts",
+      "line": 441,
+      "code": "Scope.close(attemptScope, Exit.void).pipe(Effect.forkIn(scope, { startImmediately: true }), Effect.asVoid)"
+    },
+    {
+      "file": "packages\\core\\src\\integration.ts",
+      "line": 604,
+      "code": "yield* scrub().pipe(Effect.repeat(Schedule.spaced(scrubInterval)), Effect.forkIn(scope))"
+    },
+    {
+      "file": "packages\\core\\src\\integration.ts",
+      "line": 605,
+      "code": "yield* scrubCommands().pipe(Effect.repeat(Schedule.spaced(scrubInterval)), Effect.forkIn(scope))"
+    },
+    {
+      "file": "packages\\core\\src\\integration.ts",
+      "line": 647,
+      "code": "Effect.forkIn(attemptScope, { startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\integration.ts",
+      "line": 694,
+      "code": "const stdout = yield* AppProcess.collectStream(handle.stdout, undefined).pipe(Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\integration.ts",
+      "line": 719,
+      "code": "Effect.forkIn(attemptScope, { startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\job.ts",
+      "line": 248,
+      "code": "yield* Scope.close(result.scope, Exit.void).pipe(Effect.forkIn(state.scope, { startImmediately: true }))"
+    },
+    {
+      "file": "packages\\core\\src\\job.ts",
+      "line": 299,
+      "code": "Effect.forkIn(result.scope, { startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\location-activity.ts",
+      "line": 100,
+      "code": "}).pipe(Effect.forever, Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\location-lifecycle.ts",
+      "line": 38,
+      "code": "return project.activate(location.project.id).pipe(Effect.forkIn(scope), Effect.asVoid)"
+    },
+    {
+      "file": "packages\\core\\src\\location-services.ts",
+      "line": 48,
+      "code": "? finish.pipe(Effect.forkIn(owner, { startImmediately: true }), Effect.asVoid)"
+    },
+    {
+      "file": "packages\\core\\src\\mcp\\oauth.ts",
+      "line": 526,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\mcp\\stdio.ts",
+      "line": 147,
+      "code": "const drain = yield* Effect.forkScoped("
+    },
+    {
+      "file": "packages\\core\\src\\mcp\\stdio.ts",
+      "line": 160,
+      "code": "yield* Effect.forkScoped("
+    },
+    {
+      "file": "packages\\core\\src\\model.ts",
+      "line": 280,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\models-dev.ts",
+      "line": 691,
+      "code": "yield* Effect.forkScoped(refresh().pipe(Effect.repeat(Schedule.spaced(ttl)), Effect.ignore))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\command.ts",
+      "line": 33,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\goal.ts",
+      "line": 311,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\goal.ts",
+      "line": 340,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\models-dev.ts",
+      "line": 74,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\module.ts",
+      "line": 36,
+      "code": "Effect.forkIn(scope, { startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\plan.ts",
+      "line": 91,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\azure.ts",
+      "line": 421,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\azure.ts",
+      "line": 425,
+      "code": "yield* refresh().pipe(Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\chatgpt.ts",
+      "line": 361,
+      "code": "// .pipe(Effect.andThen(refreshModels().pipe(Effect.forkScoped, Effect.asVoid)))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\chatgpt.ts",
+      "line": 365,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\chatgpt.ts",
+      "line": 367,
+      "code": "// yield* refreshModels().pipe(Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\chatgpt.ts",
+      "line": 368,
+      "code": "// yield* Effect.sleep(Duration.minutes(15)).pipe(Effect.andThen(refreshModels), Effect.forever, Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\credential-settings.ts",
+      "line": 37,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\digitalocean.ts",
+      "line": 175,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\digitalocean.ts",
+      "line": 177,
+      "code": "yield* refresh().pipe(Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\github-copilot.ts",
+      "line": 262,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\github-copilot.ts",
+      "line": 264,
+      "code": "yield* refresh().pipe(Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\gitlab.ts",
+      "line": 298,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\gitlab.ts",
+      "line": 300,
+      "code": "yield* refresh().pipe(Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\google-vertex.ts",
+      "line": 228,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\local.ts",
+      "line": 129,
+      "code": "yield* refresh().pipe(Effect.ignore, Effect.repeat(Schedule.spaced(interval)), Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\local.ts",
+      "line": 147,
+      "code": ".pipe(Stream.runForEach(reload), Effect.forkScoped({ startImmediately: true }))"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\modal.ts",
+      "line": 71,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\modal.ts",
+      "line": 73,
+      "code": "yield* refresh().pipe(Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\openai-context-caps.ts",
+      "line": 45,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\openai.ts",
+      "line": 333,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\opencode.ts",
+      "line": 405,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\provider\\snowflake-cortex.ts",
+      "line": 205,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\supervisor.ts",
+      "line": 200,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\supervisor.ts",
+      "line": 215,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\supervisor.ts",
+      "line": 243,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\warming.ts",
+      "line": 54,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin\\warming.ts",
+      "line": 129,
+      "code": "Effect.forkIn(scope),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin.ts",
+      "line": 233,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\plugin.ts",
+      "line": 249,
+      "code": "Effect.forkScoped,"
+    },
+    {
+      "file": "packages\\core\\src\\project.ts",
+      "line": 162,
+      "code": "Effect.forkIn(scope),"
+    },
+    {
+      "file": "packages\\core\\src\\project.ts",
+      "line": 509,
+      "code": "Effect.forkScoped,"
+    },
+    {
+      "file": "packages\\core\\src\\provider.ts",
+      "line": 531,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\reference.ts",
+      "line": 106,
+      "code": "yield* refresh().pipe(Effect.forkIn(scope))"
+    },
+    {
+      "file": "packages\\core\\src\\reference.ts",
+      "line": 113,
+      "code": "yield* Effect.sleep(\"1 hour\").pipe(Effect.andThen(refresh()), Effect.forever, Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\ripgrep.ts",
+      "line": 126,
+      "code": "Effect.forkScoped,"
+    },
+    {
+      "file": "packages\\core\\src\\session\\compaction.ts",
+      "line": 377,
+      "code": "}).pipe(Effect.forkIn(scope))"
+    },
+    {
+      "file": "packages\\core\\src\\session\\execution\\restart.ts",
+      "line": 226,
+      "code": "Effect.forkIn(scope),"
+    },
+    {
+      "file": "packages\\core\\src\\session\\execution\\restart.ts",
+      "line": 264,
+      "code": ".pipe(Effect.ignore, Effect.forkIn(scope), Effect.when(prepareResume(sessionID))),"
+    },
+    {
+      "file": "packages\\core\\src\\session\\model-transport.ts",
+      "line": 278,
+      "code": "Effect.forkIn(scope, { startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\session\\projector.ts",
+      "line": 924,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\session\\runner\\step.ts",
+      "line": 77,
+      "code": "const pendingStartSnapshot = yield* snapshots.capture().pipe(Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\session\\runner\\step.ts",
+      "line": 134,
+      "code": ").pipe(Effect.forkScoped),"
+    },
+    {
+      "file": "packages\\core\\src\\session\\session.ts",
+      "line": 235,
+      "code": "}).pipe(Effect.forkIn(scope, { startImmediately: true }))"
+    },
+    {
+      "file": "packages\\core\\src\\session\\session.ts",
+      "line": 259,
+      "code": ".pipe(Effect.ignore, Effect.forkIn(scope, { startImmediately: true }), Effect.asVoid)"
+    },
+    {
+      "file": "packages\\core\\src\\session\\subagent-job.ts",
+      "line": 39,
+      "code": "Effect.forkIn(scope, { startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\shell.ts",
+      "line": 118,
+      "code": "cleanup().pipe(Effect.repeat(Schedule.spaced(Duration.hours(1))), Effect.forkScoped),"
+    },
+    {
+      "file": "packages\\core\\src\\snapshot.ts",
+      "line": 104,
+      "code": "}).pipe(Effect.forkIn(lifetime)),"
+    },
+    {
+      "file": "packages\\core\\src\\snapshot.ts",
+      "line": 124,
+      "code": "Effect.forkIn(lifetime),"
+    },
+    {
+      "file": "packages\\core\\src\\tool\\mcp.ts",
+      "line": 119,
+      "code": ".pipe(Effect.forkScoped)"
+    },
+    {
+      "file": "packages\\core\\src\\tool\\mcp.ts",
+      "line": 132,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\tool\\mcp.ts",
+      "line": 138,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\tool\\plugin\\image-generate.ts",
+      "line": 224,
+      "code": "Effect.forkIn(scope, { startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\tool\\plugin\\image-generate.ts",
+      "line": 245,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\tool\\plugin\\shell.ts",
+      "line": 188,
+      "code": "Effect.forkIn(scope, { startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\tool-output.ts",
+      "line": 144,
+      "code": "Effect.forkScoped,"
+    },
+    {
+      "file": "packages\\core\\src\\vcs.ts",
+      "line": 171,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\websearch.ts",
+      "line": 100,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\wellknown\\plugin.ts",
+      "line": 33,
+      "code": "Effect.forkScoped({ startImmediately: true }),"
+    },
+    {
+      "file": "packages\\core\\src\\workspace.ts",
+      "line": 222,
+      "code": "}).pipe(Effect.repeat(Schedule.spaced(options.pollInterval ?? Duration.minutes(1))), Effect.forkScoped)"
+    }
+  ]
+}
