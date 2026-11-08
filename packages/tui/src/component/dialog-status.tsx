@@ -49,7 +49,7 @@ export function DialogStatus() {
       <box flexDirection="column" gap={1}>
         <box flexDirection="column">
           <text fg={theme.text.base}>
-            <b>Active Customizations (Real-Time Loading)</b>
+            <b>Registered Customizations (Real-Time Inventory)</b>
           </text>
           <text fg={theme.text.base}>
             • Agents (@): <b>{breakdown().agents}</b> (/agents)
@@ -73,7 +73,7 @@ export function DialogStatus() {
             • MCP Servers: <b>{breakdown().mcps}</b> (/mcps)
           </text>
           <text fg={theme.text.muted}>
-            Use /customizations (or Ctrl+P) to search everything. New files in %APPDATA%\omnicode or .omnicode load automatically.
+            Registration does not prove execution. Run omni_intelligence action=customizations for actual usage.
           </text>
         </box>
 

@@ -153,7 +153,7 @@ export function DialogCustomizations(props: { filter?: CustomizationFilter } = {
       case "mcps":
         return `MCP Servers (${count})`
       default:
-        return `OnethyCode Customizations Hub (${count} active items)`
+        return `OnethyCode Customizations Hub (${count} registered items)`
     }
   })
 

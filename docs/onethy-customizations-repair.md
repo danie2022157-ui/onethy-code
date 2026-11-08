@@ -104,3 +104,52 @@ bun --cwd packages/core run typecheck:tsc
 Esses testes também fazem parte da suíte Ubuntu/Windows do GitHub Actions.
 
 **Limites:** o carregamento de uma personalização não garante que o modelo vá invocá-la em todas as solicitações. A execução depende da tarefa, da decisão do agente, das permissões e da disponibilidade de MCPs. O novo inventário mostra claramente o que está registrado, e a sessão registra as invocações reais. Personalizações de hooks/mods/plugins só executam se houver adaptadores nativos compatíveis e habilitados.
+
+## Descoberta contextual automática (runtime)
+
+Com `OMNICODE_ACTIVE=1`, a nova integração de personalizações usa o gancho
+nativo `session.prompt` para avaliar **cada nova tarefa** (inclusive as de
+subagentes) contra o catálogo realmente registrado:
+
+- A pesquisa é local, determinística e limitada por relevância.
+- Até **duas skills** são anexadas automaticamente se corresponderem à
+  tarefa, forem próprias para autoinvocação, tiverem conteúdo pequeno
+  e a permissão efetiva `skill:<id>` estiver explicitamente em `allow`.
+  Skills que exigem confirmação (`ask`) permanecem sugestões e usam
+  normalmente a ferramenta `skill` com seu pedido de autorização.
+- Subagentes especializados são recomendados apenas quando a
+  correspondência é inequívoca; a ferramenta `subagent agent=auto`
+  continua selecionando o especialista na delegação real.
+- Apenas ferramentas MCP de servidores **conectados** entram nas sugestões.
+  O mecanismo não inicia servidores desabilitados, não instala pacotes e não
+  executa hooks, comandos slash, mods ou settings sem uma ação autorizada.
+- Templates da categoria `loops` agora são importados no diretório nativo
+  `loops/`, já reconhecido pelo carregador de comandos; são invocados
+  através da interface de comandos, e não executados ao importá-los.
+- As escolhas são gravadas na metadata imutável da mensagem,
+  `onethy.personalizations`, distinguindo recomendações de anexos realmente
+  preparados. O log de depuração emite `onethy.personalizations.selected`.
+
+Para diagnosticar no chat:
+
+~~~text
+Use omni_intelligence action=customizations para apresentar o inventário,
+as chamadas reais a skill/subagent/omni_mcp e as seleções contextuais
+registradas nas sessões recentes.
+~~~
+
+O resumo de seleções é **uma amostra limitada** das sessões recentes;
+as chamadas de ferramentas seguem sendo contadas separadamente nos últimos
+sete dias. Um skill anexado não significa que o modelo seguiu suas instruções,
+e o modelo ainda precisa decidir quando a delegação é útil.
+
+Para desativar apenas a descoberta automática (sem remover recursos):
+
+~~~powershell
+$env:ONETHY_CUSTOMIZATION_AUTONOMY="off"
+onethy
+~~~
+
+A configuração de permissões, os modelos definidos pelo usuário e o estado
+real dos provedores continuam prevalecendo. Nenhuma aprovação é inferida
+a partir da simples instalação de um recurso.
