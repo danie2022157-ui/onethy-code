@@ -360,7 +360,7 @@ const layer = Layer.effect(
                 return yield* new StepFailedError({ error: outcome.error })
               const excluded = new Set(attemptedModels)
               const connected = yield* modelCatalog.available()
-              if (isAccountQuotaError(outcome.error, loaded.model.ref)) {
+              if (isAccountQuotaError(outcome.error, loaded.model.ref) || outcome.error.type === "provider.auth") {
                 for (const sibling of connected) {
                   if (sibling.providerID !== loaded.model.ref.providerID) continue
                   const key = sibling.providerID + "/" + sibling.id

@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { AIError, RateLimitError, QuotaExceededError, InvalidProviderOutputError, Message, TransportError } from "@opencode/ai/effect"
 import { Model } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
-import { allowedAutoModels, canFailover, isAccountQuotaError, rateLimitCooldown, selectFailoverModel, requestInputModalities, transportFailoverCooldown, antigravity429, readAutoFailoverIntent, AUTO_FAILOVER_KEY } from "../src/model-failover"
+import { allowedAutoModels, canFailover, isAccountQuotaError, rateLimitCooldown, selectFailoverModel, requestInputModalities, transportFailoverCooldown, antigravity429, antigravityAuthentication, authenticationFailoverCooldown, readAutoFailoverIntent, AUTO_FAILOVER_KEY } from "../src/model-failover"
 
 const info = (provider: string, id: string, options: Partial<Model.Info> = {}): Model.Info => ({
   ...Model.Info.default(Provider.ID.make(provider), Model.ID.make(id)),
@@ -157,6 +157,44 @@ describe("provider failover decision", () => {
     expect(antigravity429(message.replace("Status: 429", "Status: 403"), {
       providerID: "antigravity", id: "claude-sonnet-5-5",
     })).toBeUndefined()
+  })
+  it("recognizes sandbox Argon quota failures and account-pool refusals", () => {
+    const model = { providerID: "google", id: "gemini-4-argon" }
+    const sandbox = [
+      "Error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 160h47m11s.",
+      "[Debug Info]",
+      "Requested Model: gemini-4-argon",
+      "Effective Model: gemini-4-argon-high",
+      "Endpoint: https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+      "Status: 429",
+    ].join("\n")
+    const failure = antigravity429(sandbox, model)
+    expect(failure?.reason._tag).toBe("RateLimit")
+    expect(failure?.reason.http?.status).toBe(429)
+    expect(rateLimitCooldown(failure!, model)).toBe(300_000)
+    const pool = antigravity429(
+      "[Antigravity] Todas tus cuentas (1) tienen la cuota agotada o bloqueada para gemini.\nCuentas con acceso a gemini-4-argon: 1.",
+      model,
+    )
+    expect(pool?.reason._tag).toBe("QuotaExceeded")
+    expect(isAccountQuotaError(pool!, model)).toBe(false)
+    expect(antigravity429("User quoted [Antigravity] Todas tus cuentas (1) tienen la cuota agotada o bloqueada para gemini.", model)).toBeUndefined()
+  })
+  it("distinguishes sandbox invalid credentials from quota exhaustion", () => {
+    const model = { providerID: "google", id: "gemini-4-argon" }
+    const invalid = [
+      "Error: API key not valid. Please pass a valid API key.",
+      "[Debug Info]",
+      "Requested Model: gemini-4-argon",
+      "Endpoint: https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+      "Status: 400",
+    ].join("\n")
+    const failure = antigravityAuthentication(invalid, model)
+    expect(failure?.reason._tag).toBe("Authentication")
+    expect(authenticationFailoverCooldown(failure!)).toBe(300_000)
+    expect(rateLimitCooldown(failure!, model)).toBeUndefined()
+    expect(antigravityAuthentication(invalid.replace("Status: 400", "Status: 429"), model)).toBeUndefined()
+    expect(antigravityAuthentication(invalid.replace("sandbox.googleapis.com", "evil.example.com"), model)).toBeUndefined()
   })
   it("does not classify messages or non-Antigravity responses as 429s", () => {
     const model = { providerID: "antigravity", id: "gemini" }

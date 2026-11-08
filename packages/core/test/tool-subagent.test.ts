@@ -1,4 +1,4 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel } from "@opencode/ai/effect"
 import { OpenAIChat } from "@opencode/ai/protocols"
@@ -34,7 +34,7 @@ import { Plugin } from "@opencode/core/plugin"
 import { PluginHooks } from "@opencode/core/plugin/hooks"
 import { PluginSupervisor } from "@opencode/core/plugin/supervisor"
 import { Permission } from "@opencode/core/permission"
-import { SubagentTool } from "@opencode/core/tool/plugin/subagent"
+import { SubagentTool, subagentAutoIntent, recoverCooledSubagentOnManualParentChoice } from "@opencode/core/tool/plugin/subagent"
 import { Tool } from "@opencode/core/tool"
 import { tmpdir } from "./fixture/tmpdir"
 import { withEnv } from "./fixture/env"
@@ -219,6 +219,29 @@ const withSubagent = (location: Location.Ref) =>
   })
 
 describe("SubagentTool", () => {
+  test("resumes a cooled child on the different model manually selected in its parent", () => {
+    const argon = Model.Ref.make({ providerID: Provider.ID.make("google"), id: Model.ID.make("gemini-4-argon") })
+    const flash = Model.Ref.make({ providerID: Provider.ID.make("google"), id: Model.ID.make("gemini-3.8-flash") })
+    const cool = new Set(["google/gemini-4-argon"])
+    expect(recoverCooledSubagentOnManualParentChoice(argon, flash, cool, true)).toBe(true)
+    expect(recoverCooledSubagentOnManualParentChoice(argon, flash, cool, false)).toBe(false)
+    expect(recoverCooledSubagentOnManualParentChoice(argon, argon, cool, true)).toBe(false)
+    expect(recoverCooledSubagentOnManualParentChoice(argon, flash, new Set(), true)).toBe(false)
+    expect(recoverCooledSubagentOnManualParentChoice(argon, flash, new Set(), true, true)).toBe(true)
+    expect(recoverCooledSubagentOnManualParentChoice(argon, flash, new Set([...cool, "google/gemini-3.8-flash"]), true)).toBe(false)
+  })
+  test("inherits current Omni Auto without overriding an explicit tool model", () => {
+    const enabled = { enabled: true, allowedModels: ["google/gemini-4-argon", "openai/gpt-6"] }
+    expect(subagentAutoIntent(enabled, false)).toEqual(enabled)
+    expect(subagentAutoIntent(enabled, true)).toEqual({ enabled: false })
+    expect(subagentAutoIntent({ enabled: false }, false, {
+      OMNICODE_ACTIVE: "1", OMNICODE_AUTO_MODEL: "1",
+    })).toEqual({ enabled: false })
+    expect(subagentAutoIntent(undefined, false, {
+      OMNICODE_ACTIVE: "1", OMNICODE_AUTO_MODEL: "1",
+    })).toEqual({ enabled: true })
+  })
+
   completionIt.live("admits one durable completion across live delivery and restart replay", () =>
     Effect.acquireRelease(
       Effect.promise(() => tmpdir()),
