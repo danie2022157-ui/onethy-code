@@ -74,8 +74,8 @@ export const Plugin = define({
           skills: skills.list(),
           agents: agents.list(),
           commands: commands.list(),
-          tools: mcp.tools(),
-          servers: mcp.servers(),
+          tools: mcp.tools().pipe(Effect.orElseSucceed(() => [])),
+          servers: mcp.servers().pipe(Effect.orElseSucceed(() => [])),
         }, { concurrency: 5 })
         const connected = new Set(available.servers
           .filter((item) => item.status.status === "connected").map((item) => item.name))
