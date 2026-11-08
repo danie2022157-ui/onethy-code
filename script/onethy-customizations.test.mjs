@@ -17,6 +17,7 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
       asset: join(base, "skills/development/example/extra.txt"),
       agent: join(base, "agents/development/frontend.md"),
       command: join(base, "commands/testing/generate.md"),
+      loop: join(base, "loops/testing/tdd.md"),
       hook: join(base, "hooks/git/prevent-direct-push.py"),
       mod: join(base, "mods/security/secret-redactor/.claude-plugin/plugin.json"),
       local: join(base, "mcps/local/memory.json"),
@@ -28,6 +29,7 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
     await writeFile(sources.asset, "supporting local asset")
     await writeFile(sources.agent, "---\ndescription: Local development assistant\ntools: Read, Bash\n---\nSupport the project.")
     await writeFile(sources.command, "---\ndescription: Generate tests\nallowed-tools: Read, Bash\n---\nAnalyze $ARGUMENTS; !\`echo NOT_ALLOWED\`")
+    await writeFile(sources.loop, "---\ndescription: TDD loop\n---\nRepeat safe test and review steps using $ARGUMENTS.")
     await writeFile(sources.hook, "import sys\n# Inert source fixture; MUST NEVER EXECUTE\n")
     await writeFile(sources.mod, JSON.stringify({ name: "secret-redactor", description: "Redacts credentials locally" }))
     await writeFile(sources.local, JSON.stringify({ mcpServers: { memory: {
@@ -40,10 +42,10 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
 
     const preview = await syncOnethyCustomizations({ sourceDir, cwd })
     assert.equal(preview.installed, 0)
-    assert.equal(preview.ready, 9)
+    assert.equal(preview.ready, 10)
     await assert.rejects(stat(join(cwd, ".opencode")))
     const first = await syncOnethyCustomizations({ sourceDir, cwd, install: true })
-    assert.equal(first.installed, 9)
+    assert.equal(first.installed, 10)
     assert.equal(first.pending, 0)
 
     const config = join(cwd, ".opencode")
@@ -61,6 +63,11 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
     assert.match(command, /\$ARGUMENTS/)
     assert.ok(!command.includes("!\`echo NOT_ALLOWED\`"))
     assert.ok(!command.includes("allowed-tools:"))
+    const loops = await readdir(join(config, "loops"))
+    assert.equal(loops.length, 1)
+    const loop = await readFile(join(config, "loops", loops[0]), "utf8")
+    assert.match(loop, /TDD loop/)
+    assert.match(loop, /\$ARGUMENTS/)
 
     const hookFiles = await readdir(join(config, "hooks/onethy"))
     const modFiles = await readdir(join(config, "mods/onethy"))
@@ -90,7 +97,7 @@ test("native customizations import local-only MCPs, commands, hooks and mods wit
       ["local-sensitive-file-guard", "local-tool-preference"])
     const repeated = await syncOnethyCustomizations({ sourceDir, cwd, install: true })
     assert.equal(repeated.installed, 0)
-    assert.equal(repeated.existing, 9)
+    assert.equal(repeated.existing, 10)
     await assert.rejects(stat(join(cwd, "NOT_ALLOWED")))
 
     const another = join(base, "skills/development/escape/SKILL.md")
