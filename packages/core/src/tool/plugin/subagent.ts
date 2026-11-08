@@ -47,11 +47,12 @@ export function recoverCooledSubagentOnManualParentChoice(
   parent: Model.Ref | undefined,
   coolingDown: ReadonlySet<string>,
   manualSelection: boolean,
+  lastChildQuotaFailure = false,
 ): boolean {
   if (!manualSelection || !child || !parent) return false
   const key = (ref: Model.Ref) => ref.providerID + "/" + ref.id
   return key(child) !== key(parent) &&
-    coolingDown.has(key(child)) && !coolingDown.has(key(parent))
+    (coolingDown.has(key(child)) || lastChildQuotaFailure) && !coolingDown.has(key(parent))
 }
 
 const backgroundResult = (sessionID: SessionSchema.ID, worktreeDirectory?: string) => ({
@@ -384,12 +385,21 @@ export const Plugin = {
               let routedModel: typeof parent.model = undefined
               const parentCoolingDown = parent.model !== undefined &&
                 coolingDown.has(parent.model.providerID + "/" + parent.model.id)
+              // A child running in a separate worktree may have its own Location-scoped
+              // cooldown. Check its durable last failed assistant, not only parent hints.
+              const lastChildAssistant =
+                existing !== undefined && override === undefined && inheritedIntent?.enabled === false
+                  ? (yield* sessions.messages({ sessionID: existing.id, type: "assistant", limit: 1 }))[0]
+                  : undefined
+              const lastChildQuotaFailure = lastChildAssistant?.type === "assistant" &&
+                ["provider.rate-limit", "provider.quota", "provider.auth",
+                 "provider.free-limit", "provider.chatgpt-limit"].includes(lastChildAssistant.error?.type ?? "")
               // "Switched model to Flash" followed by "continue" must not blindly
-              // resume a child pinned to a known-exhausted Argon route.
+              // resume a child pinned to an exhausted Argon route.
               const manualParentRecovery =
                 existing !== undefined && existing.agent === agent.id &&
                 override === undefined && inheritedIntent?.enabled === false &&
-                recoverCooledSubagentOnManualParentChoice(existing.model, parent.model, coolingDown, true) &&
+                recoverCooledSubagentOnManualParentChoice(existing.model, parent.model, coolingDown, true, lastChildQuotaFailure) &&
                 isAllowed(parent.model) &&
                 availableList.some((candidate) =>
                   candidate.providerID === parent.model?.providerID && candidate.id === parent.model.id)
