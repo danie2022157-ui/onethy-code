@@ -134,6 +134,28 @@ export const Plugin = {
             })
             const recorded = activity.tools.mode === "detail" ? activity.tools.usage : []
             const usage = (name: string) => recorded.find((entry) => entry.name === name)?.calls ?? 0
+            // The automatic prompt hook records recommendation vs attachment
+            // separately. This is a bounded sample, NOT a fabricated total.
+            const sampled = yield* sampledSessionTexts(25)
+            const automatic = sampled.flatMap(({ messages }) =>
+              messages.flatMap((message) => {
+                if (message.type !== "user") return []
+                const raw = message.metadata?.["onethy.personalizations"]
+                if (!raw || typeof raw !== "object" || Array.isArray(raw)) return []
+                const report = raw as Record<string, unknown>
+                const choice = report.selection
+                if (report.version !== 1 || !choice || typeof choice !== "object" || Array.isArray(choice)) return []
+                const selected = choice as Record<string, unknown>
+                const count = (value: unknown) => Array.isArray(value)
+                  ? value.filter((item) => typeof item === "string").length : 0
+                return [{
+                  discovered: count(selected.skills) + count(selected.agents) +
+                    count(selected.commands) + count(selected.mcpTools),
+                  attached: count(report.attached),
+                }]
+              }))
+            const automaticMatches = automatic.filter((entry) => entry.discovered > 0).length
+            const automaticAttachments = automatic.reduce((total, entry) => total + entry.attached, 0)
             const activeExperts = loadedAgents.filter((agent) =>
               agent.mode !== "primary" && !agent.hidden)
             const categories = [
@@ -174,6 +196,10 @@ export const Plugin = {
               "Descriptor references — " + refs.join(", ") + ". Descriptors are not executable plugins.",
               "MCP servers: " + servers.length + "; states: " +
                 Object.entries(statuses).map(([state, count]) => state + "=" + count).join(", ") + ".",
+              "Recent automatic selection sample (up to 30 sessions × 25 messages): " +
+                automatic.length + " user prompts inspected, " + automaticMatches +
+                " with matching resources, " + automaticAttachments + " skills automatically attached." ,
+              "An attached skill is prepared for the model; this does not mean its instructions were followed.",
               "Actual tool calls, last 7 days (this project): skill=" + usage("skill") +
                 ", subagent=" + usage("subagent") + ", omni_mcp=" + usage("omni_mcp") +
                 ". Counted from saved session tool invocations.",
