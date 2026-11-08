@@ -15,7 +15,7 @@ import { Model } from "../../model.js"
 import { Location } from "../../location.js"
 import { Worktree } from "../../worktree.js"
 import { ModelSelectionPolicy } from "../../model-selection-policy.js"
-import { AUTO_FAILOVER_KEY, readAutoFailoverIntent, type AutoFailoverIntent } from "../../model-failover.js"
+import { AUTO_FAILOVER_KEY, readAutoFailoverIntent, antigravity429, antigravityAuthentication, type AutoFailoverIntent } from "../../model-failover.js"
 import { agentModelRanking, efficiencyProfile } from "../../efficiency-profile.js"
 import { chooseImportedSpecialist } from "../../specialist-router.js"
 import { OmniBus } from "../../omni-bus.js"
@@ -391,9 +391,18 @@ export const Plugin = {
                 existing !== undefined && override === undefined && inheritedIntent?.enabled === false
                   ? (yield* sessions.messages({ sessionID: existing.id, type: "assistant", limit: 1 }))[0]
                   : undefined
-              const lastChildQuotaFailure = lastChildAssistant?.type === "assistant" &&
+              // Historical child failures may predate the normalized Antigravity error codes.
+              // Inspect only the durable provider error field, never user/chat content.
+              const lastError = lastChildAssistant?.type === "assistant" ? lastChildAssistant.error : undefined
+              const previousModel = existing?.model
+              const legacyAntigravityFailure = lastError && previousModel
+                ? antigravity429(lastError.message, previousModel) ??
+                  antigravityAuthentication(lastError.message, previousModel)
+                : undefined
+              const lastChildQuotaFailure =
                 ["provider.rate-limit", "provider.quota", "provider.auth",
-                 "provider.free-limit", "provider.chatgpt-limit"].includes(lastChildAssistant.error?.type ?? "")
+                 "provider.free-limit", "provider.chatgpt-limit"].includes(lastError?.type ?? "") ||
+                legacyAntigravityFailure !== undefined
               // "Switched model to Flash" followed by "continue" must not blindly
               // resume a child pinned to an exhausted Argon route.
               const manualParentRecovery =
