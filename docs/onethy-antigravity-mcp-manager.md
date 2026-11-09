@@ -35,7 +35,7 @@ Get-NetTCPConnection -LocalPort 51121 -ErrorAction SilentlyContinue |
   Select-Object LocalAddress,LocalPort,State,OwningProcess
 ```
 
-If nothing is listening, check OnethyCode's authorization error or use its manual callback prompt. If another process owns the port, identify it before closing it and retry. For WSL2, SSH and remote machines, browser `localhost` might not reach the OnethyCode process: run the CLI directly on the browser's machine, configure trusted port forwarding, or use manual authorization when offered.
+If nothing is listening, check OnethyCode's authorization error or use its manual callback prompt. If another process owns the port, identify it before closing it and retry. For WSL2, SSH and remote machines, browser `localhost` might not reach the OnethyCode process: OnethyCode defaults to **manual callback entry** in these environments. Run the CLI directly on the browser's machine, or configure trusted local forwarding and explicitly set `ONETHY_ANTIGRAVITY_OAUTH_LOOPBACK=1` in the process that runs the OnethyCode server to opt in to automatic callbacks.
 
 **Verification boundary:** tests use synthetic callbacks and fake credentials; they do not contact Google or verify account entitlement. OAuth success does not imply model access or available quota.
 
