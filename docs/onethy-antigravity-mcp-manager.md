@@ -14,6 +14,31 @@ OnethyCode now uses the **[JoshRob297 Antigravity OAuth plugin](https://github.c
 
 **Security and provider terms:** JoshRob297 explicitly documents that this is an unofficial integration, not endorsed by Google, which can violate Google's Terms of Service and result in account restrictions or bans. The plugin handles OAuth tokens; review its source and permissions before signing in. Prefer a supported Google provider integration if you need official access. OnethyCode does not enable options to weaken model safety settings.
 
+
+## Google OAuth localhost callback (OnethyCode)
+
+**Root cause corrected:** the pinned JoshRob297 v2 plugin registers Google → `OAuth with Google (Antigravity)` as `mode: "code"`, even though Google redirects to `http://localhost:51121/oauth-callback`. Previously, the localhost page was unreachable unless a callback server was separately running, and users had to copy the redirected URL manually.
+
+OnethyCode now bridges **only** the Google `antigravity-oauth` method, and only when Google provides a matching local `/oauth-callback` redirect, to an automatic loopback listener started **before** opening the browser:
+
+1. Run `onethy service restart` to load the updated server.
+2. Run `onethy auth login` or use `/connect` → Google → **OAuth with Google (Antigravity)**.
+3. Sign in and approve in the browser. The local callback should report that authorization was received; return to OnethyCode for the final connected status.
+4. If the port cannot be bound or the URL is incompatible, OnethyCode falls back to its **manual code/URL prompt**. Copy the **full** redirected localhost URL from the address bar and paste it **only into OnethyCode**. Never post OAuth codes or callback URLs in chat, issues or logs.
+
+The listener binds **only** loopback IPv4/IPv6, accepts one callback with the exact expected OAuth `state`, rejects invalid states, handles denied authorization, and closes with the attempt. It does **not** exchange or store Google credentials: the pinned plugin continues to do that.
+
+**Windows diagnostic (PowerShell, only while login is pending):**
+
+```powershell
+Get-NetTCPConnection -LocalPort 51121 -ErrorAction SilentlyContinue |
+  Select-Object LocalAddress,LocalPort,State,OwningProcess
+```
+
+If nothing is listening, check OnethyCode's authorization error or use its manual callback prompt. If another process owns the port, identify it before closing it and retry. For WSL2, SSH and remote machines, browser `localhost` might not reach the OnethyCode process: run the CLI directly on the browser's machine, configure trusted port forwarding, or use manual authorization when offered.
+
+**Verification boundary:** tests use synthetic callbacks and fake credentials; they do not contact Google or verify account entitlement. OAuth success does not imply model access or available quota.
+
 ## Native MCP Connection Manager improvements
 
 In OnethyCode mode, configured MCP servers continue to start asynchronously and share their connection **per project/location**, not per tab. The following runtime management policies are now built in:
