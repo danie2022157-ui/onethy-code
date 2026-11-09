@@ -23,6 +23,7 @@ import { Credential } from "./credential.js"
 import { State } from "./state.js"
 import { Bus } from "./bus.js"
 import { IntegrationConnection } from "./integration/connection.js"
+import { openAntigravityOAuthCallback } from "./integration/antigravity-oauth-loopback.js"
 import { AppProcess } from "@opencode/util/process"
 import { ChildProcess } from "effect/process"
 import { Form } from "./form.js"
@@ -620,10 +621,49 @@ const layer = Layer.effect(
         if (invalid) return yield* new AuthorizationError({ cause: new Error(invalid) })
       }
       const attemptScope = yield* Scope.fork(scope)
-      const authorization = yield* authorize(method.authorize(answer)).pipe(
+      let authorization: OAuthAuthorization = yield* authorize(method.authorize(answer)).pipe(
         Scope.provide(attemptScope),
         Effect.onExit((exit) => (Exit.isFailure(exit) ? Scope.close(attemptScope, exit) : Effect.void)),
       )
+      // The pinned Antigravity v2 plugin registers manual-code OAuth even though
+      // Google redirects to localhost:51121. Bridge only that exact integration to
+      // a scoped local listener, preserving the plugin's token exchange/storage.
+      // If binding fails (e.g. WSL forwarding or port in use), manual paste still works.
+      if (
+        input.integrationID === ID.make("google") &&
+        input.methodID === MethodID.make("antigravity-oauth") &&
+        authorization.mode === "code"
+      ) {
+        const manual = authorization
+        const listener = yield* Effect.tryPromise({
+          try: () => openAntigravityOAuthCallback(manual.url),
+          catch: (cause) => cause instanceof Error ? cause : new Error("Cannot start OAuth callback listener"),
+        }).pipe(
+          Effect.catchAll((cause) =>
+            Effect.logWarning("Antigravity loopback unavailable; using manual OAuth callback", {
+              code: (cause as NodeJS.ErrnoException).code ?? "listener-error",
+            }).pipe(Effect.as(undefined)),
+          ),
+          Scope.provide(attemptScope),
+        )
+        if (listener) {
+          yield* Effect.addFinalizer(() => Effect.promise(() => listener.close())).pipe(Scope.provide(attemptScope))
+          authorization = {
+            mode: "auto",
+            url: manual.url,
+            instructions: "Complete Google sign-in in the browser. OnethyCode will receive the local callback automatically.",
+            callback: Effect.promise(() => listener.waitForCallback()).pipe(
+              Effect.flatMap((url) => manual.callback(url)),
+            ),
+          }
+        } else {
+          authorization = {
+            ...manual,
+            instructions:
+              "Complete Google sign-in. If the localhost page cannot be reached, copy the full redirected URL from the browser address bar and paste it into OnethyCode.",
+          }
+        }
+      }
       const id = AttemptID.create()
       const created = yield* Clock.currentTimeMillis
       const time = { created, expires: authorization.expiresAt ?? created + attemptLifetime }
