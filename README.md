@@ -2,157 +2,241 @@
 
 # ⚡ OnethyCode
 
-### Ambiente de desenvolvimento com inteligência artificial, agentes especializados e múltiplos modelos — direto no terminal.
+### Engenharia de software com IA — do planejamento ao código verificado.
 
-**Planeje. Programe. Pesquise. Revise. Teste. Mantenha o contexto.**
+**Seu workspace open source de desenvolvimento com IA, direto no terminal.**
 
-Uma plataforma open source, baseada no [OpenCode](https://github.com/anomalyco/opencode), que reúne interface interativa no terminal, roteamento entre modelos, ferramentas MCP, coordenação de agentes e memória local para apoiar o desenvolvimento de software.
+Roteamento de modelos · Agentes especializados · MCPs · Pesquisa de código · Memória local · Revisão e testes
 
-[![GitHub Stars](https://img.shields.io/github/stars/danie2022157-ui/onethy-code?style=for-the-badge&logo=github&color=C8A45D)](https://github.com/danie2022157-ui/onethy-code/stargazers)
-[![License MIT](https://img.shields.io/badge/Licença-MIT-161616?style=for-the-badge)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Bun](https://img.shields.io/badge/Bun-1.4.4-F6E9D8?style=for-the-badge&logo=bun&logoColor=black)](https://bun.sh/)
-[![Terminal](https://img.shields.io/badge/Interface-CLI%20%2B%20TUI-161616?style=for-the-badge)](#interface-e-comandos)
+[![OnethyCode CI](https://github.com/danie2022157-ui/onethy-code/actions/workflows/onethy-smoke.yml/badge.svg)](https://github.com/danie2022157-ui/onethy-code/actions/workflows/onethy-smoke.yml)
+[![MIT](https://img.shields.io/badge/Licença-MIT-C8A45D?style=flat-square)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Bun](https://img.shields.io/badge/Bun-1.4.4-F6E9D8?style=flat-square&logo=bun&logoColor=black)](https://bun.sh/)
+[![CLI + TUI](https://img.shields.io/badge/Interface-CLI%20%2B%20TUI-161616?style=flat-square)](#interface-e-comandos)
 
-<img src="assets/onethy-code-hero.jpg" width="94%" alt="Apresentação visual do OnethyCode" />
+<img src="assets/onethy-code-hero.jpg" width="94%" alt="OnethyCode — ambiente de engenharia de software com agentes de IA" />
 
-**Um ambiente de programação assistida por IA que coloca o desenvolvedor no controle do fluxo de trabalho.**
+**Planeje. Pesquise. Programe. Teste. Revise. Continue.**
 
-[Começar](#instalação-e-primeiros-passos) · [Funcionalidades](#funcionalidades-em-detalhes) · [Multiagentes](#agentes-e-orquestração-de-missões) · [Arquitetura](#arquitetura-do-sistema) · [Comandos](#interface-e-comandos) · [Perguntas frequentes](#perguntas-frequentes) · [English](#english-overview)
+[Começar](#instalação-e-primeiros-passos) · [Funcionalidades](#funcionalidades-em-detalhes) · [Agentes](#agentes-e-orquestração-de-missões) · [Arquitetura](#arquitetura-do-sistema) · [Comandos](#interface-e-comandos) · [English](#english-overview)
 
 </div>
+
+> [!NOTE]
+> Baseado no [OpenCode](https://github.com/anomalyco/opencode), com módulos próprios do OnethyCode. Projeto em evolução: modelos e integrações exigem configuração, permissões e testes no ambiente real.
+
+## Comece em minutos
+
+Pré-requisitos: **Git, Node.js 20+, Bun (versão fixada no workspace)** e um provedor de IA compatível ou endpoint local configurado.
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/danie2022157-ui/onethy-code.git
+cd onethy-code
+bun install --frozen-lockfile
+.\install.ps1
+onethy
+```
+
+**Linux / macOS**
+
+```bash
+git clone https://github.com/danie2022157-ui/onethy-code.git
+cd onethy-code
+bun install --frozen-lockfile
+bash ./install.sh
+onethy
+```
+
+Abra `/help`, conecte o provedor em `/connect` e consulte `/models`. A instalação usa o checkout local: **não exclua a pasta clonada depois de instalar**. Leia [requisitos e instruções completas](#instalação-e-primeiros-passos).
 
 ---
 
 ## Sumário
 
-1. [O que é o OnethyCode](#o-que-é-o-onethycode)
-2. [Por que ele existe](#por-que-ele-existe)
-3. [Visão geral das capacidades](#visão-geral-das-capacidades)
-4. [Funcionalidades em detalhes](#funcionalidades-em-detalhes)
-5. [Agentes e orquestração de missões](#agentes-e-orquestração-de-missões)
-6. [Memória e continuidade](#memória-e-continuidade)
-7. [Inteligência e pesquisa de código](#inteligência-e-pesquisa-de-código)
-8. [Instalação e primeiros passos](#instalação-e-primeiros-passos)
-9. [Interface e comandos](#interface-e-comandos)
-10. [Fluxos de uso](#fluxos-de-uso)
-11. [Arquitetura do sistema](#arquitetura-do-sistema)
-12. [Estrutura do repositório](#estrutura-do-repositório)
-13. [Segurança, privacidade e controle](#segurança-privacidade-e-controle)
-14. [Qualidade e testes](#qualidade-e-testes)
-15. [Limitações atuais e evolução](#limitações-atuais-e-evolução)
+1. [Visão e propósito](#o-que-é-o-onethycode)
+2. [Visão geral das capacidades](#visão-geral-das-capacidades)
+3. [Funcionalidades em detalhes](#funcionalidades-em-detalhes)
+4. [Agentes e orquestração de missões](#agentes-e-orquestração-de-missões)
+5. [Memória e continuidade](#memória-e-continuidade)
+6. [Inteligência e pesquisa de código](#inteligência-e-pesquisa-de-código)
+7. [Instalação e primeiros passos](#instalação-e-primeiros-passos)
+8. [Interface e comandos](#interface-e-comandos)
+9. [Fluxos de uso](#fluxos-de-uso)
+10. [Arquitetura do sistema](#arquitetura-do-sistema)
+11. [Estrutura do repositório](#estrutura-do-repositório)
+12. [Segurança, privacidade e controle](#segurança-privacidade-e-controle)
+13. [Qualidade e testes](#qualidade-e-testes)
+14. [Limitações atuais e evolução](#limitações-atuais-e-evolução)
+15. [Diagnóstico e solução de problemas](#diagnóstico-e-solução-de-problemas)
 16. [Perguntas frequentes](#perguntas-frequentes)
 17. [Contribuição e licença](#contribuição-e-licença)
 18. [English overview](#english-overview)
 
 ## O que é o OnethyCode?
 
-**OnethyCode é um ambiente de desenvolvimento assistido por inteligência artificial, com foco no terminal.** Seu objetivo é reunir, em uma única experiência, a interação com modelos de linguagem, o entendimento de repositórios, a organização de tarefas, o uso de ferramentas locais e a colaboração entre agentes especializados.
+O **OnethyCode** é um ambiente de engenharia de software com IA, focado em terminal, que integra **modelos configuráveis, agentes especializados, ferramentas locais, pesquisa contextual e fluxos de verificação**.
 
-Em vez de tratar a IA apenas como um chat que responde perguntas, o projeto organiza um fluxo de engenharia de software: entender o problema, localizar código relevante, propor uma solução, executar ações autorizadas, verificar resultados, documentar decisões e retomar o trabalho em outras sessões.
+A ideia não é oferecer apenas um chat de programação, mas apoiar um ciclo completo: **entender o projeto → planejar → investigar → implementar → testar → revisar → retomar**. A infraestrutura deriva do OpenCode e recebe módulos específicos:
 
-Ele combina uma **CLI** (interface de linha de comando), uma **TUI** (interface visual dentro do terminal), serviços de execução, integração com provedores de IA e mecanismos de persistência local. A base técnica deriva do OpenCode e recebe módulos específicos do OnethyCode, como **Omni Fusion**, **Omni Mission**, **Memory Bank**, **Omni Intelligence** e **Omni Heal**.
+| Módulo | Responsabilidade |
+| :--- | :--- |
+| **Omni Fusion** | Seleção de modelos, políticas e recuperação controlada de falhas |
+| **Omni Mission** | Missões, dependências e delegação em paralelo limitado |
+| **Omni Intelligence** | Pesquisa de código, histórico, ferramentas, revisão e métricas |
+| **Memory Bank** | Memória local por projeto e preferências globais |
+| **Omni Heal** | Diagnóstico de erros e tentativas autorizadas de autocorreção |
+| **Omni MCP** | Descoberta, administração e recuperação de MCPs autorizados |
 
-> **Importante:** OnethyCode é software em evolução. A existência de um módulo no repositório não garante que todas as combinações de provedores, sistemas operacionais e integrações tenham sido verificadas em produção. O projeto prioriza a execução com permissões, registros verificáveis e revisão humana.
+O fluxo principal é **CLI + TUI**, mas o repositório também contém infraestrutura web, desktop, APIs e serviços de sessão.
 
 ## Por que ele existe?
 
-Trabalhar com várias ferramentas de IA para programação normalmente envolve desafios como trocar de modelo manualmente, repetir informações importantes, perder o histórico de decisões entre sessões, descobrir onde uma funcionalidade está implementada, coordenar tarefas longas e conferir se mudanças realmente passaram nos testes.
+Projetos reais exigem mais que gerar arquivos. É necessário localizar a implementação correta, preservar decisões, escolher ferramentas compatíveis, acompanhar tarefas e **provar que o resultado funciona**. O OnethyCode reúne esses mecanismos em um workflow extensível.
 
-O OnethyCode procura reduzir essa fragmentação com uma experiência orientada a projetos. Seus princípios são:
+Os princípios que orientam o projeto são **liberdade para escolher modelos**, **contexto reutilizável**, **agentes com responsabilidades específicas**, **permissões explícitas** e **resultados verificáveis**.
 
-- **Terminal como ambiente principal:** iniciar o assistente no diretório em que o trabalho acontece, sem exigir uma extensão de IDE.
-- **Liberdade de modelos:** escolher entre provedores e modelos configurados em vez de depender de um único fornecedor.
-- **Contexto reutilizável:** manter notas sobre arquitetura, convenções e objetivos, separando memórias do projeto e preferências globais.
-- **Agentes com papéis claros:** distribuir trabalho entre agentes especializados quando isso for útil e permitido.
-- **Resultados verificáveis:** diferenciar tarefas planejadas, reservadas, executadas e efetivamente concluídas.
-- **Segurança operacional:** respeitar permissões de ferramentas, confirmar mudanças destrutivas e preservar dados de outros projetos.
-- **Código aberto:** permitir inspeção, contribuição e evolução da plataforma.
+> **Uma tarefa planejada não é uma tarefa executada; uma tarefa executada não é automaticamente uma tarefa aprovada.** O sistema procura distinguir esses estados.
 
 ## Visão geral das capacidades
 
-| Área | Funcionalidade | Situação / dependências |
+| Área | Funcionalidade | Estado e condições |
 | :--- | :--- | :--- |
-| **CLI e TUI** | Terminal interativo, comandos, seleção de agentes, sessões e integrações | Implementado; compatibilidade visual varia conforme o terminal |
-| **Omni Fusion** | Seleção, filtros e regras de roteamento de modelos | Depende dos modelos e provedores configurados |
-| **Agentes especializados** | Perfis como planejador, arquiteto, programador e revisor | Disponíveis conforme contexto, permissões e configuração |
-| **Omni Mission** | Missões com tarefas, dependências, status e dispatch paralelo limitado | A execução acontece durante a chamada da ferramenta; não é um serviço autônomo permanente |
-| **Subagentes e worktrees** | Sessões-filhas e isolamento opcional do trabalho com Git worktrees | Requer Git, ferramentas e permissões adequadas |
-| **Memory Bank** | Memória por projeto e preferências globais locais | Persistência local; sem sincronização automática entre computadores |
-| **Omni Intelligence** | Busca lexical, histórico do projeto, revisão Git, inventário de ferramentas e métricas | Funções limitadas ao projeto/sessões acessíveis |
-| **Busca semântica** | Embeddings locais via Ollama | Opcional; requer Ollama e `nomic-embed-text` instalados |
-| **Omni Heal** | Execução de verificações, diagnóstico e tentativas autorizadas de reparo | Tentativas limitadas; resultado não é garantido |
-| **MCP e extensões** | Configuração de servidores MCP, skills, plugins, hooks e comandos | Conexão e execução dependem de cada integração |
-| **Gestor de projetos** | Criar, registrar, abrir, renomear e ocultar projetos da lista | Remover da lista não apaga arquivos |
-| **Git e checkpoints** | Inspeção de mudanças, snapshots de arquivos rastreados e restauração confirmada | Não substitui backup completo |
-| **Atualização** | Verificação e atualização de checkouts compatíveis | Depende da instalação e do repositório oficial |
-| **Desinstalação Windows** | Script PowerShell independente com prévia de caminhos | Requer revisão dos caminhos; teste antes de confiar em ambiente real |
+| **CLI e TUI** | Sessões, projetos, modelos, agentes e comandos | Implementado; terminal pode afetar renderização |
+| **Omni Fusion** | Roteamento automático/manual e fallback | Provedores conectados, modelos elegíveis |
+| **Agentes especializados** | Seis perfis internos e especialistas importáveis | Seleção e execução dependem de contexto/permissões |
+| **Omni Mission** | Dependências, dispatch e retorno de tarefas | 1–8 tarefas paralelas, limite de execução |
+| **Subagentes** | Sessões-filhas e worktrees opcionais | Requer Git, configuração e autorização |
+| **Code Mode / Tool Search** | Composição de ferramentas e descoberta sob demanda | Catálogo e ferramentas permitidas |
+| **Omni Intelligence** | Busca lexical, vetorial, revisão, histórico e métricas | Ollama opcional para vetores |
+| **Memory Bank** | Memória local por projeto e global | Sem sincronização automática entre dispositivos |
+| **Omni Heal** | Diagnóstico, testes e reparo delegado | Tentativas limitadas; sucesso não garantido |
+| **MCP** | Gerência, uso, standby e recuperação | Servidores configurados e autorizados |
+| **Personalizações** | Skills, agentes, comandos, hooks, plugins e mods | Importação não garante execução |
+| **Git** | Revisão, checkpoints, commits e worktrees | Checkpoint não substitui backup completo |
+| **Automação de interfaces** | Desktop nativo e ferramentas de navegador | Requer runtime/MCP e permissões |
+| **Eficiência** | Perfis economy/balanced/quality, uso e custos | Estimativas dependem dos dados dos provedores |
+| **Debug** | Logs unificados, diagnósticos e estatísticas | Registros locais e cuidados de privacidade |
+| **Instalação** | Scripts Windows/Linux/macOS e CI | Baseado em checkout do código-fonte |
+
+<img src="assets/onethy-code-tui.png" width="92%" alt="Interface interativa do OnethyCode no terminal" />
 
 ## Funcionalidades em detalhes
 
-### 1. Omni Fusion — roteamento de modelos
+### 1. Omni Fusion — múltiplos modelos e recuperação de falhas
 
-O **Omni Fusion** é a camada de seleção de modelos do OnethyCode. Ele permite trabalhar com os modelos disponíveis nas contas e integrações que o usuário configurou, aplicando políticas e preferências de seleção.
+O **Omni Fusion** seleciona entre os modelos conectados e habilitados na instalação. Permite fixar um modelo, filtrar opções, escolher estratégias por perfil e tarefa e respeitar configurações explícitas.
 
-Entre os controles presentes no projeto estão a visualização de provedores conectados, o filtro de modelos permitidos, categorias de capacidade, ajustes de roteamento e mecanismos de fallback/cooldown.
+- Seleção baseada em contexto, recursos disponíveis e custo estimado.
+- Modelos permitidos por política, com respeito a escolhas manuais.
+- Cooldown local quando ocorre erro reconhecido de cota, autenticação ou transporte.
+- **Até duas trocas de modelo por etapa lógica**, apenas quando a repetição é considerada segura.
+- Propagação controlada de roteamento para subagentes.
 
-**O que isso oferece na prática:**
+O cooldown local de cinco minutos para determinadas falhas do Antigravity **não redefine a cota do provedor**. Sem alternativa compatível e autorizada, a ferramenta deve relatar a indisponibilidade.
 
-- Consultar modelos disponibilizados pelos provedores conectados.
-- Escolher modelos explicitamente ou usar as opções automáticas.
-- Restringir a seleção a modelos ou provedores autorizados.
-- Alternar estratégias conforme o tipo de tarefa e as preferências configuradas.
-- Examinar opções de modelos pela interface `/models` e pelo seletor `/fusion-models`.
+**Leia:** [Omni Router](docs/onethy-smart-model-routing.md), [Auto-Failover](docs/onethy-auto-failover-429.md), [Antigravity](docs/onethy-antigravity-mcp-manager.md).
 
-O roteamento não garante que um modelo esteja disponível, gratuito ou sem limites de uso. Cotas, autenticação, custos e capacidades são definidos pelos respectivos provedores. O sistema também não possui acesso universal às cotas de todos os fornecedores.
+### 2. Agentes e especialistas
 
-### 2. Agentes especializados
+O orquestrador declara **seis perfis internos**, distintos de agentes importados e dos perfis oferecidos por outros componentes:
 
-O projeto disponibiliza papéis e fluxos para diferentes atividades de engenharia de software. Isso ajuda a separar as responsabilidades de quem planeja, implementa, analisa ou revisa um trabalho.
-
-| Papel | Responsabilidade típica |
+| Agente | Atuação |
 | :--- | :--- |
-| **Planner / Plan** | Organizar requisitos, dependências e etapas de implementação |
-| **Architect** | Examinar arquitetura, interfaces e decisões técnicas |
-| **Coder** | Implementar ou modificar código quando autorizado |
-| **Reviewer** | Revisar alterações, riscos e consistência |
-| **Librarian** | Auxiliar na recuperação e organização do contexto |
-| **Orchestrator / Omni** | Coordenar a estratégia e a distribuição das tarefas |
+| **Supervisor Maestro** (`supervisor`) | Planejar e coordenar tarefas |
+| **Explorador Técnico** (`researcher`) | Investigar código sem modificá-lo |
+| **Bibliotecário Técnico** (`librarian`) | Pesquisar documentação |
+| **Arquiteto de Sistemas** (`architect`) | Definir contratos e arquitetura |
+| **Desenvolvedor Core** (`coder`) | Editar e implementar código autorizado |
+| **Auditor de Qualidade** (`reviewer`) | Revisar mudanças, testes e segurança |
 
-Esses papéis não dispensam validação. Um resultado produzido por um agente continua sujeito a testes, revisão e permissões do ambiente.
+O comando de ferramenta `subagent` permite criar ou continuar sessões-filhas. O seletor `agent=auto` pode procurar um especialista registrado e recair no agente geral quando não existe uma correspondência única. O total de especialistas depende dos arquivos e configurações realmente carregados na máquina.
 
-### 3. Integrações MCP e ferramentas extensíveis
+### 3. Ferramentas nativas e Code Mode
 
-**MCP (Model Context Protocol)** permite conectar modelos e agentes a ferramentas e fontes adicionais por meio de servidores compatíveis.
+O núcleo inclui implementações para os seguintes grupos:
 
-O repositório contém implementações relacionadas a clientes MCP, transporte por processos locais e sockets, OAuth, configuração, catálogo e diagnóstico. Na CLI existem comandos como:
+| Grupo | Ferramentas |
+| :--- | :--- |
+| **Arquivos e pesquisa** | `read`, `write`, `edit`, `patch`, `glob`, `grep`, `file-diff` |
+| **Execução e organização** | `shell`, `todo`, `question`, `schedule` |
+| **Web e interfaces** | `webfetch`, `websearch`, `image-generate`, `desktop_control` |
+| **Delegação** | `subagent`, `omni_mission`, `omni_bus` |
+| **Engenharia** | `omni_intelligence`, `omni_heal`, `omni_checkpoint`, `omni_commit` |
+| **Integrações** | `omni_mcp`, `mcp-resource`, `omni_memory`, `skill` |
+
+O **Code Mode** permite descobrir e compor chamadas a ferramentas em JavaScript num ambiente controlado. O **Tool Search** evita carregar todo o catálogo no prompt quando é possível pesquisar ferramentas sob demanda. O catálogo é somente descoberta: as autorizações continuam sendo verificadas na execução.
+
+### 4. MCPs, plugins e personalizações
+
+A implementação possui cliente MCP, transporte, configuração, descoberta de ferramentas, diagnósticos e recuperação de falhas transitórias. O projeto documenta **oito definições nativas de MCP local**, **desabilitadas por padrão**:
+
+| Servidor | Finalidade |
+| :--- | :--- |
+| Playwright | Automação de navegador |
+| Chrome DevTools | Inspeção de páginas |
+| Serena | Pesquisa e edição de código |
+| Filesystem | Arquivos no escopo permitido |
+| Git | Operações sobre o repositório |
+| Memory | Memória via servidor MCP |
+| MarkItDown | Conversão de documentos |
+| Desktop Commander | Arquivos e processos locais |
+
+Servidores já autorizados podem ser priorizados conforme uso, entrar em standby e voltar sob demanda. Há reconexões limitadas e diagnóstico; não existe instalação silenciosa de executáveis ou liberação automática de permissões.
+
+**Personalizações:** skills `SKILL.md`, agentes especialistas, comandos Markdown, hooks, mods e plugins compatíveis. Os importadores preservam limites de segurança: um arquivo listado não significa um recurso ativo ou uma execução realizada.
 
 ```bash
 onethy mcp list
+onethy mcp manage
 onethy mcp doctor
-onethy mcp add
-onethy mcp auth
+onethy mcp restore --all
 ```
 
-A disponibilidade exata dos subcomandos e das opções deve ser confirmada com `onethy mcp --help` na versão instalada.
+**Leia:** [Personalizações](docs/onethy-customizations.md), [MCP autônomo](docs/onethy-autonomous-mcp.md), [Compatibilidade de especialistas](docs/onethy-customizations-repair.md).
 
-Além de MCPs, o projeto contempla **skills**, **plugins**, **hooks**, **comandos personalizados** e definições de agentes. Descobrir uma ferramenta não significa que ela está conectada nem que um agente tem autorização para executá-la.
+### 5. Projetos e sessões
 
-### 4. Gestão de projetos e sessões
+O gerenciador `/projects` permite criar, registrar, abrir e renomear entradas de projetos. **Remover da lista não apaga os arquivos.** Sessões e histórico oferecem continuidade para diferentes tarefas e repositórios, dentro dos limites de armazenamento e consulta implementados.
 
-O gerenciador de projetos do OnethyCode ajuda a trabalhar com múltiplos repositórios em um mesmo ambiente. A interface `/projects` permite criar um diretório de projeto, registrar uma pasta existente, abrir um projeto e alterar seu nome de exibição.
+### 6. Git, checkpoints e revisão
 
-A remoção de um projeto da lista significa **ocultá-lo do gerenciador**, não deletar seu código ou seu histórico. Esse comportamento é proposital para reduzir o risco de exclusões acidentais.
+O OnethyCode dispõe de ferramentas para inspecionar alterações, gerar mensagens Conventional Commits, executar commits autorizados, criar checkpoints de arquivos rastreados e restaurar pontos de controle com verificações de segurança.
 
-Também existem recursos de sessões, retomada de contexto, gerenciamento de mensagens e operações pela CLI, como `onethy session list`.
+Worktrees opcionais isolam trabalho de subagentes. As alterações precisam ser revisadas e integradas conscientemente; checkpoint **não é backup completo**, especialmente para arquivos não rastreados.
 
-### 5. Revisão, checkpoints e segurança com Git
+### 7. Gerenciamento de eficiência e qualidade
 
-Os recursos de Git são importantes para auditar o trabalho dos agentes antes de aceitar mudanças. O projeto inclui ferramentas de revisão e checkpoints de arquivos rastreados.
+`ONETHY_EFFICIENCY_PROFILE` define a política de execução:
 
-A ferramenta `omni_checkpoint` oferece operações de criação, listagem, comparação e restauração. A restauração é condicionada a verificações de segurança, incluindo confirmação explícita, estado limpo do repositório e compatibilidade com o HEAD original.
+| Perfil | Critério geral | Paralelismo padrão |
+| :--- | :--- | ---: |
+| `economy` | Favorecer menor custo estimado quando adequado | 2 |
+| `balanced` | Equilibrar custo e capacidade | 3 |
+| `quality` | Favorecer recência e contexto amplo em tarefas relevantes | 3 |
 
-**Limitação essencial:** checkpoints não incluem todos os arquivos não rastreados e não substituem backup, branch de trabalho ou controle de versão tradicional.
+O projeto monitora consumo de tokens, cache e custos estimados/relatados e permite comparar resultados de benchmarks com evidências independentes. **Uma resposta do agente dizendo “concluído” não equivale a um teste de aceitação aprovado.**
+
+**Leia:** [Efficiency Manager](docs/onethy-efficiency-manager.md) e [Quality, Memory & MCP](docs/onethy-quality-memory-mcp.md).
+
+### 8. Desktop e navegador
+
+Há pacotes de interface web/desktop e integração com controle nativo de aplicativos por `desktop_control`. Esta última exige instalação do runtime externo, permissões de acessibilidade e uma sessão gráfica na máquina onde o backend executa. Para páginas web, o usuário pode habilitar ferramentas de navegador compatíveis.
+
+**Leia:** [Desktop nativo](docs/onethy-native-desktop.md).
+
+### 9. Logs, métricas e diagnóstico
+
+```bash
+onethy debug logs --follow
+onethy debug logs --source tui --level DEBUG
+onethy debug agents
+onethy debug paths
+onethy stats --cost --models --tools
+```
+
+O sistema registra informações de Core, TUI, servidor e plugins, com filtros de nível, origem e texto. Revise os registros antes de publicá-los para não expor credenciais ou dados privados. [Detalhes do debug unificado](docs/onethy-unified-debug-logs.md).
 
 ## Agentes e orquestração de missões
 
@@ -262,16 +346,19 @@ Leia a [documentação da memória global](docs/onethy-global-memory.md).
 
 ## Inteligência e pesquisa de código
 
-A ferramenta **`omni_intelligence`** reúne ações para localizar informações relevantes e apoiar decisões técnicas.
+O **`omni_intelligence`** disponibiliza nove operações:
 
 | Ação | O que faz | Dependência ou limite |
 | :--- | :--- | :--- |
-| `code` | Busca lexical por funções, símbolos e termos relacionados à intenção | Funciona localmente, com limites de arquivos e tamanho |
-| `semantic` | Busca vetorial por significado usando embeddings | Ollama local + `nomic-embed-text` |
-| `tools` | Inventaria ferramentas, skills e MCPs disponíveis | Não concede permissões |
-| `history` | Pesquisa sessões e notas dentro do projeto acessível | Não pesquisa automaticamente toda a conta |
-| `review` | Mostra mudanças Git staged e unstaged sem editá-las | Revisão somente de leitura |
-| `metrics` | Resume eventos e consumo registrado em sessões | Não é ferramenta de faturamento exato |
+| `code` | Pesquisa lexical por funções, símbolos e arquivos | Busca local com limites |
+| `semantic` | Pesquisa vetorial pelo significado | Ollama + `nomic-embed-text` |
+| `tools` | Busca ferramentas, skills e MCPs registrados | Não autoriza execução |
+| `history` | Consulta sessões e contexto do projeto | Escopo e histórico limitados |
+| `review` | Inspeciona alterações Git | Somente leitura |
+| `metrics` | Resumo de eventos, tokens e custos | Não equivale à fatura |
+| `efficiency` | Diagnóstico de consumo e desempenho | Baseado nos dados locais |
+| `quality` | Consulta de qualidade verificada de modelos | Exige evidências válidas |
+| `customizations` | Inventário de agentes, skills, comandos e MCPs | Registro não significa uso real |
 
 ### Busca lexical
 
@@ -532,45 +619,48 @@ flowchart TD
 
 ## Estrutura do repositório
 
-Abaixo está um mapa das áreas mais relevantes para quem deseja estudar ou contribuir:
+O código está organizado como um monorepositório TypeScript/Bun, com componentes compartilhados do ecossistema OpenCode e módulos específicos do OnethyCode.
 
 ```text
 onethy-code/
-├── bin/                             # Inicializadores e resolução do runtime
+├── bin/                             # Inicializadores da CLI
 ├── packages/
-│   ├── cli/                         # CLI, comandos e integração com o terminal
-│   ├── tui/                         # Interface interativa OpenTUI
-│   ├── core/                        # Agentes, ferramentas, sessões e orquestração
-│   ├── util/                        # Utilitários e isolamento de configuração
-│   └── ...                          # Outros pacotes do workspace OpenCode
-├── docs/
-│   ├── onethy-terminal-intelligence.md
-│   ├── onethy-global-memory.md
-│   └── ...                          # Documentação e planos técnicos
-├── assets/                          # Imagens e materiais do repositório
-├── .github/workflows/               # CI e testes automatizados
-├── install.ps1                      # Instalação no Windows
-├── install.sh                       # Instalação Linux/macOS
-├── package.json                     # Workspace e scripts
-├── bun.lock                         # Dependências fixadas
+│   ├── core/                        # Agentes, modelos, ferramentas, sessões e MCP
+│   ├── cli/                         # Comandos e serviços da CLI
+│   ├── tui/                         # Interface interativa
+│   ├── ai/                          # Integração de modelos
+│   ├── codemode/                    # Ferramentas e execução Code Mode
+│   ├── app/                         # Aplicação web
+│   ├── desktop/                     # Aplicação desktop
+│   └── ...                          # Plugins, SDK e pacotes compartilhados
+├── docs/                            # Documentação técnica
+├── assets/                          # Capturas e identidade visual
+├── .opencode/                       # Recursos de desenvolvimento
+├── .github/workflows/               # CI
+├── install.ps1                      # Instalador Windows
+├── install.sh                       # Instalador Linux/macOS
+├── package.json
+├── bun.lock
 ├── CONTRIBUTING.md
 ├── SECURITY.md
 └── LICENSE
 ```
 
-### Arquivos relevantes para estudar as funcionalidades
+### Pontos de entrada para desenvolvedores
 
-- [Omni Orchestrator](packages/core/src/omni-orchestrator.ts)
-- [Ferramenta Omni Mission](packages/core/src/tool/plugin/omni-mission.ts)
-- [Ferramenta Omni Intelligence](packages/core/src/tool/plugin/omni-intelligence.ts)
-- [Busca semântica local](packages/core/src/omni-embeddings.ts)
-- [Ferramenta Omni Heal](packages/core/src/tool/plugin/omni-heal.ts)
-- [Ferramenta Omni Memory](packages/core/src/tool/plugin/omni-memory.ts)
-- [Ferramenta de Checkpoints](packages/core/src/tool/plugin/omni-checkpoint.ts)
-- [Configuração MCP](packages/core/src/config/plugin/mcp.ts)
-- [Gerenciador de projetos da TUI](packages/tui/src/component/dialog-projects.tsx)
-- [Comandos da CLI](packages/cli/src/commands/commands.ts)
-- [Registro de comandos da TUI](packages/tui/src/app.tsx)
+| Área | Código |
+| :--- | :--- |
+| Orquestrador | [`omni-orchestrator.ts`](packages/core/src/omni-orchestrator.ts) |
+| Missões e subagentes | [`omni-mission.ts`](packages/core/src/tool/plugin/omni-mission.ts) · [`subagent.ts`](packages/core/src/tool/plugin/subagent.ts) |
+| Modelos | [`model-failover.ts`](packages/core/src/model-failover.ts) |
+| Busca de código | [`omni-intelligence.ts`](packages/core/src/tool/plugin/omni-intelligence.ts) |
+| Memória | [`omni-memory.ts`](packages/core/src/tool/plugin/omni-memory.ts) |
+| Autocorreção | [`omni-heal.ts`](packages/core/src/tool/plugin/omni-heal.ts) |
+| MCP | [`omni-mcp.ts`](packages/core/src/tool/plugin/omni-mcp.ts) |
+| Ferramentas | [`packages/core/src/tool/plugin/`](packages/core/src/tool/plugin/) |
+| Comandos | [`commands.ts`](packages/cli/src/commands/commands.ts) |
+| TUI | [`packages/tui/src/`](packages/tui/src/) |
+| Testes | [`packages/core/test/`](packages/core/test/) |
 
 ## Segurança, privacidade e controle
 
@@ -655,6 +745,26 @@ O desenvolvimento futuro pode concentrar esforços em:
 - Refinar onboarding, documentação e exemplos reproduzíveis.
 
 Esses pontos representam **oportunidades de evolução**, não uma promessa de entrega ou um cronograma oficial.
+
+## Diagnóstico e solução de problemas
+
+| Problema | Verificação inicial |
+| :--- | :--- |
+| Comando `onethy` não abre | `onethy --help`, Node.js, Bun e caminho do checkout |
+| Modelo não está disponível | `onethy auth list`, `onethy models` e limites da conta |
+| Erro 429 | Logs e cotas reais do provedor; cooldown local não libera quota |
+| Servidor MCP não conecta | `onethy mcp doctor` e dependências do executável |
+| Skills não são utilizadas | Inventário de personalizações e configuração |
+| Interface com erro | Logs filtrados por `--source tui` e compatibilidade do terminal |
+
+```bash
+onethy --help
+onethy debug paths
+onethy debug logs --level ERROR --lines 100
+onethy mcp doctor
+```
+
+Para problemas reproduzíveis, abra uma [issue](https://github.com/danie2022157-ui/onethy-code/issues) com passos, versão e **logs sem dados sensíveis**. Consulte [debug unificado](docs/onethy-unified-debug-logs.md).
 
 ## Perguntas frequentes
 
@@ -758,15 +868,15 @@ Para comunicar uma vulnerabilidade, siga [SECURITY.md](SECURITY.md). Para termos
 
 ## English overview
 
-**OnethyCode is an open-source, terminal-first AI development workspace built on OpenCode.** It combines interactive CLI/TUI workflows, configurable model routing, specialized coding agents, persistent local project context, MCP integrations, Git-aware review tools, and bounded orchestration.
+**OnethyCode is an open-source, terminal-first AI software engineering workspace built on OpenCode.** It combines CLI/TUI workflows, configurable model selection, specialized coding agents, local memory, tool discovery, MCP integrations and Git-aware verification.
 
-**Key capabilities:** Omni Fusion model selection; Omni Mission task dependencies and limited subagent dispatch; project and global Memory Bank; Omni Intelligence code/history search and optional local Ollama embeddings; Omni Heal diagnostics and permission-gated repair attempts; project management; skills, hooks, plugins and MCP servers.
+**Core capabilities:** Omni Fusion model routing and bounded failover; Omni Mission dependency-aware task orchestration; child agents and optional isolated worktrees; Omni Intelligence code/history/tool search and optional local Ollama embeddings; Omni Heal diagnosis and repair attempts; Memory Bank; Code Mode; MCP management and compatible customizations.
 
-**Core design principle:** keep developers in control. Tools require the appropriate permissions, agent results require verification, local memory is not automatic cloud sync, and automation is not unlimited or guaranteed to succeed.
+**Developer control comes first:** explicit permissions, verifiable task results, bounded concurrency, local storage for project context and no assumption that third-party accounts or tools are universally available. Project maturity is active development, and real-provider integration tests are still necessary before production deployment.
 
-**Getting started:** install Git, Node.js 20+ and the Bun version pinned by the repository; clone this repository; run `bun install --frozen-lockfile`; then use `install.ps1` on Windows or `install.sh` on Linux/macOS. Start with `onethy` and check `/help` for available commands.
+**Getting started:** Install Git, Node.js 20+ and the Bun version pinned by the workspace. Clone this repo, run `bun install --frozen-lockfile`, then use `install.ps1` on Windows or `install.sh` on Linux/macOS. Start `onethy` and open `/help`.
 
-See the sections above for architecture, commands, limitations, safety and testing.
+[Installation](#instalação-e-primeiros-passos) · [Features](#funcionalidades-em-detalhes) · [Architecture](#arquitetura-do-sistema) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 ---
 
