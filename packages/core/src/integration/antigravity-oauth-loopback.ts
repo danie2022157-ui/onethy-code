@@ -1,4 +1,5 @@
 import { createServer, type RequestListener, type Server } from "node:http"
+import { readFileSync } from "node:fs"
 
 /** The Antigravity OAuth integration is the only caller of this loopback listener. */
 export interface AntigravityOAuthListener {
@@ -51,6 +52,17 @@ function stop(server: Server): Promise<void> {
   })
 }
 
+function remoteBrowserMayNotReachLoopback(): boolean {
+  if (process.env.SSH_TTY || process.env.SSH_CONNECTION || process.env.SSH_CLIENT ||
+    process.env.CODESPACES || process.env.REMOTE_CONTAINERS) return true
+  if (process.platform !== "linux") return false
+  try {
+    return /microsoft|wsl/i.test(readFileSync("/proc/version", "utf8"))
+  } catch {
+    return false
+  }
+}
+
 /**
  * Converts the pinned plugin's manual, localhost-redirect OAuth into a local
  * callback without modifying its token exchange or account storage.
@@ -59,6 +71,9 @@ function stop(server: Server): Promise<void> {
  * No token, state or callback URL is logged or sent anywhere by this listener.
  */
 export async function openAntigravityOAuthCallback(authorizationURL: string): Promise<AntigravityOAuthListener | undefined> {
+  // In WSL/SSH containers, browser localhost may refer to a different machine.
+  // Preserve the plugin\'s manual URL input unless trusted forwarding is explicit.
+  if (remoteBrowserMayNotReachLoopback() && process.env.ONETHY_ANTIGRAVITY_OAUTH_LOOPBACK !== "1") return
   const expected = target(authorizationURL)
   if (!expected) return
   let settled = false
