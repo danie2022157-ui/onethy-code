@@ -639,7 +639,7 @@ const layer = Layer.effect(
           try: () => openAntigravityOAuthCallback(manual.url),
           catch: (cause) => cause instanceof Error ? cause : new Error("Cannot start OAuth callback listener"),
         }).pipe(
-          Effect.catchAll((cause) =>
+          Effect.catch((cause) =>
             Effect.logWarning("Antigravity loopback unavailable; using manual OAuth callback", {
               code: (cause as NodeJS.ErrnoException).code ?? "listener-error",
             }).pipe(Effect.as(undefined)),

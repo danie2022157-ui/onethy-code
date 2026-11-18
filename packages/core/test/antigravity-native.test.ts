@@ -17,7 +17,9 @@ describe("Onethy native Antigravity Auth replacement", () => {
     expect(antigravityEnabled(onethy)).toBe(true)
     expect(ANTIGRAVITY_PACKAGE).toBe("github:JoshRob297/opencode-antigravity-auth")
     expect(ANTIGRAVITY_REVISION).toMatch(/^[0-9a-f]{40}$/)
-    expect(ANTIGRAVITY_SPEC).toBe("https://codeload.github.com/JoshRob297/opencode-antigravity-auth/tar.gz/" + ANTIGRAVITY_REVISION)
+    expect(ANTIGRAVITY_SPEC).toBe(
+      "https://github.com/JoshRob297/opencode-antigravity-auth/releases/download/v2.9.3/opencode-antigravity-auth-2.9.3.tgz",
+    )
     expect(withNativeAntigravity([], onethy)).toEqual([{
       type: "add",
       target: ANTIGRAVITY_SPEC,
@@ -45,10 +47,9 @@ describe("Onethy native Antigravity Auth replacement", () => {
 
   test("deduplicates Git sources and respects explicit removal of the new provider", () => {
     expect(isAntigravityTarget(ANTIGRAVITY_SPEC)).toBe(true)
-    expect(isAntigravityTarget(ANTIGRAVITY_PACKAGE + "#v2.5.4")).toBe(true)
-    expect(isAntigravityTarget(ANTIGRAVITY_SPEC)).toBe(true)
+    expect(isAntigravityTarget(ANTIGRAVITY_PACKAGE + "#v2.9.3")).toBe(true)
     expect(isAntigravityTarget(LEGACY_ANTIGRAVITY_PACKAGE)).toBe(false)
-    const manual = [{ type: "add" as const, target: ANTIGRAVITY_PACKAGE + "#v2.5.4" }]
+    const manual = [{ type: "add" as const, target: ANTIGRAVITY_PACKAGE + "#v2.9.3" }]
     expect(withNativeAntigravity(manual, onethy)).toEqual(manual)
     for (const target of ["*", ANTIGRAVITY_PACKAGE, ANTIGRAVITY_SPEC, "opencode-antigravity-auth", "opencode.antigravity-auth"]) {
       const removed = [{ type: "remove" as const, target }]
@@ -56,10 +57,10 @@ describe("Onethy native Antigravity Auth replacement", () => {
     }
   })
 
-  test("upgrades a saved Git source for the identical pinned commit to installable tarball", () => {
+  test("upgrades a saved Git source for the older pinned commit to installable tarball", () => {
     const legacyPinned = [{
       type: "add" as const,
-      target: ANTIGRAVITY_PACKAGE + "#" + ANTIGRAVITY_REVISION,
+      target: ANTIGRAVITY_PACKAGE + "#4e670a71080c16abeeac2aa5789b0e14f376c960",
       options: {},
     }]
     expect(withNativeAntigravity(legacyPinned, onethy)).toEqual([

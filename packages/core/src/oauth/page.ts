@@ -1,12 +1,12 @@
 // Branded HTML pages for local OAuth callback servers.
 //
 // These are served by the loopback HTTP servers that finish an OAuth exchange
-// (MCP, Codex/ChatGPT, xAI, Snowflake, DigitalOcean, ...). The functions return
+// (MCP, Codex/ChatGPT, xAI, Snowflake, DigitalOcean, Antigravity, ...). The functions return
 // a fully self-contained HTML string with no external assets, so they work
 // offline and drop into any transport (`res.end(...)`, Effect `response.end`,
 // etc.).
 //
-// The visual language mirrors the OpenCode app: the design tokens are a curated
+// The visual language mirrors the OpenCode / OnethyCode app: the design tokens are a curated
 // subset of the OC-2 semantic tokens in `packages/ui/src/styles/theme.css`, and
 // the wordmark is the same geometry as `packages/ui/src/components/logo.tsx`.
 // Keep this file in sync with those sources when the brand changes.
@@ -16,17 +16,39 @@ export interface CallbackPageOptions {
   provider?: string
   /** Attempt to close the window shortly after success. Defaults to true. */
   autoClose?: boolean
+  /** Application name shown in branding. Defaults to "OnethyCode" or "OpenCode". */
+  app?: string
+  /** Custom headline. */
+  headline?: string
+  /** Custom message. */
+  message?: string
+  /** Custom footnote. */
+  footnote?: string
+  /** Custom action button label. */
+  buttonText?: string
+}
+
+function defaultApp() {
+  return process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1" || process.env.OPENCODE_CLI_NAME === "onethy"
+    ? "OnethyCode"
+    : "OpenCode"
 }
 
 export function success(options?: CallbackPageOptions) {
   const provider = options?.provider
+  const app = options?.app ?? defaultApp()
+  const headline = options?.headline ?? "Authorization successful"
+  const message = options?.message ?? (provider ? `${app} is now connected to ${escapeHtml(provider)}.` : `${app} is now authorized.`)
+  const footnote = options?.footnote ?? "You can close this window."
   return renderDocument({
-    title: "Authorization successful",
+    title: headline,
+    app,
     body: renderCard({
       status: "success",
-      headline: "Authorization successful",
-      message: provider ? `OpenCode is now connected to ${escapeHtml(provider)}.` : "OpenCode is now authorized.",
-      footnote: "You can close this window.",
+      headline,
+      message,
+      footnote,
+      buttonText: options?.buttonText ?? "Close window",
     }),
     script: options?.autoClose === false ? undefined : AUTO_CLOSE_SCRIPT,
   })
@@ -34,16 +56,22 @@ export function success(options?: CallbackPageOptions) {
 
 export function error(detail: string, options?: CallbackPageOptions) {
   const provider = options?.provider
+  const app = options?.app ?? defaultApp()
+  const headline = options?.headline ?? "Authorization failed"
+  const message = options?.message ?? (provider
+    ? `${app} couldn't finish connecting to ${escapeHtml(provider)}.`
+    : `${app} couldn't complete authorization.`)
+  const footnote = options?.footnote ?? `Close this window and try again from ${app}.`
   return renderDocument({
-    title: "Authorization failed",
+    title: headline,
+    app,
     body: renderCard({
       status: "error",
-      headline: "Authorization failed",
-      message: provider
-        ? `OpenCode couldn't finish connecting to ${escapeHtml(provider)}.`
-        : "OpenCode couldn't complete authorization.",
+      headline,
+      message,
       detail,
-      footnote: "Close this window and try again from OpenCode.",
+      footnote,
+      buttonText: options?.buttonText ?? "Close window",
     }),
   })
 }
@@ -77,7 +105,14 @@ export * as OauthCallbackPage from "./page.js"
 
 type Status = "pending" | "success" | "error"
 
-function renderCard(input: { status: Status; headline: string; message: string; detail?: string; footnote: string }) {
+function renderCard(input: {
+  status: Status
+  headline: string
+  message: string
+  detail?: string
+  footnote: string
+  buttonText?: string
+}) {
   const detail = input.detail?.trim()
   return `<main class="card" id="oc-card" data-status="${input.status}" role="status" aria-live="polite">
       <div class="brand">${WORDMARK}</div>
@@ -89,18 +124,22 @@ function renderCard(input: { status: Status; headline: string; message: string; 
       <h1 class="headline" id="oc-headline">${escapeHtml(input.headline)}</h1>
       <p class="message" id="oc-message">${input.message}</p>
       <pre class="detail" id="oc-detail"${detail ? "" : " hidden"}>${detail ? escapeHtml(detail) : ""}</pre>
+      <div class="actions">
+        <button type="button" class="btn" id="oc-action-btn" onclick="try{window.close()}catch(e){}document.getElementById('oc-footnote').textContent='You can close this tab now.'">${escapeHtml(input.buttonText ?? "Close window")}</button>
+      </div>
       <p class="footnote" id="oc-footnote">${escapeHtml(input.footnote)}</p>
     </main>`
 }
 
-function renderDocument(input: { title: string; body: string; script?: string }) {
+function renderDocument(input: { title: string; body: string; script?: string; app?: string }) {
+  const app = input.app ?? defaultApp()
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>${escapeHtml(input.title)} · OpenCode</title>
+    <title>${escapeHtml(input.title)} · ${escapeHtml(app)}</title>
     <style>${STYLES}</style>
   </head>
   <body>
@@ -109,7 +148,7 @@ function renderDocument(input: { title: string; body: string; script?: string })
 </html>`
 }
 
-const AUTO_CLOSE_SCRIPT = `setTimeout(function(){try{window.close()}catch(e){}},2500)`
+const AUTO_CLOSE_SCRIPT = `setTimeout(function(){try{window.close()}catch(e){}},3000)`
 
 function bootstrapScript(options: BootstrapOptions) {
   return `var PROVIDER=${scriptString(options.provider ?? "")};
@@ -117,7 +156,7 @@ var TOKEN_URL=new URL(${scriptString(options.tokenPath)},window.location.origin)
 (function(){
   var card=document.getElementById("oc-card"),headline=document.getElementById("oc-headline"),message=document.getElementById("oc-message"),detail=document.getElementById("oc-detail"),footnote=document.getElementById("oc-footnote");
   function fail(text){card.dataset.status="error";headline.textContent="Authorization failed";message.textContent=PROVIDER?("OpenCode couldn't finish connecting to "+PROVIDER+"."):"OpenCode couldn't complete authorization.";if(text){detail.textContent=text;detail.hidden=false}footnote.textContent="Close this window and try again from OpenCode."}
-  function ok(){card.dataset.status="success";headline.textContent="Authorization successful";message.textContent=PROVIDER?("OpenCode is now connected to "+PROVIDER+"."):"OpenCode is now authorized.";detail.hidden=true;footnote.textContent="You can close this window.";setTimeout(function(){try{window.close()}catch(e){}},2500)}
+  function ok(){card.dataset.status="success";headline.textContent="Authorization successful";message.textContent=PROVIDER?("OpenCode is now connected to "+PROVIDER+"."):"OpenCode is now authorized.";detail.hidden=true;footnote.textContent="You can close this window.";setTimeout(function(){try{window.close()}catch(e){}},3000)}
   try{
     var hash=new URLSearchParams((window.location.hash||"").slice(1));
     var search=new URLSearchParams(window.location.search||"");
@@ -183,7 +222,7 @@ const DARK_VARS = `
 
 const STYLES = `
   :root { color-scheme: light dark;${LIGHT_VARS}
-    --oc-font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --oc-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --oc-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {${DARK_VARS} } }
@@ -191,7 +230,7 @@ const STYLES = `
   :root[data-theme="light"] {${LIGHT_VARS} }
 
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
+  html, body { margin: 0; min-height: 100%; }
   body {
     min-height: 100vh;
     display: grid;
@@ -206,26 +245,41 @@ const STYLES = `
   }
   .card {
     width: min(100%, 28rem);
-    padding: 2.25rem 2rem 1.75rem;
+    padding: 2.5rem 2rem 2rem;
     background: var(--oc-card);
     border: 1px solid var(--oc-border-weak);
-    border-radius: 14px;
+    border-radius: 16px;
     box-shadow: var(--oc-shadow);
     text-align: center;
+    animation: oc-card-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes oc-card-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
   .brand { display: flex; justify-content: center; margin-bottom: 1.75rem; }
-  .brand svg { height: 19px; width: auto; }
-  .status { display: flex; justify-content: center; margin-bottom: 1.125rem; }
+  .brand svg { height: 22px; width: auto; }
+  .status { display: flex; justify-content: center; margin-bottom: 1.25rem; }
   .icon { display: none; line-height: 0; }
   .icon svg { display: block; }
   .card[data-status="pending"] .icon-pending,
   .card[data-status="success"] .icon-success,
   .card[data-status="error"] .icon-error { display: block; }
-  .icon-success { color: var(--oc-success); }
-  .icon-error { color: var(--oc-error); }
+  .icon-success {
+    color: var(--oc-success);
+    animation: oc-icon-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  @keyframes oc-icon-pop {
+    from { opacity: 0; transform: scale(0.4) rotate(-10deg); }
+    to { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+  .icon-error {
+    color: var(--oc-error);
+    animation: oc-icon-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
   .icon-pending { color: var(--oc-text-weak); }
-  .headline { margin: 0; font-size: 1.1875rem; font-weight: 500; line-height: 1.3; letter-spacing: -0.012em; color: var(--oc-text-strong); }
-  .message { margin: 0.5rem 0 0; font-size: 0.9375rem; color: var(--oc-text-base); }
+  .headline { margin: 0; font-size: 1.25rem; font-weight: 600; line-height: 1.3; letter-spacing: -0.015em; color: var(--oc-text-strong); }
+  .message { margin: 0.6rem 0 0; font-size: 0.9375rem; color: var(--oc-text-base); }
   .detail {
     margin: 1.25rem 0 0;
     padding: 0.75rem 0.875rem;
@@ -243,10 +297,36 @@ const STYLES = `
     overflow: auto;
   }
   .detail[hidden] { display: none; }
-  .footnote { margin: 1.5rem 0 0; font-size: 0.8125rem; color: var(--oc-text-weak); }
+  .actions { display: flex; justify-content: center; margin-top: 1.25rem; }
+  .card[data-status="pending"] .actions { display: none; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    color: var(--oc-text-strong);
+    background: var(--oc-card);
+    border: 1px solid var(--oc-border-weak);
+    border-radius: 9999px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    transition: all 0.15s ease;
+  }
+  .btn:hover {
+    background: var(--oc-border-weak);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  }
+  .btn:active { transform: translateY(0); }
+  .footnote { margin: 1.25rem 0 0; font-size: 0.8125rem; color: var(--oc-text-weak); }
   .spinner { animation: oc-spin 0.8s linear infinite; transform-origin: center; }
   @keyframes oc-spin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner, .card, .icon-success, .icon-error { animation: none; }
+  }
 `
 
 // OpenCode wordmark — same path geometry as packages/ui/src/components/logo.tsx (Logo).

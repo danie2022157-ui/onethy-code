@@ -166,6 +166,14 @@ describe("Npm.cacheKey", () => {
     expect(await Npm.isInstallablePackage(pinned.slice(0, -1) + "notasha")).toBeFalse()
   })
 
+  test("recognizes immutable GitHub release asset tarballs without Git preparation", async () => {
+    const release = "https://github.com/JoshRob297/opencode-antigravity-auth/releases/download/v2.9.3/opencode-antigravity-auth-2.9.3.tgz"
+    expect(await Npm.isInstallablePackage(release)).toBeTrue()
+    expect(await Npm.isRegistryPackage(release)).toBeFalse()
+    expect(await Npm.cacheKey(release)).toMatch(/^remote-JoshRob297-opencode-antigravity-auth-[0-9a-f]{12}$/)
+    expect(await Npm.cacheKey(release)).toBe(await Npm.cacheKey(release))
+  })
+
   test("canonicalizes registry keys and hashes Git specs", async () => {
     expect(await Npm.cacheKey("@opencode/acme@1.0.0")).toBe(Npm.sanitize("@opencode/acme@1.0.0"))
     expect(await Npm.cacheKey("plugin")).toBe(Npm.sanitize("plugin@latest"))

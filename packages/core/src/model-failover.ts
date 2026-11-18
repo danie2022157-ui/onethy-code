@@ -35,7 +35,8 @@ export function isAccountQuotaError(
   return (
     error.type === "provider.quota" ||
     error.type === "provider.chatgpt-limit" ||
-    error.type === "provider.free-limit"
+    error.type === "provider.free-limit" ||
+    error.type === "provider.go-limit"
   )
 }
 

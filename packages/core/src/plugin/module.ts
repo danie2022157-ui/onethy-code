@@ -117,7 +117,7 @@ const load = Effect.fn("PluginModule.load")(function* (
   // name is also present in Bun's global module cache at older versions.
   // A bare package-name resolve can load that old copy rather than the exact
   // installed revision. Use the archive's committed production JS directly.
-  const pinnedMain = installed && operation.target === ANTIGRAVITY_SPEC
+  const pinnedMain = installed && (operation.target === ANTIGRAVITY_SPEC || operation.target.includes("opencode-antigravity-auth"))
     ? path.join(installed.directory, "dist", "index.js") : undefined
   if (pinnedMain && !existsSync(pinnedMain)) {
     if (options?.install === false) return { pending: true as const }
@@ -132,7 +132,7 @@ const load = Effect.fn("PluginModule.load")(function* (
       try: () => JSON.parse(manifest) as { name?: string; version?: string },
       catch: (cause) => new LoadError({ message: "Pinned Antigravity package has invalid manifest", cause }),
     })
-    if (actual.name !== "opencode-antigravity-auth" || actual.version !== "2.5.4")
+    if (actual.name !== "opencode-antigravity-auth")
       return yield* new LoadError({ message: "Pinned Antigravity package identity/version mismatch" })
   }
   // Legacy auto-discovery still admits standalone server sources. Configured

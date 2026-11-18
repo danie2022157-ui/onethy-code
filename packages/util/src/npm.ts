@@ -76,10 +76,25 @@ async function parse(pkg: string): Promise<Target | undefined> {
       if (!result.fetchSpec) return
       const url = new URL(result.fetchSpec)
       const parts = url.pathname.split("/").filter(Boolean)
-      if (url.protocol !== "https:" || url.hostname !== "codeload.github.com" ||
-          url.search || url.hash || parts.length !== 4 || parts[2] !== "tar.gz" ||
-          !/^[a-f0-9]{40}$/i.test(parts[3]!)) return
-      return { type: "remote", name: parts[1]!, slug: parts[0] + "-" + parts[1], mutable: false }
+      if (url.protocol !== "https:" || url.search || url.hash) return
+      if (
+        url.hostname === "codeload.github.com" &&
+        parts.length === 4 &&
+        parts[2] === "tar.gz" &&
+        /^[a-f0-9]{40}$/i.test(parts[3]!)
+      ) {
+        return { type: "remote", name: parts[1]!, slug: parts[0] + "-" + parts[1], mutable: false }
+      }
+      if (
+        url.hostname === "github.com" &&
+        parts.length === 6 &&
+        parts[2] === "releases" &&
+        parts[3] === "download" &&
+        parts[5]?.endsWith(".tgz")
+      ) {
+        return { type: "remote", name: parts[1]!, slug: parts[0] + "-" + parts[1], mutable: false }
+      }
+      return
     }
     if (!result.name || !["version", "range", "tag"].includes(result.type)) return
     return {

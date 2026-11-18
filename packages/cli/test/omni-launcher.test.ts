@@ -55,11 +55,12 @@ test("fails clearly when Bun cannot be found", async () => {
   if (!node) return
   const child = Bun.spawn([node, path.resolve(import.meta.dir, "../../../bin/omni.js")], {
     env: {
-      ...process.env,
+      ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== "PATH")),
       BUN_BIN: path.join(directory.path, "missing.exe"),
       LOCALAPPDATA: directory.path,
       USERPROFILE: directory.path,
       PATH: directory.path,
+      Path: directory.path,
     },
     stdout: "pipe",
     stderr: "pipe",

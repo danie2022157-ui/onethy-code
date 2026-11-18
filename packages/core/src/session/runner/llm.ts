@@ -8,7 +8,7 @@ import { Bus } from "../../bus.js"
 import { Model } from "../../model.js"
 import { OmniOrchestrator } from "../../omni-orchestrator.js"
 import { agentModelRanking, efficiencyProfile } from "../../efficiency-profile.js"
-import { selectFailoverModel, allowedAutoModels, readAutoFailoverIntent, canFailover, rateLimitCooldown, isAccountQuotaError, requestInputModalities, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
+import { selectFailoverModel, allowedAutoModels, readAutoFailoverIntent, canFailover, isAccountQuotaError, requestInputModalities, MAX_FAILOVERS_PER_STEP } from "../../model-failover.js"
 import { LocationLifecycle } from "../../location-lifecycle.js"
 import { InstructionState } from "../instruction-state.js"
 import { SessionCompaction } from "../compaction.js"
@@ -320,20 +320,26 @@ const layer = Layer.effect(
             // A tool call can arrive during a reload; its permission check reads the session's agent.
             executeTool: (call) => plugins.awaitActivation.pipe(Effect.andThen(prepared.executeTool(call))),
           },
-          retry: (cause, error, proposed) =>
-            retry.decide({
+          retry: (cause, error, proposed) => {
+            const quotaExhausted =
+              cause.reason._tag === "QuotaExceeded" ||
+              isAccountQuotaError(cause, loaded.model.ref) ||
+              isAccountQuotaError(error, loaded.model.ref)
+            return retry.decide({
               cause,
               error,
               agent: loaded.agent.id,
               model: loaded.model.ref,
               hook: prepared.retry,
-              // A quota-limited model must not be retried unchanged. Only the
+              // A quota-exhausted model must not be retried unchanged. Only the
               // authorized automatic failover path may retry it on another model.
+              // Transient rate limits (HTTP 429) can be retried with provider backoff.
               retry: proposed && (
-                rateLimitCooldown(cause, loaded.model.ref) === undefined ||
+                !quotaExhausted ||
                 canFailover(Boolean(first.session.model), process.env, autoIntent?.enabled)
               ),
-            }),
+            })
+          },
           recoverContinuation,
           recoverOverflow: Effect.suspend(() =>
             recoverOverflow
@@ -345,6 +351,8 @@ const layer = Layer.effect(
         })
         const completed = yield* SessionStep.Outcome.$match(outcome, {
           Completed: Effect.fnUntraced(function* (outcome) {
+            if (orchestrator._tag === "Some")
+              yield* orchestrator.value.clearModelCooldown(loaded.model.ref.providerID, loaded.model.ref.id)
             // The Session is about to go idle, which leaves the background summary time to finish.
             if (!outcome.needsContinuation)
               yield* compaction.precompute(

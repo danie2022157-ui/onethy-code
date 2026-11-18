@@ -1,4 +1,7 @@
 import crypto from "node:crypto"
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { TestClock } from "effect/testing"
@@ -15,7 +18,7 @@ import { Provider } from "@opencode/core/provider"
 import { AbsolutePath } from "@opencode/core/schema"
 import { location } from "./fixture/location"
 
-const projectDir = AbsolutePath.make(process.cwd())
+const projectDir = AbsolutePath.make(fs.mkdtempSync(path.join(os.tmpdir(), "omni-orchestrator-test-")))
 
 const testLocation = Layer.succeed(
   Location.Service,
@@ -223,7 +226,12 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       expect(ulwTasks[0].parallel).toBe(true)
       expect(ulwTasks[1].assignedAgent).toBe("librarian")
       const bus = yield* OmniBus.Service
-      const ulwPlan = (yield* bus.list()).find((message) => message.type === "plan" && (message.payload as { mode?: string }).mode === "ultrawork")
+      const ulwPlan = (yield* bus.list()).find(
+        (message) =>
+          message.type === "plan" &&
+          (message.payload as { mode?: string; missionID?: string }).mode === "ultrawork" &&
+          (message.payload as { mode?: string; missionID?: string }).missionID === ulwTasks[0].missionID,
+      )
       expect(ulwPlan?.payload).toMatchObject({ missionID: ulwTasks[0].missionID })
 
       const arenaTasks = yield* orchestrator.planArena("Resolver race condition", [
@@ -237,7 +245,12 @@ describe("OmniCode Multi-Agent Orchestration & Bus", () => {
       expect(arenaPlan?.payload).toMatchObject({ missionID: arenaTasks[0].missionID })
 
       const teamTasks = yield* orchestrator.planTeamPipeline("Construir funcionalidade", "mission-team")
-      const teamPlan = (yield* bus.list()).find((message) => message.type === "plan" && (message.payload as { mode?: string }).mode === "team_pipeline")
+      const teamPlan = (yield* bus.list()).find(
+        (message) =>
+          message.type === "plan" &&
+          (message.payload as { mode?: string; missionID?: string }).mode === "team_pipeline" &&
+          (message.payload as { mode?: string; missionID?: string }).missionID === teamTasks[0].missionID,
+      )
       expect(teamPlan?.payload).toMatchObject({ missionID: teamTasks[0].missionID })
 
       const routed = yield* orchestrator.selectModelForAgent("explore", "Buscar arquivos rapidamente", [

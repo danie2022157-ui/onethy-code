@@ -1,5 +1,6 @@
 import { createServer, type RequestListener, type Server } from "node:http"
 import { readFileSync } from "node:fs"
+import { OauthCallbackPage } from "../oauth/page.js"
 
 /** The Antigravity OAuth integration is the only caller of this loopback listener. */
 export interface AntigravityOAuthListener {
@@ -72,7 +73,7 @@ function remoteBrowserMayNotReachLoopback(): boolean {
  */
 export async function openAntigravityOAuthCallback(authorizationURL: string): Promise<AntigravityOAuthListener | undefined> {
   // In WSL/SSH containers, browser localhost may refer to a different machine.
-  // Preserve the plugin\'s manual URL input unless trusted forwarding is explicit.
+  // Preserve the plugin's manual URL input unless trusted forwarding is explicit.
   if (remoteBrowserMayNotReachLoopback() && process.env.ONETHY_ANTIGRAVITY_OAUTH_LOOPBACK !== "1") return
   const expected = target(authorizationURL)
   if (!expected) return
@@ -89,44 +90,62 @@ export async function openAntigravityOAuthCallback(authorizationURL: string): Pr
 
   const servers: Server[] = []
   const handler: RequestListener = (request, response) => {
-    response.setHeader("Cache-Control", "no-store")
-    response.setHeader("Referrer-Policy", "no-referrer")
-    response.setHeader("Content-Type", "text/plain; charset=utf-8")
-    response.setHeader("Connection", "close")
+    const reply = (status: number, html: string) => {
+      response.writeHead(status, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "Referrer-Policy": "no-referrer",
+        Connection: "close",
+      })
+      response.end(html)
+    }
+
     if (request.method !== "GET" || !request.url) {
-      response.writeHead(405).end("Method not allowed")
+      reply(405, OauthCallbackPage.error("Método não permitido.", { provider: "Google (Antigravity)" }))
       return
     }
     if (![ `localhost:${expected.port}`, `127.0.0.1:${expected.port}`, `[::1]:${expected.port}` ].includes(request.headers.host ?? "")) {
-      response.writeHead(400).end("Invalid callback host")
+      reply(400, OauthCallbackPage.error("Host de retorno inválido.", { provider: "Google (Antigravity)" }))
       return
     }
     const incoming = new URL(request.url, `http://localhost:${expected.port}`)
     if (incoming.pathname !== expected.path) {
-      response.writeHead(404).end("Not found")
+      reply(404, OauthCallbackPage.error("Página não encontrada.", { provider: "Google (Antigravity)" }))
       return
     }
     if (settled) {
-      response.writeHead(410).end("Authorization already received")
+      reply(410, OauthCallbackPage.error("Esta autorização já foi concluída anteriormente.", { provider: "Google (Antigravity)" }))
       return
     }
     if (incoming.searchParams.get("state") !== expected.state) {
-      response.writeHead(400).end("Invalid OAuth state")
+      reply(400, OauthCallbackPage.error("Estado OAuth (state) inválido ou expirado.", { provider: "Google (Antigravity)" }))
       return
     }
     const error = incoming.searchParams.get("error")
     const code = incoming.searchParams.get("code")
     if (!error && !code) {
-      response.writeHead(400).end("Missing authorization result")
+      reply(400, OauthCallbackPage.error("Resultado de autorização ausente.", { provider: "Google (Antigravity)" }))
       return
     }
     settled = true
     if (error) {
-      response.writeHead(400).end("Google authorization was not completed. Return to OnethyCode.")
+      reply(400, OauthCallbackPage.error("A autorização do Google foi cancelada ou negada.", {
+        provider: "Google (Antigravity)",
+        headline: "Autorização não concluída",
+        message: "A autorização do Google foi cancelada ou recusada na conta selecionada.",
+        footnote: "Retorne ao OnethyCode para tentar novamente.",
+        buttonText: "Fechar janela",
+      }))
       rejectCallback(new Error("Google authorization was cancelled or denied"))
       return
     }
-    response.writeHead(200).end("Authorization received. Return to OnethyCode to confirm the connection.")
+    reply(200, OauthCallbackPage.success({
+      provider: "Google (Antigravity)",
+      headline: "Autorização concluída com sucesso!",
+      message: "O OnethyCode foi conectado à sua conta Google com sucesso.",
+      footnote: "Você já pode fechar esta aba do navegador e retornar ao terminal.",
+      buttonText: "Fechar esta janela",
+    }))
     resolveCallback(incoming.toString())
   }
 
