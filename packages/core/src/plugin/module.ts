@@ -117,11 +117,17 @@ const load = Effect.fn("PluginModule.load")(function* (
   // name is also present in Bun's global module cache at older versions.
   // A bare package-name resolve can load that old copy rather than the exact
   // installed revision. Use the archive's committed production JS directly.
-  const pinnedMain = installed && (operation.target === ANTIGRAVITY_SPEC || operation.target.includes("opencode-antigravity-auth"))
-    ? path.join(installed.directory, "dist", "index.js") : undefined
+  const pinnedMain =
+    installed && (operation.target === ANTIGRAVITY_SPEC || operation.target.includes("opencode-antigravity-auth"))
+      ? existsSync(path.join(installed.directory, "dist", "server.js"))
+        ? path.join(installed.directory, "dist", "server.js")
+        : existsSync(path.join(installed.directory, "server.js"))
+          ? path.join(installed.directory, "server.js")
+          : path.join(installed.directory, "dist", "index.js")
+      : undefined
   if (pinnedMain && !existsSync(pinnedMain)) {
     if (options?.install === false) return { pending: true as const }
-    return yield* new LoadError({ message: "Pinned Antigravity archive has no dist/index.js" })
+    return yield* new LoadError({ message: "Pinned Antigravity archive has no server entrypoint" })
   }
   if (pinnedMain && installed) {
     const manifest = yield* Effect.tryPromise({
@@ -132,13 +138,14 @@ const load = Effect.fn("PluginModule.load")(function* (
       try: () => JSON.parse(manifest) as { name?: string; version?: string },
       catch: (cause) => new LoadError({ message: "Pinned Antigravity package has invalid manifest", cause }),
     })
-    if (actual.name !== "opencode-antigravity-auth")
+    if (actual.name !== "opencode-antigravity-auth" && actual.name !== "@cortexkit/opencode-antigravity-auth")
       return yield* new LoadError({ message: "Pinned Antigravity package identity/version mismatch" })
   }
   // Legacy auto-discovery still admits standalone server sources. Configured
   // local plugins always arrive here as directories.
+  const resolved = !local && installed ? Host.resolve(installed) : undefined
   const entrypoints: Host.Entrypoints = pinnedMain
-    ? { server: pathToFileURL(pinnedMain).href }
+    ? { ...resolved, server: pathToFileURL(pinnedMain).href }
     : local && (yield* Effect.promise(() => stat(operation.target))).isFile()
       ? { server: pathToFileURL(operation.target).href }
       : yield* Effect.sync(() => Host.resolve(installed ?? { directory: operation.target }))
