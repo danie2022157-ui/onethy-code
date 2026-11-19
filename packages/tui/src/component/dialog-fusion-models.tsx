@@ -34,6 +34,8 @@ const PROVIDER_META: Record<string, { title: string; icon: string; accentHex: st
   xai: { title: "xAI / Grok", icon: "⚡", accentHex: "#F43F5E", order: 6 },
 }
 
+const CUSTOM_ACCENTS = ["#00F5FF", "#EC4899", "#14B8A6", "#8B5CF6", "#F97316", "#84CC16", "#E11D48"]
+
 function cleanModelLabel(name: string, id: string): string {
   const base = name
     .replace(/^(OpenAI|Google|Anthropic|OpenCode)\s*[:\-–]?\s*/i, "")
@@ -101,13 +103,16 @@ export function DialogFusionModels() {
     }
 
     const temp: (Omit<ProviderColumn, "colIndex"> & { order: number })[] = []
+    let customIdx = 0
     for (const [providerID, models] of grouped.entries()) {
-      const meta = PROVIDER_META[providerID.toLowerCase()] ?? {
+      const standard = PROVIDER_META[providerID.toLowerCase()]
+      const meta = standard ?? {
         title: provNames.get(providerID) ?? providerID,
         icon: "⚡",
-        accentHex: "#00F5FF",
+        accentHex: CUSTOM_ACCENTS[customIdx % CUSTOM_ACCENTS.length] ?? "#00F5FF",
         order: 99,
       }
+      if (!standard) customIdx++
       temp.push({
         providerID,
         title: meta.title,
