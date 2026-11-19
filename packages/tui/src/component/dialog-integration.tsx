@@ -95,7 +95,14 @@ export function integrationOptions(list: IntegrationInfo[]) {
 
 export function connectMethods(integration: IntegrationInfo): ConnectMethod[] {
   return integration.methods
-    .filter((method): method is ConnectMethod => method.type !== "env")
+    .filter((method): method is ConnectMethod => {
+      if (method.type === "env") return false
+      const label = method.label ?? ""
+      if (label.includes("Antigravity vault") || label.includes("Antigravity pool")) {
+        return false
+      }
+      return true
+    })
     .toSorted((a, b) => Number(a.type === "key") - Number(b.type === "key"))
 }
 

@@ -63,6 +63,7 @@ import { LocationProvider, useLocation } from "./context/location"
 import { LocalProvider, useLocal } from "./context/local"
 import { PermissionProvider } from "./context/permission"
 import { DialogModel } from "./component/dialog-model"
+import { DialogImage } from "./component/dialog-image"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
 import { DialogUsage } from "./component/usage"
@@ -951,6 +952,17 @@ function App() {
         slash: { name: "models" },
         run: () => {
           dialog.replace(() => <DialogModel />)
+        },
+      },
+      {
+        name: "image.manager",
+        title: "Image generation manager",
+        description: "Gerenciar modelos de imagem e gerar imagens",
+        suggested: true,
+        category: "Agent",
+        slash: { name: "image", aliases: ["imagem", "images"] },
+        run: () => {
+          dialog.replace(() => <DialogImage />)
         },
       },
       {

@@ -231,14 +231,25 @@ const layer = Layer.effect(
             byProvider.get(providerID)?.forEach((model, id, models) => {
               if (!model.cost.some((cost) => cost.input > 0)) models.delete(id)
             })
-        // Non-chat models (image, decision…) only show up when listed by type, so nothing that
-        // picks or resolves a session model can reach them.
+        // Non-chat models (decision, etc.) only show up when listed by type,
+        // while image models remain available in chat unless explicitly hidden with hideFromChat.
         const other = new Map<Model.Type, Info[]>()
         byProvider.forEach((models) =>
           models.forEach((model, id) => {
+            if (model.enabled) {
+              if (model.type && model.type !== "chat") {
+                other.set(model.type, [...(other.get(model.type) ?? []), model])
+              }
+              if (model.capabilities.output.some((o) => o.startsWith("image"))) {
+                const list = other.get("image") ?? []
+                if (!list.some((m) => m.id === model.id && m.providerID === model.providerID)) {
+                  other.set("image", [...list, model])
+                }
+              }
+            }
             if ((model.type ?? "chat") === "chat") return
+            if (model.type === "image" && !model.settings?.hideFromChat) return
             models.delete(id)
-            if (model.enabled) other.set(model.type!, [...(other.get(model.type!) ?? []), model])
           }),
         )
         const all = Array.from(byProvider.values())
