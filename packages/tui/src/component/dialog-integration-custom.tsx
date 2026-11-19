@@ -10,6 +10,16 @@ import { errorMessage } from "../util/error"
 export interface DiscoveredModel {
   readonly id: string
   readonly name: string
+  readonly type?: "chat" | "image"
+}
+
+export function isLikelyImageModel(id: string, name?: string): boolean {
+  const target = `${id} ${name ?? ""}`.toLowerCase()
+  return (
+    /dall-?e|flux|stable-diffusion|\bsdxl\b|\bsd3\b|\bsd-|\bimagen\b|midjourney|ideogram|recraft|kandinsky|playground-v|bfl\/|lumina|kolors|cogview|aurora|wanx|text-to-image|image-generation/i.test(
+      target,
+    )
+  )
 }
 
 export interface CustomProviderRecord {
@@ -18,7 +28,9 @@ export interface CustomProviderRecord {
   readonly baseURL?: string
   readonly apiKey?: string
   readonly modelCount: number
+  readonly imageModelCount: number
   readonly filePath: string
+  readonly models: Record<string, { readonly name?: string; readonly type?: string }>
 }
 
 export function targetConfigFile(entries: readonly ConfigEntry[] = []): string {
@@ -38,13 +50,18 @@ export function extractCustomProviders(entries: readonly ConfigEntry[] = []): Cu
     if (entry.type !== "document" || !entry.path || !entry.info.providers) continue
     for (const [id, prov] of Object.entries(entry.info.providers)) {
       if (list.some((item) => item.id === id)) continue
+      const provModels = (prov.models ?? {}) as Record<string, { readonly name?: string; readonly type?: string }>
+      const modelKeys = Object.keys(provModels)
+      const imageCount = modelKeys.filter((k) => provModels[k]?.type === "image").length
       list.push({
         id,
         name: prov.name || id,
         baseURL: typeof prov.settings?.baseURL === "string" ? prov.settings.baseURL : undefined,
         apiKey: typeof prov.settings?.apiKey === "string" ? prov.settings.apiKey : undefined,
-        modelCount: prov.models ? Object.keys(prov.models).length : 0,
+        modelCount: modelKeys.length,
+        imageModelCount: imageCount,
         filePath: entry.path,
+        models: provModels,
       })
     }
   }
@@ -114,7 +131,10 @@ function parseModelsData(data: unknown): DiscoveredModel[] {
     seen.add(id)
     const rawName = typeof item === "object" && item !== null && "name" in item ? (item as Record<string, unknown>).name : undefined
     const name = typeof rawName === "string" && rawName.trim() ? rawName.trim() : id
-    result.push({ id, name })
+    const type = (typeof item === "object" && item !== null && (item as Record<string, unknown>).type === "image") || isLikelyImageModel(id, name)
+      ? "image"
+      : undefined
+    result.push({ id, name, type })
   }
   return result
 }
@@ -129,7 +149,7 @@ export async function saveCustomProviderToConfig(
       readonly baseURL: string
       readonly apiKey?: string
     }
-    readonly models: Record<string, { readonly name?: string }>
+    readonly models: Record<string, { readonly name?: string; readonly type?: "chat" | "image" }>
   },
 ) {
   const file = Bun.file(filePath)
@@ -254,9 +274,10 @@ async function fetchAndConfirmModels(
             .filter(Boolean)
           if (!ids.length) return
           const targetFile = targetConfigFile(entries)
-          const modelEntries: Record<string, { readonly name?: string }> = {}
+          const modelEntries: Record<string, { readonly name?: string; readonly type?: "chat" | "image" }> = {}
           for (const mId of ids) {
-            modelEntries[mId] = { name: mId }
+            const isImg = isLikelyImageModel(mId)
+            modelEntries[mId] = isImg ? { name: mId, type: "image" } : { name: mId }
           }
           await saveCustomProviderToConfig(targetFile, id, {
             name,
@@ -267,9 +288,10 @@ async function fetchAndConfirmModels(
             },
             models: modelEntries,
           })
+          const imgCount = Object.values(modelEntries).filter((m) => m.type === "image").length
           toast.show({
             variant: "success",
-            message: `Provedor "${name}" salvo com ${ids.length} modelos em ${path.basename(targetFile)}!`,
+            message: `Provedor "${name}" salvo com ${ids.length} modelos${imgCount > 0 ? ` (${imgCount} de imagem)` : ""} em ${path.basename(targetFile)}!`,
           })
           dialog.clear()
         }}
@@ -277,6 +299,8 @@ async function fetchAndConfirmModels(
     ))
     return
   }
+
+  const detectedImages = models.filter((m) => m.type === "image").length
 
   dialog.replace(() => (
     <DialogSelect
@@ -286,12 +310,14 @@ async function fetchAndConfirmModels(
         {
           title: `✓ Importar todos os ${models.length} modelos`,
           value: "import_all",
-          description: `Salvar provedor "${name}" com todos os modelos puxados`,
+          description: detectedImages > 0
+            ? `Salvar provedor "${name}" (${detectedImages} modelo(s) de imagem detectados automaticamente)`
+            : `Salvar provedor "${name}" com todos os modelos puxados`,
           onSelect: async () => {
             const targetFile = targetConfigFile(entries)
-            const modelEntries: Record<string, { readonly name?: string }> = {}
+            const modelEntries: Record<string, { readonly name?: string; readonly type?: "chat" | "image" }> = {}
             for (const m of models) {
-              modelEntries[m.id] = { name: m.name || m.id }
+              modelEntries[m.id] = m.type === "image" ? { name: m.name || m.id, type: "image" } : { name: m.name || m.id }
             }
             await saveCustomProviderToConfig(targetFile, id, {
               name,
@@ -304,16 +330,16 @@ async function fetchAndConfirmModels(
             })
             toast.show({
               variant: "success",
-              message: `Provedor "${name}" salvo com ${models.length} modelos em ${path.basename(targetFile)}!`,
+              message: `Provedor "${name}" salvo com ${models.length} modelos${detectedImages > 0 ? ` (${detectedImages} de imagem)` : ""} em ${path.basename(targetFile)}!`,
             })
             dialog.clear()
           },
         },
         {
-          title: `Modelos: ${models.slice(0, 6).map((m) => m.id).join(", ")}${models.length > 6 ? "..." : ""}`,
+          title: `Modelos: ${models.slice(0, 6).map((m) => (m.type === "image" ? `🎨 ${m.id}` : m.id)).join(", ")}${models.length > 6 ? "..." : ""}`,
           value: "preview",
           disabled: true,
-          description: "Lista de modelos obtida automaticamente",
+          description: detectedImages > 0 ? `${detectedImages} modelo(s) de imagem identificados automaticamente` : "Lista de modelos obtida automaticamente",
           onSelect: () => {},
         },
         {
@@ -365,9 +391,9 @@ export function manageCustomProvider(
                 dialog.clear()
                 return
               }
-              const modelEntries: Record<string, { readonly name?: string }> = {}
+              const modelEntries: Record<string, { readonly name?: string; readonly type?: "chat" | "image" }> = {}
               for (const m of models) {
-                modelEntries[m.id] = { name: m.name || m.id }
+                modelEntries[m.id] = m.type === "image" ? { name: m.name || m.id, type: "image" } : { name: m.name || m.id }
               }
               await saveCustomProviderToConfig(provider.filePath, provider.id, {
                 name: provider.name,
@@ -378,13 +404,20 @@ export function manageCustomProvider(
                 },
                 models: modelEntries,
               })
+              const imgCount = Object.values(modelEntries).filter((m) => m.type === "image").length
               toast.show({
                 variant: "success",
-                message: `Modelos atualizados: ${models.length} modelos importados para "${provider.name}"!`,
+                message: `Modelos atualizados: ${models.length} modelos importados para "${provider.name}"${imgCount > 0 ? ` (${imgCount} de imagem)` : ""}!`,
               })
               dialog.clear()
             })()
           },
+        },
+        {
+          title: `🎨 Modelos de Imagem (${provider.imageModelCount} configurados)`,
+          value: "manage_images",
+          description: "Marcar modelos como geradores de imagem ou cadastrar novos",
+          onSelect: () => promptManageImageModels(provider, dialog, toast),
         },
         {
           title: "🔑 Alterar API Key",
@@ -472,6 +505,94 @@ export function manageCustomProvider(
           },
         },
       ]}
+    />
+  ))
+}
+
+function promptManageImageModels(
+  provider: CustomProviderRecord,
+  dialog: ReturnType<typeof useDialog>,
+  toast: ReturnType<typeof useToast>,
+) {
+  const models = provider.models ?? {}
+  const entries = Object.entries(models)
+
+  const toggleModelType = async (modelID: string, currentType?: string) => {
+    const newType = currentType === "image" ? undefined : "image"
+    const targetFile = provider.filePath
+    const file = Bun.file(targetFile)
+    const content = await file.text()
+    const edits = modify(content, ["providers", provider.id, "models", modelID, "type"], newType, {
+      formattingOptions: { tabSize: 2, insertSpaces: true },
+    })
+    const updated = applyEdits(content, edits)
+    await Bun.write(targetFile, updated.endsWith("\n") ? updated : `${updated}\n`)
+    toast.show({
+      variant: "success",
+      message:
+        newType === "image"
+          ? `✓ Modelo "${modelID}" configurado como Gerador de Imagem! 🎨`
+          : `✓ Modelo "${modelID}" configurado como Modelo de Chat padrão.`,
+    })
+    dialog.clear()
+  }
+
+  const addImageModel = () => {
+    dialog.replace(() => (
+      <DialogPrompt
+        title={`Adicionar Modelo de Imagem (${provider.name})`}
+        subtitle="Digite o ID do modelo de imagem (ex: dall-e-3, flux-1-schnell, sdxl)"
+        placeholder="Ex: dall-e-3"
+        onCancel={() => manageCustomProvider(provider, dialog, toast)}
+        onConfirm={async (val) => {
+          const modelID = val.trim()
+          if (!modelID) return
+          const targetFile = provider.filePath
+          const file = Bun.file(targetFile)
+          const content = await file.text()
+          const edits = modify(
+            content,
+            ["providers", provider.id, "models", modelID],
+            { name: modelID, type: "image" },
+            { formattingOptions: { tabSize: 2, insertSpaces: true } },
+          )
+          const updated = applyEdits(content, edits)
+          await Bun.write(targetFile, updated.endsWith("\n") ? updated : `${updated}\n`)
+          toast.show({
+            variant: "success",
+            message: `Modelo de imagem "${modelID}" adicionado a "${provider.name}"! 🎨`,
+          })
+          dialog.clear()
+        }}
+      />
+    ))
+  }
+
+  const options = [
+    {
+      title: "➕ Adicionar modelo de imagem manualmente",
+      value: "__add_image_model__",
+      description: "Cadastrar modelo pelo ID (ex: dall-e-3, flux-1-schnell, sdxl)",
+      onSelect: addImageModel,
+    },
+    ...entries.map(([mId, mInfo]) => {
+      const isImg = mInfo?.type === "image"
+      return {
+        title: `${isImg ? "🎨 [IMAGEM] " : "💬 [CHAT] "} ${mInfo?.name ?? mId}`,
+        value: mId,
+        description: isImg
+          ? `ID: ${mId} • Clique para alternar para modelo de Chat`
+          : `ID: ${mId} • Clique para alternar para modelo de Imagem`,
+        onSelect: () => void toggleModelType(mId, mInfo?.type),
+      }
+    }),
+  ]
+
+  dialog.replace(() => (
+    <DialogSelect
+      title={`Modelos de Imagem (${provider.name})`}
+      titlePlaceholder="Buscar modelo para alternar..."
+      options={options}
     />
   ))
 }
