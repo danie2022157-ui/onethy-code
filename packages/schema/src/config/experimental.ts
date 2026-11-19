@@ -27,6 +27,10 @@ export class Info extends Schema.Class<Info>("ConfigExperimental.Info")({
         description:
           "Default model for the experimental_image_generate tool when the agent doesn't choose one, as providerID/modelID. Falls back to automatic selection when it isn't available.",
       }),
+      models: Schema.Array(Schema.String).pipe(optional).annotate({
+        description:
+          "Pool of selected/allowed image generation models for multi-model selection, rotation, and fallback.",
+      }),
     }),
   ])
     .pipe(optional)

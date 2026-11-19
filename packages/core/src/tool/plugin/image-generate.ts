@@ -104,6 +104,17 @@ export const Plugin = {
           !preferred.variants.some((variant) => variant.id === configured.variant)
         if (preferred && !variantMissing && (!images || acceptsImages(preferred)))
           return { model: preferred, variant: configured?.variant }
+        const pool = configuredPool(yield* config.entries())
+        for (const item of pool) {
+          const slash = item.indexOf("/")
+          if (slash <= 0) continue
+          const pId = item.slice(0, slash)
+          const mId = item.slice(slash + 1)
+          const candidate = available.find((m) => m.providerID === pId && m.id === mId)
+          if (candidate && (!images || acceptsImages(candidate))) {
+            return { model: candidate }
+          }
+        }
         const providerID = (yield* ctx.session.get({ sessionID })).model?.providerID
         const model = defaultModel(available, { providerID, images })
         if (!model)
@@ -403,6 +414,14 @@ function imageGenerate(entries: readonly Entry[]) {
 function configuredModel(entries: readonly Entry[]) {
   const value = imageGenerate(entries)
   return typeof value === "object" ? value.model : undefined
+}
+
+function configuredPool(entries: readonly Entry[]) {
+  const value = imageGenerate(entries)
+  if (typeof value === "object" && Array.isArray((value as Record<string, unknown>).models)) {
+    return (value as Record<string, unknown>).models as string[]
+  }
+  return []
 }
 
 function acceptsImages(model: Model.Info) {
