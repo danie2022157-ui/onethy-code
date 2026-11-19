@@ -577,12 +577,13 @@ function KeyMethod(props: {
       title={props.method.label ?? `Connect ${props.integration.name}`}
       placeholder="API key"
       onConfirm={(key) => {
-        if (!key) return
+        const trimmed = key.trim()
+        if (!trimmed) return
         void client.api.integration.connect
           .key({
             integrationID: props.integration.id,
             location: locationQuery(props.location),
-            key,
+            key: trimmed,
             ...(props.answer ? { answer: props.answer } : {}),
           })
           .then(() => connected(props.integration, props.location, data, dialog, toast, props.onConnected))

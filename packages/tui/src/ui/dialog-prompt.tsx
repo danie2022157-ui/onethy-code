@@ -1,11 +1,13 @@
-import { TextareaRenderable } from "@opentui/core"
+import { decodePasteBytes, stripAnsiSequences, TextareaRenderable } from "@opentui/core"
+import { usePaste, useRenderer } from "@opentui/solid"
 import { Keymap } from "../context/keymap"
 import { useTheme } from "../context/theme"
+import { useClipboard } from "../context/clipboard"
+import { useToast } from "./toast"
 import { DialogFooter, DialogHeader, DialogLayout, useDialog, type DialogSize } from "./dialog"
 import { Show, createEffect, createSignal, onMount, type JSX } from "solid-js"
 import { Spinner } from "../component/spinner"
 import { useConfig } from "../config"
-import { useRenderer } from "@opentui/solid"
 
 export type DialogPromptAction = {
   title: string
@@ -34,6 +36,8 @@ export type DialogPromptProps = {
 export function DialogPrompt(props: DialogPromptProps) {
   const dialog = useDialog()
   const renderer = useRenderer()
+  const clipboard = useClipboard()
+  const toast = useToast()
   const theme = useTheme().surface("dialog")
   const config = useConfig().data
   const [textareaTarget, setTextareaTarget] = createSignal<TextareaRenderable>()
@@ -43,6 +47,25 @@ export function DialogPrompt(props: DialogPromptProps) {
     if (props.busy) return
     props.onConfirm?.(textarea.plainText)
   }
+
+  function pasteClipboard() {
+    if (props.busy || !textarea || textarea.isDestroyed) return
+    void clipboard
+      .read()
+      .then((content) => {
+        if (!content || content.mime !== "text/plain") return
+        const value = stripAnsiSequences(content.data).replace(/\r\n?/g, "\n")
+        textarea.insertText(value)
+      })
+      .catch(toast.error)
+  }
+
+  usePaste((event) => {
+    if (props.busy || !textarea || textarea.isDestroyed) return
+    const value = stripAnsiSequences(decodePasteBytes(event.bytes)).replace(/\r\n?/g, "\n")
+    textarea.insertText(value)
+    event.preventDefault()
+  })
 
   const handle = {
     setValue(value: string) {
@@ -71,6 +94,12 @@ export function DialogPrompt(props: DialogPromptProps) {
         title: "Submit dialog prompt",
         group: "Dialog",
         run: confirm,
+      },
+      {
+        id: "prompt.paste",
+        title: "Paste from clipboard",
+        group: "Dialog",
+        run: pasteClipboard,
       },
       ...(props.actions ?? []).map((action) => ({
         id: action.command,
@@ -143,6 +172,7 @@ export function DialogPrompt(props: DialogPromptProps) {
         actions: {
           primary: [
             ...extraActions(),
+            { title: "paste", command: "prompt.paste", disabled: props.busy, onTrigger: pasteClipboard },
             { title: "submit", command: "dialog.prompt.submit", disabled: props.busy, onTrigger: confirm },
           ],
         },
@@ -151,7 +181,11 @@ export function DialogPrompt(props: DialogPromptProps) {
         <Show when={!props.busy} fallback={<text fg={theme.text.muted}>processing…</text>}>
           <DialogFooter
             actions={{
-              secondary: [{ title: "submit", command: "dialog.prompt.submit", onTrigger: confirm }, ...extraActions()],
+              secondary: [
+                { title: "paste", command: "prompt.paste", onTrigger: pasteClipboard },
+                { title: "submit", command: "dialog.prompt.submit", onTrigger: confirm },
+                ...extraActions(),
+              ],
             }}
           />
         </Show>
