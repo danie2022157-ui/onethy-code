@@ -1,5 +1,9 @@
-# OnethyCode — Instalador Global para Windows
+﻿# OnethyCode - Instalador Global para Windows
 $ErrorActionPreference = "Stop"
+try {
+  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+  $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch {}
 
 if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
   Write-Error "Este instalador precisa ser executado do checkout local. Use git clone, bun install --frozen-lockfile e depois .\\install.ps1."
@@ -31,13 +35,13 @@ Write-Host "==========================================================" -Foregro
 
 $nodePath = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $nodePath) {
-  Write-Host "[ERRO] Node.js não foi encontrado no PATH. Instale o Node.js v20+ antes de continuar." -ForegroundColor Red
+  Write-Host "[ERRO] Node.js nao foi encontrado no PATH. Instale o Node.js v20+ antes de continuar." -ForegroundColor Red
   exit 1
 }
 
 $nodeMajor = & $nodePath -p "Number(process.versions.node.split('.')[0])"
 if ($LASTEXITCODE -ne 0 -or [int]$nodeMajor -lt 20) {
-  Write-Host "[ERRO] Node.js v20+ é necessário. Versão encontrada: $nodeMajor" -ForegroundColor Red
+  Write-Host "[ERRO] Node.js v20+ e necessario. Versao encontrada: $nodeMajor" -ForegroundColor Red
   exit 1
 }
 
@@ -46,7 +50,7 @@ $dependencies = @(
   (Join-Path $currentDir "packages\cli\node_modules")
 )
 if ($dependencies | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Container) }) {
-  Write-Host "[ERRO] Dependências do OmniCode ausentes. Execute 'bun install' em $currentDir antes de instalar." -ForegroundColor Red
+  Write-Host "[ERRO] Dependencias do OnethyCode ausentes. Execute 'bun install' em $currentDir antes de instalar." -ForegroundColor Red
   exit 1
 }
 
@@ -87,13 +91,13 @@ try {
   Remove-Item -LiteralPath $resolverScriptPath -Force
 }
 if ($resolveExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($bunPath)) {
-  Write-Host "[ERRO] Bun não foi encontrado. Instale o Bun ou defina BUN_BIN com o caminho absoluto do executável." -ForegroundColor Red
+  Write-Host "[ERRO] Bun nao foi encontrado. Instale o Bun ou defina BUN_BIN com o caminho absoluto do executavel." -ForegroundColor Red
   exit 1
 }
 
 & $bunPath --version *> $null
 if ($LASTEXITCODE -ne 0) {
-  Write-Host "[ERRO] O executável Bun resolvido não pôde ser executado: $bunPath" -ForegroundColor Red
+  Write-Host "[ERRO] O executavel Bun resolvido nao pode ser executado: $bunPath" -ForegroundColor Red
   exit 1
 }
 
@@ -283,7 +287,7 @@ Set-Content -Path $omniCmd -Value $cmdContent -Encoding ASCII
 Set-Content -Path $omnicodeCmd -Value $cmdContent -Encoding ASCII
 
 Write-Host "[OK] Comandos 'onethy', 'onethy-code' e aliases instalados em: $targetDir" -ForegroundColor Green
-Write-Host "[OK] Agora você pode abrir qualquer terminal e digitar 'onethy' diretamente!" -ForegroundColor Green
+Write-Host "[OK] Agora voce pode abrir qualquer terminal e digitar 'onethy' diretamente!" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # First-install personalization sync. Bun postinstall normally runs BEFORE the
@@ -322,7 +326,7 @@ if ($env:ONETHY_SKIP_CUSTOMIZATION_SYNC -ne "1" -and $env:GITHUB_ACTIONS -ne "tr
 if ($env:ONETHY_SKIP_PRECOMPILE -ne "1" -and $env:GITHUB_ACTIONS -ne "true" -and $env:CI -ne "true") {
   $precompileScript = Join-Path $currentDir "packages\cli\script\build-local-cache.ts"
   if (Test-Path -LiteralPath $precompileScript -PathType Leaf) {
-    Write-Host "[OnethyCode] Pré-compilando bundle rápido do CLI + TUI..." -ForegroundColor Cyan
+    Write-Host "[OnethyCode] Pre-compilando bundle rapido do CLI + TUI..." -ForegroundColor Cyan
     try {
       & $bunPath $precompileScript
     } catch {
