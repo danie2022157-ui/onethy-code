@@ -340,41 +340,6 @@ function manageConnections(
   })
 }
 
-function promptCustomEndpoint(
-  integration: IntegrationInfo,
-  method: Extract<ConnectMethod, { type: "key" }>,
-  location: LocationRef,
-  dialog: ReturnType<typeof useDialog>,
-  onConnected?: OnIntegrationConnected,
-) {
-  const defaultUrl =
-    integration.id === "anthropic"
-      ? (process.env.ANTHROPIC_BASE_URL ?? "https://api.cosmospro.dev")
-      : "https://api.openai.com/v1"
-  dialog.replace(() => (
-    <DialogPrompt
-      title={`Endpoint Personalizado (${integration.name})`}
-      subtitle="Ex: https://api.cosmospro.dev"
-      value={defaultUrl}
-      placeholder="https://..."
-      onCancel={() => selectMethod(integration, [method], location, dialog, onConnected)}
-      onConfirm={(url) => {
-        const trimmed = url.trim().replace(/\/+$/, "")
-        if (!trimmed) return
-        dialog.replace(() => (
-          <KeyMethod
-            integration={integration}
-            method={method}
-            location={location}
-            answer={{ baseURL: trimmed }}
-            onConnected={onConnected}
-          />
-        ))
-      }}
-    />
-  ))
-}
-
 function selectMethod(
   integration: IntegrationInfo,
   methods: ConnectMethod[],
@@ -383,7 +348,6 @@ function selectMethod(
   onConnected?: OnIntegrationConnected,
 ) {
   const missingAntigravity = nativeAntigravityMissing(integration)
-  const keyMethod = methods.find((m): m is Extract<ConnectMethod, { type: "key" }> => m.type === "key")
   dialog.replace(() => {
     const newDesigns = useNewDesigns()
     return (
@@ -392,21 +356,10 @@ function selectMethod(
         renderFilter={!newDesigns()}
         options={[
           ...methods.map((method) => ({
-            title: method.type === "key" ? (method.label ?? "API key (Oficial)") : method.label,
+            title: method.label ?? "API key",
             value: method.type === "key" ? "key" : method.id,
-            description: method.type === "key" ? `Usar endpoint padrão da ${integration.name}` : undefined,
             onSelect: () => openMethod(integration, method, location, dialog, onConnected),
           })),
-          ...(keyMethod
-            ? [
-                {
-                  title: "🌐 API key com Endpoint Personalizado (Proxy / Cosmos / OneAPI)",
-                  value: "custom_endpoint_key",
-                  description: "Configurar URL Base personalizada (ex: https://api.cosmospro.dev)",
-                  onSelect: () => promptCustomEndpoint(integration, keyMethod, location, dialog, onConnected),
-                },
-              ]
-            : []),
           ...(missingAntigravity
             ? [
                 {
