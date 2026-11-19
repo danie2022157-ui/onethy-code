@@ -1,5 +1,5 @@
 import type { ConfigEntry } from "@opencode/client"
-import { applyEdits, modify } from "jsonc-parser"
+import { applyEdits, modify, parse } from "jsonc-parser"
 import path from "path"
 import { useDialog } from "../ui/dialog"
 import { DialogPrompt } from "../ui/dialog-prompt"
@@ -340,7 +340,7 @@ async function fetchAndConfirmModels(
           value: "preview",
           disabled: true,
           description: detectedImages > 0 ? `${detectedImages} modelo(s) de imagem identificados automaticamente` : "Lista de modelos obtida automaticamente",
-          onSelect: () => {},
+          onSelect: () => { },
         },
         {
           title: "Voltar / Cancelar",
@@ -417,7 +417,7 @@ export function manageCustomProvider(
           title: `🎨 Modelos de Imagem (${provider.imageModelCount} configurados)`,
           value: "manage_images",
           description: "Marcar modelos como geradores de imagem ou cadastrar novos",
-          onSelect: () => promptManageImageModels(provider, dialog, toast),
+          onSelect: () => void promptManageImageModels(provider, dialog, toast),
         },
         {
           title: "🔑 Alterar API Key",
@@ -509,30 +509,79 @@ export function manageCustomProvider(
   ))
 }
 
-function promptManageImageModels(
+async function promptManageImageModels(
   provider: CustomProviderRecord,
   dialog: ReturnType<typeof useDialog>,
   toast: ReturnType<typeof useToast>,
 ) {
   const models = provider.models ?? {}
   const entries = Object.entries(models)
+  const targetFile = provider.filePath
+  const file = Bun.file(targetFile)
+  const content = await file.text()
+  const parsed = (parse(content) ?? {}) as {
+    readonly experimental?: {
+      readonly image_generate?: string | { readonly model?: string }
+    }
+  }
+  const rawDefault = parsed.experimental?.image_generate
+  const currentDefaultModel = typeof rawDefault === "string" ? rawDefault : typeof rawDefault === "object" ? rawDefault?.model : undefined
 
-  const toggleModelType = async (modelID: string, currentType?: string) => {
-    const newType = currentType === "image" ? undefined : "image"
-    const targetFile = provider.filePath
-    const file = Bun.file(targetFile)
-    const content = await file.text()
-    const edits = modify(content, ["providers", provider.id, "models", modelID, "type"], newType, {
+  const setDefaultImageModel = async (modelID: string) => {
+    const freshFile = Bun.file(targetFile)
+    const freshContent = await freshFile.text()
+    const fullRef = `${provider.id}/${modelID}`
+    const edits = modify(freshContent, ["experimental", "image_generate", "model"], fullRef, {
       formattingOptions: { tabSize: 2, insertSpaces: true },
     })
-    const updated = applyEdits(content, edits)
+    const updated = applyEdits(freshContent, edits)
+    await Bun.write(targetFile, updated.endsWith("\n") ? updated : `${updated}\n`)
+    toast.show({
+      variant: "success",
+      message: `⭐ "${fullRef}" agora é o Modelo Padrão de Geração de Imagem! 🎨`,
+    })
+    dialog.clear()
+  }
+
+  const toggleModelType = async (modelID: string, currentType?: string, alsoSetDefault?: boolean) => {
+    const newType = currentType === "image" ? undefined : "image"
+    const freshFile = Bun.file(targetFile)
+    const freshContent = await freshFile.text()
+    let edits = modify(freshContent, ["providers", provider.id, "models", modelID, "type"], newType, {
+      formattingOptions: { tabSize: 2, insertSpaces: true },
+    })
+    let updated = applyEdits(freshContent, edits)
+    if (alsoSetDefault && newType === "image") {
+      const fullRef = `${provider.id}/${modelID}`
+      edits = modify(updated, ["experimental", "image_generate", "model"], fullRef, {
+        formattingOptions: { tabSize: 2, insertSpaces: true },
+      })
+      updated = applyEdits(updated, edits)
+    }
     await Bun.write(targetFile, updated.endsWith("\n") ? updated : `${updated}\n`)
     toast.show({
       variant: "success",
       message:
         newType === "image"
-          ? `✓ Modelo "${modelID}" configurado como Gerador de Imagem! 🎨`
+          ? alsoSetDefault
+            ? `✓ Modelo "${modelID}" configurado como Gerador de Imagem E padrão do sistema! ⭐🎨`
+            : `✓ Modelo "${modelID}" configurado como Gerador de Imagem! 🎨`
           : `✓ Modelo "${modelID}" configurado como Modelo de Chat padrão.`,
+    })
+    dialog.clear()
+  }
+
+  const removeModel = async (modelID: string) => {
+    const freshFile = Bun.file(targetFile)
+    const freshContent = await freshFile.text()
+    const edits = modify(freshContent, ["providers", provider.id, "models", modelID], undefined, {
+      formattingOptions: { tabSize: 2, insertSpaces: true },
+    })
+    const updated = applyEdits(freshContent, edits)
+    await Bun.write(targetFile, updated.endsWith("\n") ? updated : `${updated}\n`)
+    toast.show({
+      variant: "success",
+      message: `Modelo "${modelID}" removido de "${provider.name}".`,
     })
     dialog.clear()
   }
@@ -543,27 +592,117 @@ function promptManageImageModels(
         title={`Adicionar Modelo de Imagem (${provider.name})`}
         subtitle="Digite o ID do modelo de imagem (ex: dall-e-3, flux-1-schnell, sdxl)"
         placeholder="Ex: dall-e-3"
-        onCancel={() => manageCustomProvider(provider, dialog, toast)}
+        onCancel={() => void promptManageImageModels(provider, dialog, toast)}
         onConfirm={async (val) => {
           const modelID = val.trim()
           if (!modelID) return
-          const targetFile = provider.filePath
-          const file = Bun.file(targetFile)
-          const content = await file.text()
-          const edits = modify(
-            content,
+          const freshFile = Bun.file(targetFile)
+          const freshContent = await freshFile.text()
+          const edits1 = modify(
+            freshContent,
             ["providers", provider.id, "models", modelID],
             { name: modelID, type: "image" },
             { formattingOptions: { tabSize: 2, insertSpaces: true } },
           )
-          const updated = applyEdits(content, edits)
+          let updated = applyEdits(freshContent, edits1)
+          const fullRef = `${provider.id}/${modelID}`
+          const edits2 = modify(
+            updated,
+            ["experimental", "image_generate", "model"],
+            fullRef,
+            { formattingOptions: { tabSize: 2, insertSpaces: true } },
+          )
+          updated = applyEdits(updated, edits2)
           await Bun.write(targetFile, updated.endsWith("\n") ? updated : `${updated}\n`)
           toast.show({
             variant: "success",
-            message: `Modelo de imagem "${modelID}" adicionado a "${provider.name}"! 🎨`,
+            message: `Modelo de imagem "${modelID}" adicionado e definido como PADRÃO de imagem! ⭐🎨`,
           })
           dialog.clear()
         }}
+      />
+    ))
+  }
+
+  const openModelActionDialog = (mId: string, mInfo?: { readonly name?: string; readonly type?: string }) => {
+    const isImg = mInfo?.type === "image"
+    const isDefault = currentDefaultModel === `${provider.id}/${mId}`
+
+    if (isImg) {
+      dialog.replace(() => (
+        <DialogSelect
+          title={`Gerenciar Modelo de Imagem: ${mId}`}
+          options={[
+            ...(isDefault
+              ? [
+                  {
+                    title: "⭐ Modelo Padrão Ativo do Sistema",
+                    value: "already_default",
+                    description: "Este modelo já é o gerador padrão usado quando nenhuma opção é especificada.",
+                    onSelect: () => void promptManageImageModels(provider, dialog, toast),
+                  },
+                ]
+              : [
+                  {
+                    title: "⭐ Definir como Modelo Padrão de Geração de Imagem",
+                    value: "set_default",
+                    description: `Configura ${provider.id}/${mId} como gerador padrão ativo em experimental.image_generate`,
+                    onSelect: () => void setDefaultImageModel(mId),
+                  },
+                ]),
+            {
+              title: "💬 Alternar para Modelo de Chat comum",
+              value: "to_chat",
+              description: "Volta este modelo para a lista normal de conversação / chat",
+              onSelect: () => void toggleModelType(mId, "image"),
+            },
+            {
+              title: "❌ Remover Modelo",
+              value: "remove",
+              description: "Excluir este modelo do provedor",
+              onSelect: () => void removeModel(mId),
+            },
+            {
+              title: "↩️ Voltar",
+              value: "back",
+              description: "Voltar para a lista de modelos",
+              onSelect: () => void promptManageImageModels(provider, dialog, toast),
+            },
+          ]}
+        />
+      ))
+      return
+    }
+
+    dialog.replace(() => (
+      <DialogSelect
+        title={`Gerenciar Modelo: ${mId}`}
+        options={[
+          {
+            title: "🎨 Transformar em Modelo de Imagem",
+            value: "to_image",
+            description: "Marca este modelo como gerador de imagem (não aparecerá no chat de texto)",
+            onSelect: () => void toggleModelType(mId, undefined, false),
+          },
+          {
+            title: "⭐ Transformar em Modelo de Imagem E definir como Padrão",
+            value: "to_image_default",
+            description: "Marca como imagem e define imediatamente como o gerador de imagem padrão do sistema",
+            onSelect: () => void toggleModelType(mId, undefined, true),
+          },
+          {
+            title: "❌ Remover Modelo",
+            value: "remove",
+            description: "Excluir este modelo do provedor",
+            onSelect: () => void removeModel(mId),
+          },
+          {
+            title: "↩️ Voltar",
+            value: "back",
+            description: "Voltar para a lista de modelos",
+            onSelect: () => void promptManageImageModels(provider, dialog, toast),
+          },
+        ]}
       />
     ))
   }
@@ -572,18 +711,22 @@ function promptManageImageModels(
     {
       title: "➕ Adicionar modelo de imagem manualmente",
       value: "__add_image_model__",
-      description: "Cadastrar modelo pelo ID (ex: dall-e-3, flux-1-schnell, sdxl)",
+      description: "Cadastrar modelo pelo ID (ex: dall-e-3, flux-1-schnell, sdxl) e definir como padrão",
       onSelect: addImageModel,
     },
     ...entries.map(([mId, mInfo]) => {
       const isImg = mInfo?.type === "image"
+      const isDefault = currentDefaultModel === `${provider.id}/${mId}`
+      const prefix = isDefault ? "⭐ [PADRÃO] " : isImg ? "🎨 [IMAGEM] " : "💬 [CHAT] "
       return {
-        title: `${isImg ? "🎨 [IMAGEM] " : "💬 [CHAT] "} ${mInfo?.name ?? mId}`,
+        title: `${prefix}${mInfo?.name ?? mId}`,
         value: mId,
-        description: isImg
-          ? `ID: ${mId} • Clique para alternar para modelo de Chat`
-          : `ID: ${mId} • Clique para alternar para modelo de Imagem`,
-        onSelect: () => void toggleModelType(mId, mInfo?.type),
+        description: isDefault
+          ? `ID: ${mId} • Modelo padrão do sistema ativo para geração de imagens`
+          : isImg
+            ? `ID: ${mId} • Modelo de imagem configurado (clique para opções / tornar padrão)`
+            : `ID: ${mId} • Modelo de chat (clique para transformar em modelo de imagem)`,
+        onSelect: () => openModelActionDialog(mId, mInfo),
       }
     }),
   ]
@@ -591,7 +734,7 @@ function promptManageImageModels(
   dialog.replace(() => (
     <DialogSelect
       title={`Modelos de Imagem (${provider.name})`}
-      titlePlaceholder="Buscar modelo para alternar..."
+      titlePlaceholder="Buscar modelo para gerenciar..."
       options={options}
     />
   ))

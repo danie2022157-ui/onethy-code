@@ -219,8 +219,11 @@ function overlay(
     }
     if (config.type !== undefined) {
       model.type = config.type
-      if (config.type === "image" && !model.capabilities.output.some((o) => o.startsWith("image"))) {
-        model.capabilities.output = ["image", ...model.capabilities.output]
+      if (config.type === "image") {
+        if (!model.capabilities.output.some((o) => o.startsWith("image"))) {
+          model.capabilities.output = ["image", ...model.capabilities.output]
+        }
+        model.time ??= { released: Date.now() }
       }
     }
     if (config.family !== undefined) model.family = config.family
