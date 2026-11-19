@@ -87,6 +87,7 @@ const child = spawn(bunBin, bunArgs, {
     ...makeOmniEnvironment(process.env, bunBin),
     ONETHY_ACTIVE: "1",
     ONETHY_INSTALL_ROOT: rootDir,
+    ONETHY_ANTIGRAVITY_AUTH: process.env.ONETHY_ANTIGRAVITY_AUTH ?? "1",
     ...(activeCommit ? { ONETHY_COMMIT: activeCommit } : {}),
     OPENCODE_CLI_NAME: "onethy",
     OPENCODE_THEME: process.env.OPENCODE_THEME || "onethy",
