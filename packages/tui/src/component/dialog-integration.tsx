@@ -340,6 +340,34 @@ function manageConnections(
   })
 }
 
+function methodDescription(method: ConnectMethod): string | undefined {
+  if (method.type === "key") return "Chave de API oficial"
+  const label = method.label ?? ""
+  if (label.includes("Use approved Antigravity vault")) {
+    return "Apenas para servidores empresariais com cofre (não usar em máquina pessoal)"
+  }
+  if (label.includes("Use existing local Antigravity pool")) {
+    return "Reconectar contas já salvas no pool local (requer conta ativa com cota)"
+  }
+  if (label.includes("browser")) {
+    return "★ Recomendado: Fazer login com conta Google no navegador"
+  }
+  if (label.includes("paste redirect URL")) {
+    return "Para ambientes remotos/SSH (colar URL de redirecionamento)"
+  }
+  return undefined
+}
+
+function methodOrder(method: ConnectMethod): number {
+  const label = method.label ?? ""
+  if (label.includes("browser")) return 1
+  if (label.includes("paste redirect URL")) return 2
+  if (method.type === "key") return 3
+  if (label.includes("Use existing local Antigravity pool")) return 4
+  if (label.includes("Use approved Antigravity vault")) return 5
+  return 10
+}
+
 function selectMethod(
   integration: IntegrationInfo,
   methods: ConnectMethod[],
@@ -348,6 +376,7 @@ function selectMethod(
   onConnected?: OnIntegrationConnected,
 ) {
   const missingAntigravity = nativeAntigravityMissing(integration)
+  const sortedMethods = [...methods].sort((a, b) => methodOrder(a) - methodOrder(b))
   dialog.replace(() => {
     const newDesigns = useNewDesigns()
     return (
@@ -355,9 +384,10 @@ function selectMethod(
         title={`Connect ${integration.name}`}
         renderFilter={!newDesigns()}
         options={[
-          ...methods.map((method) => ({
+          ...sortedMethods.map((method) => ({
             title: method.label ?? "API key",
             value: method.type === "key" ? "key" : method.id,
+            description: methodDescription(method),
             onSelect: () => openMethod(integration, method, location, dialog, onConnected),
           })),
           ...(missingAntigravity

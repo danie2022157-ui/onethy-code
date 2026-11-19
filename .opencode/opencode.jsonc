@@ -149,6 +149,28 @@
           "name": "omni-coding"
         }
       }
+    },
+    "infinete": {
+      "name": "infinete",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "https://api.infinitemodel.app",
+        "apiKey": "sk-XJ1zZQlBASfX0vysocpNXEYhfOSHjPrfpOtzpA7NLHE"
+      },
+      "models": {
+        "claude-fable-5-1[1m]": {
+          "name": "claude-fable-5-1[1m]"
+        },
+        "claude-opus-5-5[1m]": {
+          "name": "claude-opus-5-5[1m]"
+        },
+        "claude-sonnet-5-5": {
+          "name": "claude-sonnet-5-5"
+        },
+        "claude-haiku-4-5-20251001[1m]": {
+          "name": "claude-haiku-4-5-20251001[1m]"
+        }
+      }
     }
   },
 }
