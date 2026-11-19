@@ -381,8 +381,21 @@ function unresolvedProviderVariables(model: RuntimeInfo, baseURL: string) {
 }
 
 const nativeCredentialSettings = (model: RuntimeInfo, specifier: string, credential: Credential.Value | undefined) => {
-  if (!credential) return {}
-  if (credential.type === "key") return { apiKey: credential.key }
+  if (!credential) {
+    if (specifier === "@opencode/ai/providers/anthropic" && process.env.ANTHROPIC_BASE_URL) {
+      return { baseURL: process.env.ANTHROPIC_BASE_URL }
+    }
+    return {}
+  }
+  if (credential.type === "key") {
+    const baseURL =
+      (typeof credential.metadata?.baseURL === "string" ? credential.metadata.baseURL : undefined) ??
+      (specifier === "@opencode/ai/providers/anthropic" ? process.env.ANTHROPIC_BASE_URL : undefined)
+    return {
+      apiKey: credential.key,
+      ...(baseURL ? { baseURL } : {}),
+    }
+  }
   if (credential.type === "oauth") return tokenSettings(specifier, credential.access)
   // The Bedrock plugin projects the saved profile into settings; SigV4 keeps an ambient bearer token from taking over.
   if (specifier.startsWith("@opencode/ai/providers/amazon-bedrock")) return { auth: "sigv4" }

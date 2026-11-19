@@ -823,7 +823,7 @@ const layer = Layer.effect(
             const invalid = Form.validateFields(method.form) ?? Form.validateAnswer(method.form, answer)
             if (invalid) return yield* new AuthorizationError({ cause: new Error(invalid) })
           }
-          if (!method.form && Object.keys(answer).length > 0) {
+          if (!method.form && Object.keys(answer).filter((key) => key !== "baseURL").length > 0) {
             return yield* new AuthorizationError({ cause: new Error("Key method does not accept a form answer") })
           }
           yield* createCredential({
@@ -848,7 +848,7 @@ const layer = Layer.effect(
             const invalid = Form.validateFields(method.form) ?? Form.validateAnswer(method.form, answer)
             if (invalid) return yield* new AuthorizationError({ cause: new Error(invalid) })
           }
-          if (!method.form && Object.keys(answer).length > 0) {
+          if (!method.form && Object.keys(answer).filter((key) => key !== "baseURL").length > 0) {
             return yield* new AuthorizationError({ cause: new Error("External method does not accept a form answer") })
           }
           yield* createCredential({

@@ -29,19 +29,31 @@ export type Settings = ProviderPackage.Settings &
     readonly baseURL?: string
   }
 
+function normalizeBaseURL(url?: string): string | undefined {
+  if (!url) return undefined
+  const trimmed = url.trim().replace(/\/+$/, "")
+  return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`
+}
+
 const auth = (options: ProviderAuthOption<"optional">) => {
   if ("auth" in options && options.auth) return options.auth
-  return Auth.optional("apiKey" in options ? options.apiKey : undefined, "apiKey")
+  const key = "apiKey" in options ? options.apiKey : undefined
+  return Auth.optional(key, "apiKey")
+    .orElse(Auth.config("ANTHROPIC_AUTH_TOKEN"))
     .orElse(Auth.config("ANTHROPIC_API_KEY"))
     .pipe(Auth.header("x-api-key"))
 }
 
 export const configure = (input: Config = {}) => {
   const { apiKey: _, auth: _auth, baseURL, ...rest } = input
+  const resolvedBaseURL =
+    normalizeBaseURL(baseURL) ??
+    normalizeBaseURL(process.env.ANTHROPIC_BASE_URL) ??
+    AnthropicMessages.DEFAULT_BASE_URL
   const compatible = AnthropicCompatible.configure({
     ...rest,
     auth: auth(input),
-    baseURL: baseURL ?? AnthropicMessages.DEFAULT_BASE_URL,
+    baseURL: resolvedBaseURL,
     provider: id,
   })
   return {
@@ -56,14 +68,18 @@ export const model: ProviderPackage.Model<Settings, AnthropicMessages.ProviderOp
   modelID,
   { apiKey, authToken, baseURL, body, headers, ...providerOptions }: Settings = {},
 ) => {
+  const resolvedBaseURL =
+    normalizeBaseURL(baseURL) ??
+    normalizeBaseURL(process.env.ANTHROPIC_BASE_URL)
+  const resolvedAuthToken = authToken ?? (apiKey === undefined ? process.env.ANTHROPIC_AUTH_TOKEN : undefined)
   if (apiKey !== undefined && authToken !== undefined)
     throw new ProviderConfigurationError({
       provider: id,
       message: "Anthropic apiKey cannot be combined with authToken",
     })
   return configure({
-    ...(authToken === undefined ? { apiKey: apiKey } : { auth: Auth.bearer(authToken) }),
-    baseURL,
+    ...(resolvedAuthToken === undefined ? { apiKey: apiKey } : { auth: Auth.bearer(resolvedAuthToken) }),
+    baseURL: resolvedBaseURL,
     headers,
     http: body === undefined ? undefined : { body },
     providerOptions,
