@@ -38,6 +38,11 @@ import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
 import { nativeAntigravityMissing } from "../util/native-antigravity-connection"
 import {
+  extractCustomProviders,
+  manageCustomProvider,
+  promptAddCustomProvider,
+} from "./dialog-integration-custom"
+import {
   formInitialValues,
   formLabel,
   formRows,
@@ -54,7 +59,18 @@ const INTEGRATION_PRIORITY: Record<string, number> = {
   "github-copilot": 3,
   anthropic: 4,
   google: 5,
+  xai: 6,
 }
+
+const ALLOWED_INTEGRATIONS = new Set([
+  "opencode",
+  "opencode-go",
+  "openai",
+  "github-copilot",
+  "anthropic",
+  "google",
+  "xai",
+])
 
 type ConnectMethod = Exclude<IntegrationInfo["methods"][number], { type: "env" }>
 type IntegrationAttempt = IntegrationOauthConnectOutput["data"]
@@ -104,11 +120,18 @@ export function DialogIntegration(
   const data = useData()
   const currentLocation = useLocation()
   const dialog = useDialog()
+  const toast = useToast()
   const theme = useTheme().surface("dialog")
   const location = currentLocation.ref ?? data.location.default()
+  const customProviders = createMemo(() => extractCustomProviders(data.location.config.list(location) ?? []))
   const integrations = createMemo(() =>
     integrationOptions(data.location.integration.list(location) ?? []).filter(
-      (integration) => props.integrationID === undefined || integration.id === props.integrationID,
+      (integration) =>
+        props.integrationID !== undefined
+          ? integration.id === props.integrationID
+          : ALLOWED_INTEGRATIONS.has(integration.id) ||
+            integration.connections.length > 0 ||
+            customProviders().some((p) => p.id === integration.id),
     ),
   )
 
@@ -125,34 +148,60 @@ export function DialogIntegration(
   })
 
   const options = createMemo(() => {
-    return integrations().map((integration) => {
-      const methods = connectMethods(integration)
-      const credentials = credentialConnections(integration)
-      const missingAntigravity = nativeAntigravityMissing(integration)
-      let category = "Services"
-      if (integration.id in INTEGRATION_PRIORITY) category = "Popular"
-      if (integration.metadata?.source === "mcp") category = "MCP"
-      const status = integration.connections[0]?.status
-      return {
-        title: integration.name,
-        value: integration.id,
-        description: methods.length === 0 ? "Environment only" : undefined,
-        footer: missingAntigravity
-          ? "⚠ Antigravity OAuth não carregado"
-          : status ? "Sign in required →" : connectionSummary(integration) || undefined,
-        footerColor: status ? theme.text.feedback.warning.base : undefined,
-        category,
-        disabled: methods.length === 0 && credentials.length === 0 && !missingAntigravity,
-        gutter:
-          integration.connections.length > 0 && !status
-            ? () => <text fg={theme.text.feedback.success.base}>✓</text>
-            : undefined,
-        onSelect: () => {
-          if (credentials.length) return manageConnections(integration, methods, location, dialog, props.onConnected)
-          return selectMethod(integration, methods, location, dialog, props.onConnected)
-        },
-      }
-    })
+    const customList = customProviders()
+    const customOptions = customList.map((prov) => ({
+      title: prov.name,
+      value: `custom_${prov.id}`,
+      description: `${prov.baseURL ?? "Endpoint customizado"} • ${prov.modelCount} modelo(s)`,
+      category: "Provedores Personalizados",
+      gutter: () => <text fg={theme.text.feedback.success.base}>✓</text>,
+      onSelect: () => manageCustomProvider(prov, dialog, toast),
+    }))
+
+    const addCustomOption = {
+      title: "🌐 Adicionar Provedor Personalizado",
+      value: "__add_custom_provider__",
+      description: "Configurar endpoint (Cosmos, OneAPI, Ollama, etc.) e buscar modelos",
+      category: "Popular",
+      gutter: () => <text fg={theme.text.feedback.info.base}>+</text>,
+      onSelect: () => promptAddCustomProvider(dialog, data.location.config.list(location) ?? [], toast),
+    }
+
+    const standardOptions = integrations()
+      .filter((integration) => !customList.some((p) => p.id === integration.id))
+      .map((integration) => {
+        const methods = connectMethods(integration)
+        const credentials = credentialConnections(integration)
+        const missingAntigravity = nativeAntigravityMissing(integration)
+        let category = "Popular"
+        if (integration.metadata?.source === "mcp") category = "MCP"
+        const status = integration.connections[0]?.status
+        const title = integration.id === "opencode" ? "OpenCode Console" : integration.name
+        return {
+          title,
+          value: integration.id,
+          description: methods.length === 0 ? "Environment only" : undefined,
+          footer: missingAntigravity
+            ? "⚠ Antigravity OAuth não carregado"
+            : status ? "Sign in required →" : connectionSummary(integration) || undefined,
+          footerColor: status ? theme.text.feedback.warning.base : undefined,
+          category,
+          disabled: methods.length === 0 && credentials.length === 0 && !missingAntigravity,
+          gutter:
+            integration.connections.length > 0 && !status
+              ? () => <text fg={theme.text.feedback.success.base}>✓</text>
+              : undefined,
+          onSelect: () => {
+            if (credentials.length) return manageConnections(integration, methods, location, dialog, props.onConnected)
+            return selectMethod(integration, methods, location, dialog, props.onConnected)
+          },
+        }
+      })
+
+    if (props.integrationID !== undefined) {
+      return standardOptions
+    }
+    return [addCustomOption, ...customOptions, ...standardOptions]
   })
 
   return (
