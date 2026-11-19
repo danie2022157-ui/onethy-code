@@ -1,19 +1,16 @@
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
-import { run } from "@opencode/tui"
 import { Commands } from "../commands"
 import { Runtime } from "../../framework/runtime"
 import { Config } from "../../config"
 import { Context, Effect, FileSystem, Option, Queue, Schedule, Semaphore } from "effect"
 import { ServerConnection } from "../../services/server-connection"
 import { Updater } from "../../services/updater"
-import { UpdatePreflight } from "../../services/update-preflight"
+import type { Handle } from "../../services/update-preflight"
 import { Npm } from "@opencode/util/npm"
 import { OPENCODE_ARTIFACT, OPENCODE_CHANNEL, OPENCODE_HIGHLIGHTS, OPENCODE_VERSION } from "../../version"
 import { Env } from "../../env"
 import { Service } from "@opencode/client/effect/service"
-import { OpenCode } from "@opencode/client/promise"
-import { findSession } from "../../session-target"
 import { errorMessage } from "../../util/error"
 
 export default Runtime.handler(Commands, (input) =>
@@ -21,7 +18,36 @@ export default Runtime.handler(Commands, (input) =>
     const requestedDirectory = Option.getOrUndefined(input.directory)
     const requestedServer = Option.getOrUndefined(input.server)
     if (requestedDirectory !== undefined) process.chdir(requestedDirectory)
-    const preflight = UpdatePreflight.make()
+    const tui = import("@opencode/tui")
+    let activePreflight: Promise<Handle> | undefined
+    const loadPreflight = async (from?: string) => {
+      const { UpdatePreflight } = await import("../../services/update-preflight")
+      const handle = UpdatePreflight.make()
+      handle.begin(from)
+      return handle
+    }
+    const preflight: Handle = {
+      begin: (from) => {
+        if (!process.stdout.isTTY || !process.stdin.isTTY) return false
+        activePreflight ??= loadPreflight(from)
+        return true
+      },
+      loading: () => {
+        void activePreflight?.then((handle) => handle.loading())
+      },
+      finish: async () => {
+        const handle = await activePreflight
+        return handle?.finish()
+      },
+      fail: async (message) => {
+        const handle = await activePreflight
+        await handle?.fail(message)
+      },
+      close: async () => {
+        const handle = await activePreflight
+        await handle?.close()
+      },
+    }
     yield* Effect.addFinalizer(() => Effect.promise(() => preflight.close()))
     const serviceStarts = yield* Queue.unbounded<{
       readonly reason: "missing" | "version-mismatch"
@@ -55,8 +81,16 @@ export default Runtime.handler(Commands, (input) =>
     const sessionExists =
       session !== undefined &&
       (yield* Effect.tryPromise({
-        try: () =>
-          findSession(OpenCode.make({ baseUrl: server.endpoint.url, headers: Service.headers(server.endpoint) }), session),
+        try: async () => {
+          const [{ OpenCode }, { findSession }] = await Promise.all([
+            import("@opencode/client/promise"),
+            import("../../session-target"),
+          ])
+          return findSession(
+            OpenCode.make({ baseUrl: server.endpoint.url, headers: Service.headers(server.endpoint) }),
+            session,
+          )
+        },
         catch: (cause) => new Error(errorMessage(cause)),
       })) !== undefined
     const updater = yield* Updater.Service
@@ -93,6 +127,7 @@ export default Runtime.handler(Commands, (input) =>
     const runFork = Effect.runForkWith(context)
     const runPromise = Effect.runPromiseWith(context)
     const service = server.service
+    const { run } = yield* Effect.promise(() => tui)
     yield* Effect.logDebug("tui initializing", { channel: OPENCODE_CHANNEL, local: requestedServer === undefined })
     yield* run({
       app: {

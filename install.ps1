@@ -82,13 +82,88 @@ $onethyCodeCmd = Join-Path $targetDir "onethy-code.cmd"
 $omniCmd = Join-Path $targetDir "omni.cmd"
 $omnicodeCmd = Join-Path $targetDir "omnicode.cmd"
 $launcherPs1 = Join-Path $targetDir "onethy.ps1"
+$launcherMjs = Join-Path $targetDir "onethy-launcher.mjs"
 $configPath = Join-Path $targetDir "onethy-config.json"
 
 $cmdContent = @"
 @echo off
+if exist "$nodePath" (
+  "$nodePath" "%~dp0onethy-launcher.mjs" %*
+  exit /b %ERRORLEVEL%
+)
 "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0onethy.ps1" %*
 exit /b %ERRORLEVEL%
 "@
+$launcherMjsContent = @'
+import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
+
+const root = path.dirname(fileURLToPath(import.meta.url))
+const configPath = path.join(root, "onethy-config.json")
+const required = ["bin/onethy.js", "bin/omni-runtime.js", "packages/cli/src/index.ts", "install.ps1"]
+
+function isCheckout(directory) {
+  if (!directory || typeof directory !== "string") return false
+  try {
+    const full = path.resolve(directory)
+    return required.every((relative) => fs.statSync(path.join(full, relative)).isFile())
+  } catch {
+    return false
+  }
+}
+
+function findCheckout(savedPath) {
+  if (!savedPath || typeof savedPath !== "string") return undefined
+  let current = path.resolve(savedPath)
+  for (let depth = 0; depth < 8; depth += 1) {
+    for (const candidate of [current, path.join(current, "onethy-code")]) {
+      if (isCheckout(candidate)) return path.resolve(candidate)
+    }
+    const parent = path.dirname(current)
+    if (parent === current) break
+    current = parent
+  }
+  return undefined
+}
+
+if (!fs.existsSync(configPath)) {
+  console.error("[OnethyCode] Missing global launcher configuration. Re-run install.ps1 from the OnethyCode source folder.")
+  process.exit(1)
+}
+
+let config
+try {
+  config = JSON.parse(fs.readFileSync(configPath, "utf8").replace(/^\uFEFF/, ""))
+} catch {
+  console.error("[OnethyCode] Launcher configuration is unreadable. Re-run install.ps1 from the OnethyCode source folder.")
+  process.exit(1)
+}
+
+let checkout = typeof config?.checkout === "string" ? config.checkout : ""
+if (!isCheckout(checkout)) {
+  checkout = findCheckout(checkout)
+  if (!checkout) {
+    console.error("[OnethyCode] The saved checkout path is no longer valid. Open the folder containing bin\\onethy.js and run .\\install.ps1 again.")
+    process.exit(1)
+  }
+  console.log(`[OnethyCode] Repaired stale checkout path: ${checkout}`)
+  config.checkout = checkout
+  const temporary = `${configPath}.${process.pid}.tmp`
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(config), "utf8")
+    fs.renameSync(temporary, configPath)
+  } catch {
+    console.error("[OnethyCode] Warning: path repaired for this launch only; re-run install.ps1 to persist it.")
+  } finally {
+    try {
+      if (fs.existsSync(temporary)) fs.unlinkSync(temporary)
+    } catch {}
+  }
+}
+
+await import(pathToFileURL(path.join(checkout, "bin", "onethy.js")).href)
+'@
 $launcherContent = @'
 $ErrorActionPreference = "Stop"
 $configPath = Join-Path $PSScriptRoot "onethy-config.json"
@@ -180,6 +255,7 @@ $configContent = [ordered]@{ nodePath = $nodePath; checkout = $currentDir } | Co
 
 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 Set-Content -Path $launcherPs1 -Value $launcherContent -Encoding ASCII
+[System.IO.File]::WriteAllText($launcherMjs, $launcherMjsContent, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText($configPath, $configContent, [System.Text.UTF8Encoding]::new($false))
 Set-Content -Path $onethyCmd -Value $cmdContent -Encoding ASCII
 Set-Content -Path $onethyCodeCmd -Value $cmdContent -Encoding ASCII
@@ -219,6 +295,18 @@ if ($env:ONETHY_SKIP_CUSTOMIZATION_SYNC -ne "1" -and $env:GITHUB_ACTIONS -ne "tr
       $env:ONETHY_INSTALL_ROOT = $previousRoot
       $env:OMNICODE_ACTIVE = $previousOmni
       $env:ONETHY_ACTIVE = $previousOnethy
+    }
+  }
+}
+
+if ($env:ONETHY_SKIP_PRECOMPILE -ne "1" -and $env:GITHUB_ACTIONS -ne "true" -and $env:CI -ne "true") {
+  $precompileScript = Join-Path $currentDir "packages\cli\script\build-local-cache.ts"
+  if (Test-Path -LiteralPath $precompileScript -PathType Leaf) {
+    Write-Host "[OnethyCode] Pré-compilando bundle rápido do CLI + TUI..." -ForegroundColor Cyan
+    try {
+      & $bunPath $precompileScript
+    } catch {
+      Write-Warning "Unable to build optional local CLI cache: $_"
     }
   }
 }

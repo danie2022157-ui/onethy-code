@@ -86,7 +86,13 @@ describe("InstructionBuiltIns", () => {
     withEnv({ OMNICODE_ACTIVE: undefined }, () => Effect.gen(function* () {
       const builtins = yield* InstructionBuiltIns.Service
       const observed = yield* Instructions.read(yield* builtins.load())
-      for (const key of ["omnicode/memory-bank", "omnicode/global-memory", "omnicode/auto-customizations"]) {
+      for (const key of [
+        "omnicode/memory-bank",
+        "omnicode/global-memory",
+        "omnicode/auto-customizations",
+        "omnicode/bus",
+        "omnicode/project-decisions",
+      ]) {
         const source = observed.find((item) => item.key === key)
         expect(source).toBeDefined()
         expect(source!.value).toBe(Instructions.removed)

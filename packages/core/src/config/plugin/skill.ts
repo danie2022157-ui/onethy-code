@@ -12,6 +12,7 @@ import { Location } from "../../location.js"
 import { AbsolutePath } from "../../schema.js"
 import { Skill } from "../../skill.js"
 import { SkillDiscovery } from "../../skill/discovery.js"
+import { OnethyCustomizationCache } from "./onethy-customization-cache.js"
 import { SkillFile } from "./skill-file.js"
 import { SkillScan } from "./skill-scan.js"
 
@@ -123,29 +124,37 @@ export const Plugin = define({
               ),
             )
       const roots = (yield* Effect.forEach(directories, watchDirectory)).flat()
-      const skills: Skill.Info[] = []
-      for (const directory of directories) {
-        const scanned = yield* SkillScan.scan(directory)
-        const parsedList = yield* Effect.forEach(
-          scanned,
-          (filepath) =>
-            Effect.gen(function* () {
-              if (!roots.some((root) => FSUtil.contains(root, filepath))) {
-                const resolved = yield* fs.realPath(filepath).pipe(Effect.orElseSucceed(() => filepath))
-                if (!roots.some((root) => FSUtil.contains(root, resolved))) yield* watch(resolved, "file")
-              }
-              const content = yield* fs.readFileStringSafe(filepath).pipe(Effect.orElseSucceed(() => undefined))
-              if (!content) return undefined
-              const parsed = SkillFile.parse(directory, filepath, content)
-              if (parsed._tag === "Skipped") return undefined
-              return parsed.skill
-            }),
-          { concurrency: 32 },
-        )
-        for (const item of parsedList) {
-          if (item) skills.push(item)
-        }
-      }
+      const loadedDirectories = yield* Effect.forEach(directories, (directory) =>
+        OnethyCustomizationCache.cached({
+          fs,
+          global,
+          kind: "skills",
+          root: directory,
+          directories: [directory],
+          schema: Skill.Info,
+          compute: Effect.gen(function* () {
+            const scanned = yield* SkillScan.scan(directory)
+            const parsedList = yield* Effect.forEach(
+              scanned,
+              (filepath) =>
+                Effect.gen(function* () {
+                  if (!roots.some((root) => FSUtil.contains(root, filepath))) {
+                    const resolved = yield* fs.realPath(filepath).pipe(Effect.orElseSucceed(() => filepath))
+                    if (!roots.some((root) => FSUtil.contains(root, resolved))) yield* watch(resolved, "file")
+                  }
+                  const content = yield* fs.readFileStringSafe(filepath).pipe(Effect.orElseSucceed(() => undefined))
+                  if (!content) return undefined
+                  const parsed = SkillFile.parse(directory, filepath, content)
+                  if (parsed._tag === "Skipped") return undefined
+                  return parsed.skill
+                }),
+              { concurrency: 32 },
+            )
+            return parsedList.filter((item): item is Skill.Info => item !== undefined)
+          }),
+        }),
+      )
+      const skills = loadedDirectories.flat()
       yield* Effect.logDebug("skill source loaded", {
         source: Skill.Source.key(source),
         type: source.type,
@@ -158,11 +167,9 @@ export const Plugin = define({
     const refresh = Effect.fn("ConfigSkillPlugin.refresh")(
       function* (file?: string) {
         yield* FiberMap.clear(watches)
-        const skills = new Map<Skill.ID, Skill.Info>()
         const current = sources()
-        for (const source of current) {
-          for (const skill of yield* load(source)) skills.set(skill.id, skill)
-        }
+        const loadedSources = yield* Effect.forEach(current, load, { concurrency: 8 })
+        const skills = new Map(loadedSources.flat().map((skill) => [skill.id, skill]))
         loaded.skills = Array.from(skills.values())
         if (file) {
           yield* Effect.logInfo("skills rescanned", {

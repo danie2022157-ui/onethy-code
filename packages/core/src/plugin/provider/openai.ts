@@ -42,6 +42,7 @@ type TokenResponse = {
 
 const Claims = Schema.fromJsonString(
   Schema.Struct({
+    exp: Schema.optional(Schema.Number),
     chatgpt_account_id: Schema.optional(Schema.String),
     organizations: Schema.optional(Schema.Array(Schema.Struct({ id: Schema.String }))),
     "https://api.openai.com/auth": Schema.optional(
@@ -57,7 +58,7 @@ const browser = (app: App.Info) =>
     method: {
       id: browserMethodID,
       type: "oauth",
-      label: "Codex browser (legacy)",
+      label: process.env.OMNICODE_ACTIVE === "1" ? "Sign in with ChatGPT" : "Codex browser (legacy)",
     },
     authorize: () =>
       Effect.gen(function* () {
@@ -176,7 +177,10 @@ const headless = (app: App.Info) =>
     method: {
       id: headlessMethodID,
       type: "oauth",
-      label: "Codex device code (legacy)",
+      label:
+        process.env.OMNICODE_ACTIVE === "1"
+          ? "Sign in with ChatGPT (device code)"
+          : "Codex device code (legacy)",
     },
     authorize: () =>
       Effect.gen(function* () {
@@ -383,12 +387,14 @@ function request<A>(url: string, init: RequestInit) {
 
 function credential(methodID: Integration.MethodID, tokens: TokenResponse) {
   const accountID = extractAccountID(tokens)
+  const fallbackExpires = Date.now() + (tokens.expires_in ?? 3600) * 1000
+  const jwtExpires = extractExpiry(tokens.access_token)
   return Credential.OAuth.make({
     type: "oauth",
     methodID,
     refresh: tokens.refresh_token,
     access: tokens.access_token,
-    expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,
+    expires: jwtExpires ? Math.min(jwtExpires, fallbackExpires) : fallbackExpires,
     metadata: accountID ? { accountID } : undefined,
   })
 }
@@ -421,6 +427,13 @@ function authorizeURL(redirect: string, pkce: Pkce, state: string) {
 
 function extractAccountID(tokens: TokenResponse) {
   return claim(tokens.id_token) ?? claim(tokens.access_token)
+}
+
+function extractExpiry(token: string) {
+  const part = token.split(".")[1]
+  if (!part) return
+  const claims = Option.getOrUndefined(decodeClaims(Buffer.from(part, "base64url").toString()))
+  return typeof claims?.exp === "number" && claims.exp > 0 ? claims.exp * 1000 : undefined
 }
 
 function claim(token: string) {

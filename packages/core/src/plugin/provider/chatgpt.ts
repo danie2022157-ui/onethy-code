@@ -232,11 +232,15 @@ export const ChatGPTPlugin = define({
       // }
     })
 
-    yield* ctx.integration.transform((editor) => {
-      editor.method.update(
-        signIn(ctx.app, () => Option.getOrUndefined(decodeMetadata(chatgpt?.metadata))?.clientID, ctx.storage),
-      )
-    })
+    const useExperimentalTokenSharing =
+      process.env.OMNICODE_ACTIVE !== "1" || process.env.ONETHY_EXPERIMENTAL_CHATGPT_TOKEN_SHARING === "1"
+    if (useExperimentalTokenSharing) {
+      yield* ctx.integration.transform((editor) => {
+        editor.method.update(
+          signIn(ctx.app, () => Option.getOrUndefined(decodeMetadata(chatgpt?.metadata))?.clientID, ctx.storage),
+        )
+      })
+    }
     yield* Effect.forEach(
       yield* credentials.list(Integration.ID.make("openai")),
       (entry) => {

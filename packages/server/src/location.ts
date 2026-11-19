@@ -35,7 +35,7 @@ export function locationErrors<A, E, R>(effect: Effect.Effect<A, E, R>) {
 
 export const awaitPlugins = Plugin.awaitActivation.pipe(
   Effect.timeoutOrElse({
-    duration: "5 seconds",
+    duration: "30 seconds",
     orElse: () =>
       Effect.fail(
         new ServiceUnavailableError({

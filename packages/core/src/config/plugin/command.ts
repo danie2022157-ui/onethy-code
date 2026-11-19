@@ -15,8 +15,13 @@ import { SubagentJob } from "../../session/subagent-job.js"
 import { ShellSelect } from "../../shell/select.js"
 import { FSUtil } from "@opencode/util/fs-util"
 import { ConfigMarkdown } from "../markdown.js"
+import { OnethyCustomizationCache } from "./onethy-customization-cache.js"
 
 const decodeCommand = Schema.decodeUnknownOption(ConfigCommand.Info)
+const CachedCommand = Schema.Struct({
+  name: Schema.String,
+  info: ConfigCommand.Info,
+})
 
 export const Plugin = define({
   id: "opencode.config.command",
@@ -26,7 +31,14 @@ export const Plugin = define({
     const loadEntry = Effect.fnUntraced(function* (entry: Entry) {
       if (entry.type === "document") return [{ commands: entry.info.commands }]
       if (entry.type !== "directory") return []
-      const commands = yield* loadDirectory(fs, entry.path)
+      const commands = yield* OnethyCustomizationCache.cached({
+        fs,
+        kind: "commands",
+        root: entry.path,
+        directories: sourceDirectories.map((name) => path.join(entry.path, name)),
+        schema: CachedCommand,
+        compute: loadDirectory(fs, entry.path),
+      })
       return [{ commands: Object.fromEntries(commands.map((command) => [command.name, command.info])) }]
     })
     const location = yield* Location.Service

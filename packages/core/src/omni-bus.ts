@@ -46,7 +46,7 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const location = yield* Location.Service
-    const workspace = location.directory ?? location.project.canonical ?? location.project.directory
+    const workspace = location.project.directory ?? location.project.canonical ?? location.directory
     const busFilePath = path.join(workspace, ".omnicode", "bus.json")
     const messages: AgentMessage[] = []
 

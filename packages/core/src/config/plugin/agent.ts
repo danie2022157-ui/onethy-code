@@ -18,6 +18,7 @@ import type { ReadTool } from "../../tool/plugin/read.js"
 import type { EditTool } from "../../tool/plugin/edit.js"
 import { AbsolutePath } from "../../schema.js"
 import { legacyAITmplAgent } from "./onethy-agent-compat.js"
+import { OnethyCustomizationCache } from "./onethy-customization-cache.js"
 
 const legacySources = [
   { pattern: "{agent,agents}/**/*.md", primary: false },
@@ -42,16 +43,28 @@ export const Plugin = define({
     const loadEntry = Effect.fnUntraced(function* (entry: Entry) {
       if (entry.type === "document") return [entry]
       if (entry.type !== "directory") return []
-      const files = yield* discover(fs, entry.path)
-      return yield* Effect.forEach(
-        files,
-        (file) =>
-          fs.readFileStringSafe(file.filepath).pipe(
-            Effect.flatMap((content) => (content ? decode(file, content) : Effect.succeed(undefined))),
-            Effect.orElseSucceed(() => undefined),
-          ),
-        { concurrency: 32 },
-      ).pipe(Effect.map((documents) => documents.filter((document): document is Document => document !== undefined)))
+      return yield* OnethyCustomizationCache.cached({
+        fs,
+        global,
+        kind: "agents",
+        root: entry.path,
+        directories: sourceDirectories.map((name) => path.join(entry.path, name)),
+        schema: Document,
+        compute: Effect.gen(function* () {
+          const files = yield* discover(fs, entry.path)
+          return yield* Effect.forEach(
+            files,
+            (file) =>
+              fs.readFileStringSafe(file.filepath).pipe(
+                Effect.flatMap((content) => (content ? decode(file, content) : Effect.succeed(undefined))),
+                Effect.orElseSucceed(() => undefined),
+              ),
+            { concurrency: 32 },
+          ).pipe(
+            Effect.map((documents) => documents.filter((document): document is Document => document !== undefined)),
+          )
+        }),
+      })
     })
     const load = Effect.fn("ConfigAgentPlugin.load")(function* () {
       return yield* Effect.forEach(yield* config.entries(), loadEntry).pipe(Effect.map((documents) => documents.flat()))

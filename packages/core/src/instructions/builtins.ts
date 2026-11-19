@@ -2,21 +2,35 @@ export * as InstructionBuiltIns from "./builtins.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import fs from "node:fs"
+import path from "node:path"
 import { Context, DateTime, Effect, Layer, Schema } from "effect"
 import { Global } from "@opencode/util/global"
 import { Location } from "../location.js"
 import { Instructions } from "./index.js"
 import { OmniOrchestrator } from "../omni-orchestrator.js"
 import { boundedMemorySections, efficiencyProfile } from "../efficiency-profile.js"
-import { projectMemoryDirectory, readMemoryFile, renderGlobalMemory } from "../omni-memory-bank.js"
+import {
+  PROJECT_TEMPLATES,
+  initializeMemoryBank,
+  projectMemoryDirectory,
+  readMemoryFile,
+  renderGlobalMemory,
+} from "../omni-memory-bank.js"
 
 export interface Interface {
   readonly load: () => Effect.Effect<Instructions.List>
 }
 
-
 function readMemoryBank(directory: string): string {
   const memDir = projectMemoryDirectory(directory)
+  if (!fs.existsSync(memDir)) {
+    try {
+      initializeMemoryBank(memDir, PROJECT_TEMPLATES)
+    } catch {
+      // Fallback if unable to scaffold immediately
+    }
+  }
+
   if (!fs.existsSync(memDir)) {
     return [
       "<auto_memory_bank>",
@@ -56,6 +70,50 @@ function readMemoryBank(directory: string): string {
     "\nInstruction: You MUST keep this memory bank in sync whenever architectural decisions or milestones change using 'omni_memory'.",
     "</auto_memory_bank>",
   ].join("\n")
+}
+
+function readBusDigest(workspace: string, limit = 6): string {
+  const busFile = path.join(workspace, ".omnicode", "bus.json")
+  try {
+    if (!fs.existsSync(busFile)) return ""
+    const raw = fs.readFileSync(busFile, "utf-8")
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) return ""
+    const recent = parsed.slice(-limit)
+    const lines = recent.map((m: { sender?: string; target?: string; taskId?: string; type?: string; payload?: unknown }) => {
+      const text = typeof m.payload === "string" ? m.payload : JSON.stringify(m.payload).slice(0, 300)
+      const sender = m.sender ?? "desconhecido"
+      const target = m.target && m.target !== "*" ? ` -> ${m.target}` : ""
+      const task = m.taskId ? ` (${m.taskId})` : ""
+      const type = (m.type ?? "status").toUpperCase()
+      return `- [${type}] de ${sender}${target}${task}: ${text}`
+    })
+    return [
+      "<omnicode_inter_session_bus>",
+      "Barramento compartilhado de mensagens entre sessões e subagentes (.omnicode/bus.json):",
+      ...lines,
+      "Instrução: Use 'omni_bus' para publicar descobertas (broadcast) ou comunicar-se com outras sessões.",
+      "</omnicode_inter_session_bus>",
+    ].join("\n")
+  } catch {
+    return ""
+  }
+}
+
+function readProjectDecisions(workspace: string): string {
+  const memPath = path.join(workspace, ".omnicode", "memory.md")
+  try {
+    if (!fs.existsSync(memPath)) return ""
+    const content = fs.readFileSync(memPath, "utf-8").trim()
+    if (!content || content.length < 30) return ""
+    return [
+      "<omnicode_project_decisions>",
+      content.slice(0, 8000),
+      "</omnicode_project_decisions>",
+    ].join("\n")
+  } catch {
+    return ""
+  }
 }
 
 function renderAutoCustomizationsDirective(_directory: string): string {
@@ -182,6 +240,32 @@ const layer = Layer.effect(
               render: {
                 initial: (directive) => directive,
                 changed: (_previous, directive) => directive,
+              },
+            }),
+            Instructions.make({
+              key: Instructions.Key.make("omnicode/bus"),
+              codec: Schema.toCodecJson(Schema.String),
+              read: Effect.sync(() => {
+                if (process.env.OMNICODE_ACTIVE !== "1") return Instructions.removed
+                const bus = readBusDigest(location.project.directory)
+                return bus.trim() ? bus : Instructions.removed
+              }),
+              render: {
+                initial: (bus) => bus,
+                changed: (_previous, bus) => bus,
+              },
+            }),
+            Instructions.make({
+              key: Instructions.Key.make("omnicode/project-decisions"),
+              codec: Schema.toCodecJson(Schema.String),
+              read: Effect.sync(() => {
+                if (process.env.OMNICODE_ACTIVE !== "1") return Instructions.removed
+                const decisions = readProjectDecisions(location.project.directory)
+                return decisions.trim() ? decisions : Instructions.removed
+              }),
+              render: {
+                initial: (decisions) => decisions,
+                changed: (_previous, decisions) => decisions,
               },
             }),
           ]),

@@ -45,6 +45,16 @@ export function same(left: Info, right: Info) {
   return left.id === right.id && left.version === right.version && left.url === right.url && left.pid === right.pid
 }
 
+/** Whether an operating system process with `pid` is still running. */
+export function alive(pid: number) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return typeof error === "object" && error !== null && "code" in error && error.code === "EPERM"
+  }
+}
+
 /** Ask a registered owner for its health and classify the answer. */
 export async function probeResult(info: Info, timeout = defaultEnsureTiming.requestTimeout) {
   const endpoint = {
