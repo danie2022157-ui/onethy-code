@@ -1,4 +1,4 @@
-﻿# OnethyCode - Instalador Global para Windows
+# OnethyCode - Instalador Global para Windows
 $ErrorActionPreference = "Stop"
 try {
   [Console]::OutputEncoding = [System.Text.Encoding]::UTF8

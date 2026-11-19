@@ -40,7 +40,8 @@ function resolveGitCommit(dir: string) {
 }
 
 process.chdir(cliDir)
-await rm(outdir, { recursive: true, force: true })
+const tempOutdir = `${outdir}.${process.pid}.${Date.now()}.tmp`
+await rm(tempOutdir, { recursive: true, force: true })
 
 const solidPlugin = createSolidTransformPlugin()
 const modelsSnapshot = modelsSnapshotPlugin(await bundledModelsSnapshot())
@@ -86,7 +87,7 @@ const pluginRuntimePlugin: BunPlugin = {
 
 const result = await Bun.build({
   entrypoints: ["./src/index.ts", "./src/photon-worker.ts"],
-  outdir,
+  outdir: tempOutdir,
   tsconfig: "./tsconfig.json",
   target: "bun",
   format: "esm",
@@ -97,12 +98,22 @@ const result = await Bun.build({
 
 if (!result.success) {
   for (const log of result.logs) console.error(log)
+  await rm(tempOutdir, { recursive: true, force: true }).catch(() => {})
   process.exit(1)
 }
 
 const commit = resolveGitCommit(rootDir) ?? "local"
 await Bun.write(
-  path.join(outdir, "stamp.json"),
+  path.join(tempOutdir, "stamp.json"),
   JSON.stringify({ commit, builtAt: Date.now() }, null, 2),
 )
+
+// Atomic replacement: swap new build into place to prevent ENOENT on concurrently loaded chunks
+await rm(outdir, { recursive: true, force: true }).catch(() => {})
+try {
+  fs.renameSync(tempOutdir, outdir)
+} catch {
+  fs.cpSync(tempOutdir, outdir, { recursive: true, force: true })
+  await rm(tempOutdir, { recursive: true, force: true }).catch(() => {})
+}
 
