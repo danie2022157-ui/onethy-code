@@ -1,3 +1,4 @@
+import type { ProviderInfo } from "@opencode/client"
 import { createStore } from "solid-js/store"
 import { dedupeWith } from "effect/Array"
 import { createSimpleContext } from "./helper"
@@ -663,18 +664,58 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           enabled() {
             return autoStore.enabled
           },
-          connectedProviders() {
+          connectedProviders(): ProviderInfo[] {
             const integrations = data.location.integration.list(location.ref) ?? []
             const connectedIntegrationIDs = new Set(
               integrations.filter((item) => item.connections.length > 0).map((item) => item.id),
             )
-            const provList = providers() ?? []
+            const standardIntegrationIDs = new Set(integrations.map((item) => item.id))
+            const configDocs = data.location.config.list(location.ref) ?? []
+            const configuredProviderIDs = new Set<string>()
+            const configuredProviderNames = new Map<string, string>()
+            for (const doc of configDocs) {
+              if (doc.type === "document" && doc.info.providers) {
+                for (const [id, info] of Object.entries(doc.info.providers)) {
+                  configuredProviderIDs.add(id.toLowerCase())
+                  configuredProviderIDs.add(id)
+                  if (info.name) {
+                    configuredProviderNames.set(id.toLowerCase(), info.name)
+                    configuredProviderNames.set(id, info.name)
+                  }
+                }
+              }
+            }
+            const provList: ProviderInfo[] = [...(providers() ?? [])]
             const activeModels = (models() ?? []).filter((m) => m.status !== "deprecated")
             const provWithModels = new Set(activeModels.map((m) => m.providerID))
+
+            const knownProvIDs = new Set(provList.map((p) => p.id))
+            for (const m of activeModels) {
+              if (!knownProvIDs.has(m.providerID)) {
+                knownProvIDs.add(m.providerID)
+                provList.push({
+                  id: m.providerID,
+                  name:
+                    configuredProviderNames.get(m.providerID) ??
+                    configuredProviderNames.get(m.providerID.toLowerCase()) ??
+                    m.providerID,
+                  activation: "enabled",
+                  package: "",
+                } as ProviderInfo)
+              }
+            }
+
             const connected = provList.filter(
               (p) =>
                 provWithModels.has(p.id) &&
-                (connectedIntegrationIDs.has(p.integrationID ?? p.id) || p.id === "opencode"),
+                (connectedIntegrationIDs.has(p.integrationID ?? p.id) ||
+                  configuredProviderIDs.has(p.id) ||
+                  configuredProviderIDs.has(p.id.toLowerCase()) ||
+                  p.activation === "enabled" ||
+                  Boolean((p.settings as Record<string, unknown> | undefined)?.apiKey) ||
+                  Boolean((p.settings as Record<string, unknown> | undefined)?.baseURL) ||
+                  !standardIntegrationIDs.has(p.integrationID ?? p.id) ||
+                  p.id === "opencode"),
             )
             if (connected.length > 0) return connected
             return provList.filter((p) => provWithModels.has(p.id))

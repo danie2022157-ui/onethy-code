@@ -1,4 +1,4 @@
-import type { ModelInfo } from "@opencode/client"
+import type { ModelInfo, ProviderInfo } from "@opencode/client"
 import { createMemo, createSignal, onMount, Show } from "solid-js"
 import { useLocal } from "../context/local"
 import { DialogSelect } from "../ui/dialog-select"
@@ -92,17 +92,25 @@ function DialogConnectedModels(props: {
     newDesigns() && !props.providerID && model.providerID === "opencode" && isFreeModel(model)
 
   const connected = useConnected()
-  const providers = createMemo(
-    () => new Map((data.location.provider.list(location.ref) ?? []).map((item) => [item.id, item])),
-  )
+  const providers = createMemo(() => {
+    const list = local.model.auto.connectedProviders()
+    const map = new Map<string, ProviderInfo>()
+    for (const p of data.location.provider.list(location.ref) ?? []) {
+      map.set(p.id, p)
+    }
+    for (const p of list) {
+      if (!map.has(p.id)) {
+        map.set(p.id, p)
+      }
+    }
+    return map
+  })
   const models = createMemo(() => data.location.model.list(location.ref) ?? [])
-
-  const showExtra = createMemo(() => connected() && !props.providerID)
 
   const options = createMemo(() => {
     const needle = query().trim()
-    const showSections = showExtra() && needle.length === 0
-    const favorites = connected() ? (newDesigns() ? favoritesAtOpen : local.model.favorite()) : []
+    const showSections = !props.providerID && needle.length === 0
+    const favorites = newDesigns() ? favoritesAtOpen : local.model.favorite()
     const recents = local.model.recent()
 
     function toOptions(items: typeof favorites, category: string) {
@@ -144,8 +152,7 @@ function DialogConnectedModels(props: {
         .map((model) => {
           const provider = providers().get(model.providerID)
           const value = { providerID: model.providerID, modelID: model.id }
-          // Users with nothing connected can only favorite models in the free picker (new designs); this picker keeps them unavailable.
-          const favorite = connected() && isFavorite(value)
+          const favorite = isFavorite(value)
           return {
             value,
             providerID: model.providerID,
@@ -153,7 +160,7 @@ function DialogConnectedModels(props: {
             title: model.name,
             releaseDate: model.time.released,
             description: newDesigns() ? undefined : favorite ? "(Favorite)" : undefined,
-            category: connected() ? (freeGroup(model) ? "Free" : (provider?.name ?? model.providerID)) : undefined,
+            category: freeGroup(model) ? "Free" : (provider?.name ?? model.providerID),
             footer: trailing(model, favorite),
             free: isFreeModel(model),
             detail: newDesigns() ? () => <ModelDetail model={model} usage={usage(model)} /> : undefined,
@@ -176,13 +183,39 @@ function DialogConnectedModels(props: {
             return false
           return true
         }),
-      connected(),
+      true,
     )
 
     const connProviders = local.model.auto.connectedProviders()
     const connModels = local.model.auto.connectedModels()
     const connNames =
       connProviders.length > 0 ? connProviders.map((p) => p.name).join(", ") : "No providers connected"
+
+    const navOptions = !props.providerID
+      ? [
+          {
+            value: { providerID: "__select_provider__", modelID: "select" },
+            title: "📁 Filtrar por Provedor (Ver apenas modelos de um provedor)",
+            description: `Escolher entre ${providers().size} provedores disponíveis`,
+            category: "Provedores",
+            onSelect: () => {
+              promptFilterByProvider(dialog, Array.from(providers().values()), models(), (pID) => {
+                dialog.replace(() => <DialogModel providerID={pID} />)
+              })
+            },
+          },
+        ]
+      : [
+          {
+            value: { providerID: "__all_providers__", modelID: "all" },
+            title: "← Ver todos os provedores",
+            description: "Voltar para a lista completa com todos os modelos",
+            category: "Navegação",
+            onSelect: () => {
+              dialog.replace(() => <DialogModel />)
+            },
+          },
+        ]
 
     const autoOptions =
       !props.providerID && process.env.OMNICODE_ACTIVE === "1"
@@ -226,6 +259,7 @@ function DialogConnectedModels(props: {
 
     return [
       ...autoOptions,
+      ...navOptions,
       ...favoriteOptions,
       ...recentOptions,
       ...modelOptions.filter((option) => option.category !== "Free"),
@@ -247,6 +281,20 @@ function DialogConnectedModels(props: {
       titlePlaceholder="Search models..."
       options={options()}
       actions={[
+        {
+          command: "model.dialog.filter_provider",
+          title: props.providerID ? "all providers" : "filter by provider",
+          selection: "none",
+          onTrigger: () => {
+            if (props.providerID) {
+              dialog.replace(() => <DialogModel />)
+            } else {
+              promptFilterByProvider(dialog, Array.from(providers().values()), models(), (pID) => {
+                dialog.replace(() => <DialogModel providerID={pID} />)
+              })
+            }
+          },
+        },
         {
           command: "model.dialog.provider",
           title: newDesigns()
@@ -278,9 +326,11 @@ function DialogConnectedModels(props: {
         {
           command: "model.dialog.favorite",
           title: newDesigns() ? (option) => (isFavorite(option?.value) ? "unfavorite" : "favorite") : "Favorite",
-          hidden: !connected(),
+          disabled: (option) => !option?.value?.providerID || option.value.providerID.startsWith("__"),
           onTrigger: (option) => {
-            local.model.toggleFavorite(option.value as { providerID: string; modelID: string })
+            const val = option.value as { providerID: string; modelID: string }
+            if (val.providerID.startsWith("__")) return
+            local.model.toggleFavorite(val)
           },
         },
       ]}
@@ -291,4 +341,45 @@ function DialogConnectedModels(props: {
       current={local.model.current()}
     />
   )
+}
+
+function promptFilterByProvider(
+  dialog: ReturnType<typeof useDialog>,
+  providersList: ProviderInfo[],
+  modelsList: ModelInfo[],
+  onSelectProvider: (providerID: string) => void,
+) {
+  const activeModels = modelsList.filter((m) => m.status !== "deprecated")
+  const provMap = new Map<string, number>()
+  for (const m of activeModels) {
+    provMap.set(m.providerID, (provMap.get(m.providerID) ?? 0) + 1)
+  }
+  const provById = new Map<string, ProviderInfo>()
+  for (const p of providersList) {
+    provById.set(p.id, p)
+  }
+  for (const pID of provMap.keys()) {
+    if (!provById.has(pID)) {
+      provById.set(pID, { id: pID, name: pID, activation: "enabled", package: "" } as ProviderInfo)
+    }
+  }
+
+  const options = Array.from(provById.values())
+    .filter((p) => (provMap.get(p.id) ?? 0) > 0)
+    .sort((a, b) => (provMap.get(b.id) ?? 0) - (provMap.get(a.id) ?? 0) || a.name.localeCompare(b.name))
+    .map((p) => ({
+      title: p.name,
+      value: p.id,
+      description: `${provMap.get(p.id) ?? 0} modelo(s) disponíveis`,
+      onSelect: () => onSelectProvider(p.id),
+    }))
+
+  dialog.replace(() => (
+    <DialogSelect
+      title="Selecionar Provedor"
+      titlePlaceholder="Buscar provedor..."
+      options={options}
+      onSelect={(opt) => onSelectProvider(opt.value)}
+    />
+  ))
 }
