@@ -7,14 +7,19 @@ export function findBun(env = process.env) {
   const localAppData = env.LOCALAPPDATA || path.join(home, "AppData", "Local")
   const executable = process.platform === "win32" ? "bun.exe" : "bun"
   const pathKey = Object.keys(env).find((key) => key.toUpperCase() === "PATH")
+  const pathDirs = ((pathKey && env[pathKey]) || "")
+    .split(path.delimiter)
+    .filter((directory) => path.isAbsolute(directory))
+
   const candidates = [
     env.BUN_BIN,
     path.join(localAppData, "omnicode", "bin", executable),
     path.join(home, ".bun", "bin", executable),
-    ...((pathKey && env[pathKey]) || "")
-      .split(path.delimiter)
-      .filter((directory) => path.isAbsolute(directory))
-      .map((directory) => path.join(directory, executable)),
+    path.join(localAppData, "Programs", "bun", executable),
+    ...pathDirs.flatMap((directory) => [
+      path.join(directory, executable),
+      path.join(directory, "node_modules", "bun", "bin", executable),
+    ]),
   ]
 
   return candidates.find((candidate) => candidate && path.isAbsolute(candidate) && isBun(candidate))

@@ -28,6 +28,7 @@ target
 .scripts
 .cache
 .direnv/
+onethy-code/
 
 # Local dev files
 opencode-dev

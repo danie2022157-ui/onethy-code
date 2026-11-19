@@ -50,6 +50,26 @@ if ($dependencies | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Con
   exit 1
 }
 
+if (-not $env:BUN_BIN) {
+  $bunCmd = Get-Command bun -ErrorAction SilentlyContinue
+  if ($bunCmd) {
+    if ($bunCmd.Source.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCase)) {
+      $env:BUN_BIN = $bunCmd.Source
+    } else {
+      $npmBun = Join-Path (Split-Path $bunCmd.Source -Parent) "node_modules\bun\bin\bun.exe"
+      if (Test-Path -LiteralPath $npmBun -PathType Leaf) {
+        $env:BUN_BIN = $npmBun
+      }
+    }
+  }
+}
+if (-not $env:BUN_BIN -and $env:APPDATA) {
+  $globalNpmBun = Join-Path $env:APPDATA "npm\node_modules\bun\bin\bun.exe"
+  if (Test-Path -LiteralPath $globalNpmBun -PathType Leaf) {
+    $env:BUN_BIN = $globalNpmBun
+  }
+}
+
 $runtimePath = Join-Path $currentDir "bin\omni-runtime.js"
 $resolverScriptPath = Join-Path $env:TEMP "omnicode-resolve-bun-$PID.mjs"
 $resolverScript = @'
