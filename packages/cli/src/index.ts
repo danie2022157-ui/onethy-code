@@ -1,5 +1,9 @@
 #!/usr/bin/env bun
 
+// Register the Solid JSX transform from this package's dependency graph.
+// This avoids resolving @opentui/solid/preload from the caller's working directory.
+import "@opentui/solid/preload"
+
 import { ensurePluginRuntime } from "@opencode/plugin/runtime"
 import { NodeRuntime, NodeServices } from "@effect/platform-node"
 import { Cause, Effect } from "effect"
