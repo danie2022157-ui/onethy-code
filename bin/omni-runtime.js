@@ -33,6 +33,10 @@ export function makeOmniEnvironment(env, bunBin) {
     OMNICODE_ACTIVE: "1",
     OPENCODE_CLI_NAME: "onethy",
     BUN_BIN: bunBin,
+    // A user's current project may have its own bunfig.toml with unrelated
+    // preloads. Do not let that config override OnethyCode's runtime setup.
+    // The CLI registers its required Solid transform from its own entrypoint.
+    BUN_CONFIG_FILE: "",
     [pathKey]: [path.dirname(bunBin), env[pathKey]].filter(Boolean).join(path.delimiter),
   }
 }
