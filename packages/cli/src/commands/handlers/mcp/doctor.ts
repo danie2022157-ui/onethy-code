@@ -56,13 +56,13 @@ export default Runtime.handler(
       servers = yield* Effect.promise(read)
     }
 
-    const counts = { connected: 0, failed: 0, needs_auth: 0, disabled: 0, pending: 0 }
+    const counts = { connected: 0, failed: 0, needs_auth: 0, disabled: 0, pending: 0, standby: 0 }
     for (const server of servers.toSorted((a, b) => a.name.localeCompare(b.name))) {
       counts[server.status.status]++
       process.stdout.write(`[${server.status.status}] ${server.name} - ${advice(server)}` + EOL)
     }
     process.stdout.write(
-      `Total: ${servers.length} | connected: ${counts.connected} | failed: ${counts.failed} | auth: ${counts.needs_auth} | disabled: ${counts.disabled} | pending: ${counts.pending}` + EOL,
+      `Total: ${servers.length} | connected: ${counts.connected} | failed: ${counts.failed} | auth: ${counts.needs_auth} | disabled: ${counts.disabled} | pending: ${counts.pending} | standby: ${counts.standby}` + EOL,
     )
     if (counts.failed && !input.retry)
       process.stdout.write("Run 'onethy mcp doctor --retry' to retry failed connections." + EOL)
@@ -103,5 +103,7 @@ export function advice(server: McpServer): string {
       return "disabled by configuration or discovery; run onethy mcp doctor --enable <name> to approve"
     case "failed":
       return safeError(server.status.error) + " (check command, PATH, dependencies, URL and authentication)"
+    case "standby":
+      return "standby (connects on demand)"
   }
 }

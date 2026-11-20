@@ -58,18 +58,18 @@ export function DialogLogs() {
   }
   const copy = () => {
     void clipboard.write(lines().join("\n")).then(() => {
-      toast.show({ message: "Logs filtrados copiados (dados conhecidos ocultados)", variant: "info" })
+      toast.show({ message: "Filtered logs copied (sensitive data redacted)", variant: "info" })
     }).catch(toast.error)
   }
 
   Keymap.createLayer(() => ({
     mode: "modal",
     commands: [
-      { bind: "s", title: "Filtrar origem", group: "Debug", run: cycleSource },
-      { bind: "l", title: "Filtrar nível", group: "Debug", run: cycleLevel },
-      { bind: "p", title: "Pausar/retomar", group: "Debug", run: () => { setPaused((value) => !value); void refresh() } },
-      { bind: "r", title: "Atualizar", group: "Debug", run: refresh },
-      { bind: "c", title: "Copiar logs", group: "Debug", run: copy },
+      { bind: "s", title: "Filter source", group: "Debug", run: cycleSource },
+      { bind: "l", title: "Filter level", group: "Debug", run: cycleLevel },
+      { bind: "p", title: "Pause/resume", group: "Debug", run: () => { setPaused((value) => !value); void refresh() } },
+      { bind: "r", title: "Refresh", group: "Debug", run: refresh },
+      { bind: "c", title: "Copy logs", group: "Debug", run: copy },
     ],
   }))
 
@@ -80,32 +80,32 @@ export function DialogLogs() {
 
   return (
     <DialogLayout
-      header={<DialogHeader title="OnethyCode · Logs" description="Core, servidor, TUI e plugins · atualiza automaticamente" />}
+      header={<DialogHeader title="OnethyCode · Logs" description="Core, server, TUI and plugins · updates automatically" />}
       footer={{ actions: {
         secondary: [
-          { title: "origem", key: "s", onTrigger: cycleSource },
-          { title: "nível", key: "l", onTrigger: cycleLevel },
-          { title: paused() ? "retomar" : "pausar", key: "p", onTrigger: () => setPaused((value) => !value) },
+          { title: "source", key: "s", onTrigger: cycleSource },
+          { title: "level", key: "l", onTrigger: cycleLevel },
+          { title: paused() ? "resume" : "pause", key: "p", onTrigger: () => setPaused((value) => !value) },
         ],
         primary: [
-          { title: "copiar", key: "c", onTrigger: copy },
-          { title: "atualizar", key: "r", onTrigger: () => void refresh() },
+          { title: "copy", key: "c", onTrigger: copy },
+          { title: "refresh", key: "r", onTrigger: () => void refresh() },
         ],
       } }}
     >
       <box flexDirection="column" gap={1}>
-        <text fg={theme.text.muted}>Origem: {source()} · Nível: {level()} · {paused() ? "pausado" : "ao vivo"} · {file()}</text>
+        <text fg={theme.text.muted}>Source: {source()} · Level: {level()} · {paused() ? "paused" : "live"} · {file()}</text>
         <scrollbox maxHeight={20} scrollbarOptions={{ visible: true }}>
           <box flexDirection="column">
             <For each={output()}>{(line) => (
               <text fg={color(line)} wrapMode="word">{line}</text>
             )}</For>
             <text fg={theme.text.muted}>
-              {error() || (lines().length ? "" : "Nenhum log para o filtro. Para DEBUG: ONETHY_DEBUG=1 e reinicie o serviço.")}
+              {error() || (lines().length ? "" : "No logs matching current filter. For DEBUG: set ONETHY_DEBUG=1 and restart service.")}
             </text>
           </box>
         </scrollbox>
-        <text fg={theme.text.muted}>Dados conhecidos são ocultados; revise antes de compartilhar logs. s=origem · l=nível · p=pausa · c=copia</text>
+        <text fg={theme.text.muted}>Known secrets are redacted; review before sharing logs. s=source · l=level · p=pause · c=copy</text>
       </box>
     </DialogLayout>
   )

@@ -82,7 +82,6 @@ import { PatchTool } from "../tool/plugin/patch.js"
 import { EditTool } from "../tool/plugin/edit.js"
 import { GlobTool } from "../tool/plugin/glob.js"
 import { GrepTool } from "../tool/plugin/grep.js"
-import { ImageGenerateTool } from "../tool/plugin/image-generate.js"
 import { McpResourceTools } from "../tool/plugin/mcp-resource.js"
 import { OmniBusTool } from "../tool/plugin/omni-bus.js"
 import { OmniMissionTool } from "../tool/plugin/omni-mission.js"
@@ -278,7 +277,6 @@ const pre = [
   EditTool.Plugin,
   GlobTool.Plugin,
   GrepTool.Plugin,
-  ImageGenerateTool.Plugin,
   OmniBusTool.Plugin,
   OmniMissionTool.Plugin,
   OmniMemoryTool.Plugin,

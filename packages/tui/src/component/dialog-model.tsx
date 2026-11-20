@@ -195,9 +195,9 @@ function DialogConnectedModels(props: {
       ? [
           {
             value: { providerID: "__select_provider__", modelID: "select" },
-            title: "📁 Filtrar por Provedor (Ver apenas modelos de um provedor)",
-            description: `Escolher entre ${providers().size} provedores disponíveis`,
-            category: "Provedores",
+            title: "📁 Filter by Provider (View models for one provider)",
+            description: `Choose from ${providers().size} available providers`,
+            category: "Providers",
             onSelect: () => {
               promptFilterByProvider(dialog, Array.from(providers().values()), models(), (pID) => {
                 dialog.replace(() => <DialogModel providerID={pID} />)
@@ -208,9 +208,9 @@ function DialogConnectedModels(props: {
       : [
           {
             value: { providerID: "__all_providers__", modelID: "all" },
-            title: "← Ver todos os provedores",
-            description: "Voltar para a lista completa com todos os modelos",
-            category: "Navegação",
+            title: "← View all providers",
+            description: "Return to full list showing all models",
+            category: "Navigation",
             onSelect: () => {
               dialog.replace(() => <DialogModel />)
             },
@@ -370,14 +370,14 @@ function promptFilterByProvider(
     .map((p) => ({
       title: p.name,
       value: p.id,
-      description: `${provMap.get(p.id) ?? 0} modelo(s) disponíveis`,
+      description: `${provMap.get(p.id) ?? 0} model(s) available`,
       onSelect: () => onSelectProvider(p.id),
     }))
 
   dialog.replace(() => (
     <DialogSelect
-      title="Selecionar Provedor"
-      titlePlaceholder="Buscar provedor..."
+      title="Select Provider"
+      titlePlaceholder="Search provider..."
       options={options}
       onSelect={(opt) => onSelectProvider(opt.value)}
     />

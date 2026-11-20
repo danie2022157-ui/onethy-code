@@ -98,7 +98,8 @@ type Themes = {
   lock(): void
   unlock(): void
   setMode(mode?: "dark" | "light", persist?: boolean): boolean
-  set(theme: string): boolean
+  set(theme: string, persist?: boolean): boolean
+  preview(theme: string): boolean
   afterPaint(): void
   onError(handler: ThemeErrorHandler): () => void
   readonly ready: boolean
@@ -299,7 +300,7 @@ const themeContext = createSimpleContext({
     const initStarted = performance.now()
     const selected = createMemo(() => {
       const sources = available()
-      const fallback = sources.onethy ? "onethy" : "opencode"
+      const fallback = "opencode"
       const name = sources[store.active] ? store.active : fallback
       try {
         return loadTheme(sources[name], name, store.mode, newDesigns())
@@ -340,15 +341,23 @@ const themeContext = createSimpleContext({
         pin(requested, persist)
         return true
       },
-      set(theme: string) {
+      set(theme: string, persist = true) {
         if (!has(theme)) return false
         setStore("active", theme)
         if (theme === "system") refreshPalette()
-        void configState
-          .update((draft) => {
-            draft.theme = { ...draft.theme, name: theme }
-          })
-          .catch(() => {})
+        if (persist) {
+          void configState
+            .update((draft) => {
+              draft.theme = { ...draft.theme, name: theme }
+            })
+            .catch(() => {})
+        }
+        return true
+      },
+      preview(theme: string) {
+        if (!has(theme)) return false
+        setStore("active", theme)
+        if (theme === "system") refreshPalette()
         return true
       },
       afterPaint,

@@ -189,7 +189,7 @@ export function DialogIntegration(
           value: integration.id,
           description: methods.length === 0 ? "Environment only" : undefined,
           footer: missingAntigravity
-            ? "⚠ Antigravity OAuth não carregado"
+            ? "⚠ Antigravity OAuth not loaded"
             : status ? "Sign in required →" : connectionSummary(integration) || undefined,
           footerColor: status ? theme.text.feedback.warning.base : undefined,
           category,
@@ -348,19 +348,19 @@ function manageConnections(
 }
 
 function methodDescription(method: ConnectMethod): string | undefined {
-  if (method.type === "key") return "Chave de API oficial"
+  if (method.type === "key") return "Official API Key"
   const label = method.label ?? ""
   if (label.includes("Use approved Antigravity vault")) {
-    return "Apenas para servidores empresariais com cofre (não usar em máquina pessoal)"
+    return "Enterprise servers with vault only (do not use on personal machine)"
   }
   if (label.includes("Use existing local Antigravity pool")) {
-    return "Reconectar contas já salvas no pool local (requer conta ativa com cota)"
+    return "Reconnect accounts already saved in local pool (requires active account with quota)"
   }
   if (label.includes("browser")) {
-    return "★ Recomendado: Fazer login com conta Google no navegador"
+    return "★ Recommended: Sign in with Google account in browser"
   }
   if (label.includes("paste redirect URL")) {
-    return "Para ambientes remotos/SSH (colar URL de redirecionamento)"
+    return "For remote/SSH environments (paste redirect URL)"
   }
   return undefined
 }
@@ -400,8 +400,8 @@ function selectMethod(
           ...(missingAntigravity
             ? [
                 {
-                  title: "⚠ Antigravity OAuth não carregou",
-                  description: "No PowerShell: onethy plugin check; depois onethy service restart",
+                  title: "⚠ Antigravity OAuth not loaded",
+                  description: "Run in terminal: onethy plugin check; then onethy service restart",
                   value: "__native_antigravity_missing__",
                   disabled: true,
                   onSelect: () => {},

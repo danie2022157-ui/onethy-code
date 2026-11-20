@@ -160,8 +160,8 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
   const mono = miniSettings.mono
   const renderer = await createCliRenderer({
     stdin: input.host.terminal.stdin,
-    targetFps: 30,
-    maxFps: 60,
+    targetFps: 120,
+    maxFps: 120,
     useMouse: false,
     autoFocus: false,
     openConsoleOnError: false,

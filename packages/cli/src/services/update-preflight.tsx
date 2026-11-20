@@ -85,7 +85,8 @@ async function open(from?: string): Promise<Session> {
     exitOnCtrlC: false,
     screenMode: "split-footer",
     footerHeight: 4,
-    targetFps: 60,
+    targetFps: 120,
+    maxFps: 120,
     useKittyKeyboard: {},
     consoleOptions: {
       keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],

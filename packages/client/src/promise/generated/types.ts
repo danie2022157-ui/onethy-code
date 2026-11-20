@@ -258,6 +258,8 @@ export type McpStatusConnected = { status: "connected" }
 
 export type McpStatusPending = { status: "pending" }
 
+export type McpStatusStandby = { status: "standby" }
+
 export type McpStatusDisabled = { status: "disabled" }
 
 export type McpStatusFailed = { status: "failed"; error: string }
@@ -760,7 +762,13 @@ export type IntegrationCommandAttempt = { attemptID: IntegrationAttemptID; time:
 
 export type McpServer = {
   name: string
-  status: McpStatusConnected | McpStatusPending | McpStatusDisabled | McpStatusFailed | McpStatusNeedsAuth
+  status:
+    | McpStatusConnected
+    | McpStatusPending
+    | McpStatusStandby
+    | McpStatusDisabled
+    | McpStatusFailed
+    | McpStatusNeedsAuth
   title?: string
   integrationID?: IntegrationID
 }
@@ -2375,6 +2383,7 @@ export type ConfigEntry =
                   protocol?: McpProtocol
                 }
           }
+          overrides?: { [x: string]: boolean }
         }
         compaction?: { auto?: boolean; keep?: { tokens?: number }; buffer?: number }
         skills?: Array<string>
@@ -2452,7 +2461,6 @@ export type ConfigEntry =
           todo?: boolean
           background_compaction?: boolean
           media_blob?: boolean
-          image_generate?: boolean | { model?: string | { providerID: string; model: string; variant?: string } }
           schedules?: boolean
           subagent_depth?: number
           location_idle_timeout?: string | false

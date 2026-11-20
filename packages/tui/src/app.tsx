@@ -63,7 +63,6 @@ import { LocationProvider, useLocation } from "./context/location"
 import { LocalProvider, useLocal } from "./context/local"
 import { PermissionProvider } from "./context/permission"
 import { DialogModel } from "./component/dialog-model"
-import { DialogImage } from "./component/dialog-image"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
 import { DialogUsage } from "./component/usage"
@@ -260,7 +259,8 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
     Effect.gen(function* () {
       const options = {
         externalOutputMode: "passthrough",
-        targetFps: 60,
+        targetFps: 120,
+        maxFps: 120,
         gatherStats: false,
         exitOnCtrlC: false,
         useKittyKeyboard: {},
@@ -532,7 +532,8 @@ function App() {
   const toast = useToast()
   const updater = useUpdateNotification()
   const theme = useTheme()
-  const { mode, supports, setMode, locked, lock, unlock, afterPaint } = useThemes()
+  const themes = useThemes()
+  const { mode, supports, setMode, locked, lock, unlock, afterPaint } = themes
   const data = useData()
   const location = useLocation()
   const exit = useExit()
@@ -854,7 +855,7 @@ function App() {
             title: "Manage projects — create, open, rename, and remove from the list",
             description: "Create or add folders and organize projects without deleting files.",
             category: "OmniCode",
-            slash: { name: "projects", aliases: ["project", "projetos"] },
+            slash: { name: "projects", aliases: ["project"] },
             run: () => dialog.replace(() => <DialogProjects />),
           }]
         : []),
@@ -952,17 +953,6 @@ function App() {
         slash: { name: "models" },
         run: () => {
           dialog.replace(() => <DialogModel />)
-        },
-      },
-      {
-        name: "image.manager",
-        title: "Image generation manager",
-        description: "Gerenciar modelos de imagem e gerar imagens",
-        suggested: true,
-        category: "Agent",
-        slash: { name: "image", aliases: ["imagem", "images"] },
-        run: () => {
-          dialog.replace(() => <DialogImage />)
         },
       },
       {
@@ -1075,7 +1065,7 @@ function App() {
               title: "Customizations Hub (Agents, Skills, Plugins, Mods, Hooks, Commands & MCPs)",
               category: "OmniCode",
               suggested: true,
-              slash: { name: "customizations", aliases: ["personalizacoes", "catalog", "all"] },
+              slash: { name: "customizations", aliases: ["catalog", "all"] },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="all" />)
               },
@@ -1084,7 +1074,6 @@ function App() {
               name: "omnicode.skills",
               title: "Installed & User Skills (@skill)",
               category: "OmniCode",
-              slash: { name: "skills" },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="skills" />)
               },
@@ -1102,7 +1091,7 @@ function App() {
               name: "omnicode.mods",
               title: "Installed & User Mods and Plugins",
               category: "OmniCode",
-              slash: { name: "mods", aliases: ["plugins"] },
+              slash: { name: "mods" },
               run: () => {
                 dialog.replace(() => <DialogCustomizations filter="mods" />)
               },
@@ -1390,9 +1379,22 @@ function App() {
       {
         name: "theme.switch",
         title: "Switch theme",
-        slash: { name: "themes", aliases: ["theme"] },
-        run: () => {
-          dialog.replace(() => <DialogThemeList />)
+        slash: { name: "themes", aliases: ["theme"], arguments: true as const },
+        run: (input?: string) => {
+          const trimmed = input?.trim().toLowerCase()
+          if (trimmed) {
+            const all = themes.all()
+            const match = Object.keys(all).find((name) => name.toLowerCase() === trimmed)
+            if (match) {
+              themes.set(match, true)
+              toast.show({
+                variant: "success",
+                message: `Theme set to "${match}"`,
+              })
+              return
+            }
+          }
+          dialog.replace(() => <DialogThemeList initialQuery={trimmed} />)
         },
         category: "System",
       },
@@ -1757,12 +1759,15 @@ function App() {
             <span style={{ fg: theme.text.base, bold: true }}>Ctrl+B</span> Sidebar
           </text>
         </box>
-        <box flexDirection="row" gap={1}>
+        <box flexDirection="row" gap={2}>
           <Show when={route.data.type === "session"}>
             <text fg={theme.text.muted}>
               <span style={{ fg: theme.text.base, bold: true }}>Alt+↑/↓</span> Messages
             </text>
           </Show>
+          <text fg={theme.text.muted} onMouseUp={() => dialog.push(() => <DialogThemeList />)}>
+            <span style={{ fg: theme.text.action.primary.base, bold: true }}>🎨</span> {themes.selected}
+          </text>
         </box>
       </box>
       <Show when={devtools() && !(route.data.type === "plugin" && route.data.id === "opencode.stats")}>

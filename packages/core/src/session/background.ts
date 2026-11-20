@@ -26,8 +26,6 @@ export const outstanding = Effect.fnUntraced(function* (
         shellID: recovery.shellID,
         command: recovery.command,
       }
-    if (recovery.kind === "image")
-      return { kind: "image" as const, sessionID: recovery.sessionID, path: recovery.path, model: recovery.model }
     return {
       kind: "subagent" as const,
       sessionID: recovery.parentSessionID,
