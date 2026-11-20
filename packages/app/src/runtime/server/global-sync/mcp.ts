@@ -13,6 +13,7 @@ export async function toggleMcp(input: {
     needs_auth: input.authenticate,
     disabled: input.connect,
     failed: input.connect,
+    standby: input.connect,
   }[input.status]()
   await input.refresh()
 }

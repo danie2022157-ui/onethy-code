@@ -24,6 +24,7 @@ const statusLabels = {
   failed: "mcp.status.failed",
   needs_auth: "mcp.status.needs_auth",
   disabled: "mcp.status.disabled",
+  standby: "mcp.status.standby",
 } as const
 
 /** The MCPs dialog for the current workspace. */

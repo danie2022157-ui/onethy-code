@@ -384,6 +384,7 @@ export const dict = {
   "mcp.status.failed": "Failed",
   "mcp.status.needs_auth": "Needs auth",
   "mcp.status.disabled": "Disabled",
+  "mcp.status.standby": "Standby",
   "mcp.auth.interactiveForm": "MCP server {{name}} requires an interactive authentication form",
 
   "dialog.fork.empty": "No messages to fork from",
