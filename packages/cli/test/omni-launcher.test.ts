@@ -81,6 +81,7 @@ test("isolates inherited OpenCode settings and preserves provider credentials", 
       OPENCODE_CONFIG_DIR: "C:\\OpenCode\\config",
       OPENCODE_DB: "C:\\OpenCode\\data.db",
       OPENAI_API_KEY: "test-key",
+      BUN_CONFIG_FILE: "C:\\untrusted\\bunfig.toml",
       PATH: "C:\\tools",
     },
     "C:\\tools\\bun.exe",
@@ -90,6 +91,7 @@ test("isolates inherited OpenCode settings and preserves provider credentials", 
   expect(env.OPENCODE_DB).toBeUndefined()
   expect(env.OMNICODE_ACTIVE).toBe("1")
   expect(env.BUN_BIN).toBe("C:\\tools\\bun.exe")
+  expect(env.BUN_CONFIG_FILE).toBe("")
   expect(env.OPENAI_API_KEY).toBe("test-key")
   expect(env.PATH?.split(path.delimiter)[0]).toBe("C:\\tools")
 })
