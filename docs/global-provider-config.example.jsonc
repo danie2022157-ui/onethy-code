@@ -1,0 +1,8 @@
+// Copy or merge these provider/model settings into ~/.config/opencode/opencode.jsonc
+// Global configuration applies across projects. Keep credentials out of Git; use {env:VAR}.
+{
+  "$schema": "https://opencode.ai/config.json",
+  "providers": {
+    // Add provider configurations here after connecting them.
+  }
+}
