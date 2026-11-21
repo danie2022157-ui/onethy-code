@@ -1,4 +1,4 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { Command } from "@opencode/core/command"
 import { Model } from "@opencode/core/model"
@@ -193,6 +193,109 @@ describe("CommandPlugin.Plugin", () => {
           delivery: "steer",
         },
       ])
+    }),
+
+  it.effect("registers built-in grillme interview command", () =>
+    Effect.gen(function* () {
+      const command = yield* Command.Service
+      const prompts: Array<{ text: string; delivery: string }> = []
+      yield* CommandPlugin.Plugin.effect(
+        host({
+          command: {
+            list: () => Effect.die("unused command.list"),
+            transform: command.transform,
+            reload: command.reload,
+          },
+          session: {
+            prompt: (input) =>
+              Effect.sync(() => {
+                prompts.push({ text: input.text, delivery: input.delivery ?? "steer" })
+                return SessionInbox.User.make({
+                  id: SessionMessage.ID.make("msg_test"),
+                  sessionID: input.sessionID,
+                  time: { created: DateTime.makeUnsafe(0) },
+                  type: "user",
+                  payload: { text: input.text },
+                  delivery: input.delivery ?? "steer",
+                })
+              }),
+          },
+        }),
+      ).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory }, { projectDirectory: project })),
+        ),
+      )
+
+      expect(yield* command.get("grillme")).toMatchObject({
+        name: "grillme",
+        description: "Interview me about a feature, then produce a specification for explicit review",
+      })
+
+      yield* command.execute({
+        name: "grillme",
+        invocation: {
+          sessionID: Session.ID.make("ses_test"),
+          prompt: { text: "add a checkout feature" },
+          delivery: "steer",
+        },
+      })
+
+      expect(prompts).toHaveLength(1)
+      expect(prompts[0].delivery).toBe("steer")
+      expect(prompts[0].text).toContain("[GRILLME — INTERVIEW AND SPECIFICATION MODE]")
+      expect(prompts[0].text).toContain("Do not implement, edit, write")
+      expect(prompts[0].text).toContain("Approval is a separate explicit user decision")
+      expect(prompts[0].text).toContain("User request:\nadd a checkout feature")
+    }),
+
+  it.effect("grillme passes empty prompt text when invoked without arguments", () =>
+    Effect.gen(function* () {
+      const command = yield* Command.Service
+      const prompts: Array<{ text: string; delivery: string }> = []
+      yield* CommandPlugin.Plugin.effect(
+        host({
+          command: {
+            list: () => Effect.die("unused command.list"),
+            transform: command.transform,
+            reload: command.reload,
+          },
+          session: {
+            prompt: (input) =>
+              Effect.sync(() => {
+                prompts.push({ text: input.text, delivery: input.delivery ?? "steer" })
+                return SessionInbox.User.make({
+                  id: SessionMessage.ID.make("msg_test"),
+                  sessionID: input.sessionID,
+                  time: { created: DateTime.makeUnsafe(0) },
+                  type: "user",
+                  payload: { text: input.text },
+                  delivery: input.delivery ?? "steer",
+                })
+              }),
+          },
+        }),
+      ).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory }, { projectDirectory: project })),
+        ),
+      )
+
+      yield* command.execute({
+        name: "grillme",
+        invocation: {
+          sessionID: Session.ID.make("ses_test"),
+          prompt: { text: "" },
+          delivery: "queue",
+        },
+      })
+
+      expect(prompts).toHaveLength(1)
+      expect(prompts[0].delivery).toBe("queue")
+      expect(prompts[0].text).toContain("[GRILLME — INTERVIEW AND SPECIFICATION MODE]")
+      expect(prompts[0].text).toContain("User request:\n")
     }),
   )
 })
