@@ -2400,11 +2400,29 @@ function UserMessage(props: { message: SessionMessageUser }) {
   const theme = useTheme()
   const mode = themes.mode
   const [hover, setHover] = createSignal(false)
+  const [expanded, setExpanded] = createSignal(false)
   const color = createMemo(() => local.agent.color(data.session.get(ctx.sessionID)?.agent ?? "build"))
   const delivery = createMemo(() => ctx.pendingDelivery(props.message.id))
   const dialog = useDialog()
   const renderer = useRenderer()
   const promptRef = usePromptRef()
+
+  const isLong = createMemo(() => {
+    const text = props.message.text.trim()
+    return text.length > 200 || text.split("\n").length > 3
+  })
+
+  const displayText = createMemo(() => {
+    if (expanded() || !isLong()) return props.message.text
+    const text = props.message.text.trim()
+    const firstLine = text.split("\n")[0]
+    return firstLine.length > 180 ? firstLine.slice(0, 180) + "…" : firstLine + "…"
+  })
+
+  const toggleExpanded = () => {
+    if (!isLong()) return
+    setExpanded((prev) => !prev)
+  }
 
   const updatePendingSteer = async (action: "queue" | "cancel") => {
     if (await ctx.mutatePending(action, props.message.id)) dialog.clear()
@@ -2428,6 +2446,10 @@ function UserMessage(props: { message: SessionMessageUser }) {
           }}
           onMouseUp={() => {
             if (renderer.getSelection()?.getSelectedText()) return
+            if (isLong() && !delivery()) {
+              toggleExpanded()
+              return
+            }
             if (delivery() === "steer") {
               dialog.replace(() => (
                 <DialogSelect
@@ -2460,7 +2482,12 @@ function UserMessage(props: { message: SessionMessageUser }) {
           backgroundColor={hover() ? theme.decrease(theme.background.raised.base) : theme.background.raised.base}
           flexShrink={0}
         >
-          <text fg={theme.text.base}>{props.message.text}</text>
+          <text fg={theme.text.base}>{displayText()}</text>
+          <Show when={isLong() && !delivery()}>
+            <text fg={theme.text.muted}>
+              {expanded() ? "− Click to collapse" : "+ Click to expand"}
+            </text>
+          </Show>
           <Show when={skills().length}>
             <box flexDirection="row" paddingTop={1} gap={1} flexWrap="wrap">
               <For each={skills()}>
