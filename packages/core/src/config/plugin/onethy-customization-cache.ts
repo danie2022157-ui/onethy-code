@@ -11,13 +11,6 @@ const memory = new Map<string, { readonly digest: string; readonly items: unknow
 const fingerprintDirectory = Effect.fnUntraced(function* (fs: FSUtil.Interface, directory: string) {
   const entries = yield* fs.readDirectoryEntries(directory).pipe(Effect.orElseSucceed(() => []))
   if (entries.length === 0) return [] as string[]
-  if (entries.length > 64) {
-    const dirMtime = yield* fs.stat(directory).pipe(
-      Effect.map((info) => Option.match(info.mtime, { onNone: () => 0, onSome: (date) => date.getTime() })),
-      Effect.orElseSucceed(() => 0),
-    )
-    return entries.map((entry) => `${directory}:${dirMtime}:${entry.type}:${entry.name}`)
-  }
   return yield* Effect.forEach(
     entries,
     (entry) => {
