@@ -52,28 +52,25 @@ export function DialogStatus() {
             <b>Active Customizations (Real-Time Loading)</b>
           </text>
           <text fg={theme.text.base}>
-            • Agents (@): <b>{breakdown().agents}</b> (/agents)
+            • Agents (@): <b>{breakdown().agents}</b>
           </text>
           <text fg={theme.text.base}>
-            • Skills (@): <b>{breakdown().pureSkills}</b> (/skills)
+            • Skills (@): <b>{breakdown().pureSkills}</b>
           </text>
           <text fg={theme.text.base}>
-            • Mods & Plugins: <b>{breakdown().mods}</b> (/mods · /plugins)
+            • Mods & Plugins: <b>{breakdown().mods}</b>
           </text>
           <text fg={theme.text.base}>
-            • Hooks: <b>{breakdown().hooks}</b> (/hooks)
+            • Hooks: <b>{breakdown().hooks}</b>
           </text>
           <text fg={theme.text.base}>
-            • Settings & Modes: <b>{breakdown().settings}</b> (/modes)
+            • Settings & Modes: <b>{breakdown().settings}</b>
           </text>
           <text fg={theme.text.base}>
-            • Slash Commands & Loops (/): <b>{breakdown().commands}</b> ({breakdown().loops} loops) (/commands)
+            • Slash Commands & Loops (/): <b>{breakdown().commands}</b> ({breakdown().loops} loops)
           </text>
           <text fg={theme.text.base}>
-            • MCP Servers: <b>{breakdown().mcps}</b> (/mcps)
-          </text>
-          <text fg={theme.text.muted}>
-            Use /customizations (or Ctrl+P) to search everything. New files in %APPDATA%\omnicode or .omnicode load automatically.
+            • MCP Servers: <b>{breakdown().mcps}</b>
           </text>
         </box>
 

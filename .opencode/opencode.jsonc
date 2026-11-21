@@ -17,136 +17,28 @@
     "github-pr-search": false,
   },
   "providers": {
-    "devhante": {
-      "name": "DEVHANTE",
+    "cosmos": {
+      "name": "Cosmos",
       "package": "@opencode/ai/providers/openai-compatible",
       "settings": {
-        "baseURL": "https://api.devhubbrasil.com/v1",
-        "apiKey": "dh_dn5UlsdVGIpqFq8AGrmwmzqv-64brZ6YNSYwImDmwvITg_yE"
+        "baseURL": "https://api.cosmospro.dev",
+        "apiKey": "sk-cosmos-8b6ff3c6962b184918def479abb936ed85e2a2f6b9dd2f020693d3ef267686f8"
       },
       "models": {
-        "devhub-chat": {
-          "name": "devhub-chat"
+        "claude-opus-5-5": {
+          "name": "claude-opus-5-5"
         },
-        "hive-deepseek-v4.1-flash-1017": {
-          "name": "hive-deepseek-v4.1-flash-1017"
+        "claude-sonnet-5-5": {
+          "name": "claude-sonnet-5-5"
         },
-        "hive-glm-5.3-flash": {
-          "name": "hive-glm-5.3-flash"
+        "claude-haiku-5-5": {
+          "name": "claude-haiku-5-5"
         },
-        "gemma-2-2b": {
-          "name": "Gemma 2 2b"
+        "claude-fable-5-1": {
+          "name": "claude-fable-5-1"
         },
-        "deepseek-v4-flash-0731": {
-          "name": "DeepSeek v4 flash 0731"
-        },
-        "gpt-5.6-luna": {
-          "name": "GPT 5.6 luna"
-        },
-        "deepseek-v4-pro-0813": {
-          "name": "DeepSeek v4 pro 0813"
-        },
-        "qwen3.8-27b": {
-          "name": "Qwen 3.8-27b"
-        },
-        "seed-2.1-turbo": {
-          "name": "Seed 2.1 turbo"
-        },
-        "seed-2.1-pro": {
-          "name": "Seed 2.1 pro"
-        },
-        "kimi-k2.6": {
-          "name": "Kimi k2.6"
-        },
-        "gemini-3.7-flash": {
-          "name": "Gemini 3.7 flash"
-        },
-        "glm-5.3": {
-          "name": "GLM 5.3"
-        },
-        "glm-5.2": {
-          "name": "GLM 5.2"
-        },
-        "qwen3.8-max": {
-          "name": "Qwen 3.8-max"
-        },
-        "qwen3.7-max": {
-          "name": "Qwen 3.7-max"
-        },
-        "muse-spark-1.1": {
-          "name": "Muse Spark 1.1"
-        },
-        "deepseek-v4-pro-max": {
-          "name": "DeepSeek v4 pro max"
-        },
-        "gemini-3.6-flash": {
-          "name": "Gemini 3.6 flash"
-        },
-        "grok-4.5": {
-          "name": "Grok 4.5"
-        },
-        "grok-4.6": {
-          "name": "Grok 4.6"
-        },
-        "claude-sonnet-5": {
-          "name": "Sonnet 5"
-        },
-        "claude-sonnet-5.5": {
-          "name": "Sonnet 5.5"
-        },
-        "gpt-5.6-terra": {
-          "name": "GPT 5.6 terra"
-        },
-        "gemini-3.1-pro": {
-          "name": "Gemini 3.1 pro"
-        },
-        "kimi-k3": {
-          "name": "Kimi k3"
-        },
-        "claude-opus-4.8": {
-          "name": "Opus 4.8"
-        },
-        "claude-opus-4.6": {
-          "name": "Opus 4.6"
-        },
-        "claude-opus-4.7": {
-          "name": "Opus 4.7"
-        },
-        "claude-opus-5": {
-          "name": "Opus 5"
-        },
-        "claude-opus-5.5": {
-          "name": "Opus 5.5"
-        },
-        "claude-mythos-preview": {
-          "name": "Claude mythos preview"
-        },
-        "gpt-5.6-sol": {
-          "name": "GPT 5.6 sol"
-        },
-        "gpt-5.5": {
-          "name": "GPT 5.5"
-        },
-        "gpt-5.5-pro": {
-          "name": "GPT 5.5 pro"
-        },
-        "claude-fable-5": {
-          "name": "Fable 5"
-        },
-        "claude-fable-5.1": {
-          "name": "Fable 5.1"
-        },
-        "claude-fable-5.2": {
-          "name": "Fable 5.2"
-        },
-        "gpt-6": {
-          "name": "GPT-6"
-        },
-        "omni-chat": {
-          "name": "omni-chat"
-        },
-        "omni-coding": {
-          "name": "omni-coding"
+        "safety-classifier": {
+          "name": "safety-classifier"
         }
       }
     }

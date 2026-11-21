@@ -37,26 +37,28 @@ const it = testEffect(
 
 describe("InstructionBuiltIns", () => {
   it.effect("loads location-scoped environment and host-local date instructions", () =>
-    Effect.gen(function* () {
-      yield* TestClock.setTime(timestamp)
-      const context = yield* InstructionBuiltIns.Service
-      const initialized = yield* readInitial(yield* context.load())
+    withEnv({ OMNICODE_ACTIVE: undefined }, () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(timestamp)
+        const context = yield* InstructionBuiltIns.Service
+        const initialized = yield* readInitial(yield* context.load())
 
-      expect(initialized.text).toBe(
-        [
-          `Today's date: ${localDate(timestamp)}`,
-          "",
-          "Here is some useful information about the environment you are running in:",
-          "<env>",
-          `  Working directory: ${directory}`,
-          `  Workspace root folder: ${projectDirectory}`,
-          "  Is directory a git repo: yes",
-          `  Platform: ${process.platform}`,
-          `  Prefer ${temporary} over generic system temporary directories such as /tmp; it is pre-created and approved for external access.`,
-          "</env>",
-        ].join("\n"),
-      )
-    }),
+        expect(initialized.text).toBe(
+          [
+            `Today's date: ${localDate(timestamp)}`,
+            "",
+            "Here is some useful information about the environment you are running in:",
+            "<env>",
+            `  Working directory: ${directory}`,
+            `  Workspace root folder: ${projectDirectory}`,
+            "  Is directory a git repo: yes",
+            `  Platform: ${process.platform}`,
+            `  Prefer ${temporary} over generic system temporary directories such as /tmp; it is pre-created and approved for external access.`,
+            "</env>",
+          ].join("\n"),
+        )
+      }),
+    ),
   )
 
   it.effect("updates the date without repeating unchanged environment instructions", () =>
