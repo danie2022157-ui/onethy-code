@@ -2,10 +2,11 @@ export * as CommandPlugin from "./command.js"
 
 import crypto from "node:crypto"
 import { define } from "@opencode/plugin/effect/plugin"
-import { Effect, Option, Stream } from "effect"
+import { Effect, Option, Schema, Stream } from "effect"
 import { Bus } from "../bus.js"
 import { Location } from "../location.js"
 import { Mcp } from "../mcp/index.js"
+import { KV } from "../kv.js"
 import { Model } from "../model.js"
 import { OmniBus } from "../omni-bus.js"
 import { OmniOrchestrator } from "../omni-orchestrator.js"
@@ -390,6 +391,28 @@ export const Plugin = define({
         })
       }
 
+      editor.add({
+        name: "grillme",
+        description: "Interview me about a feature, then produce a specification for explicit review",
+        execute: (input) =>
+          ctx.session
+            .prompt({
+              ...input.prompt,
+              sessionID: input.sessionID,
+              text: [
+                "[GRILLME — INTERVIEW AND SPECIFICATION MODE]",
+                "Help the user clarify a software feature through a focused, iterative interview.",
+                "Ask exactly one concise, high-value question at a time. Use available project context; inspect relevant files only when useful and never assume unverified facts.",
+                "Do not implement, edit, write, or otherwise change project files during this interview. Do not delegate implementation.",
+                "When requirements are sufficiently clear, summarize a specification (goal, user behavior, constraints, acceptance criteria, open questions) and stop. Do not begin implementation.",
+                "Approval is a separate explicit user decision. Do not infer approval from completing the interview, the initial request, silence, or an ambiguous response. Only proceed toward implementation after the user separately and explicitly approves the finished specification.",
+                "If /grillme is invoked again, resume from conversation history: ask the next unresolved question, or restate the specification if already produced.",
+                "\nUser request:\n$ARGUMENTS",
+              ].join("\n"),
+              delivery: input.delivery,
+            })
+            .pipe(Effect.asVoid),
+      })
       editor.add({
         name: "init",
         description: "Guided AGENTS.md setup for the project",
