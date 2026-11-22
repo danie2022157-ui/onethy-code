@@ -217,13 +217,8 @@ async function fetchAndConfirmModels(
           if (!ids.length) return
           const modelEntries: Record<string, { readonly name?: string }> = {}
           for (const mId of ids) modelEntries[mId] = { name: mId }
-          await api.experimental.config.update({ providers: { [id]: {
-            name,
-            package: "@opencode/ai/providers/openai-compatible",
-            settings: { baseURL, ...(apiKey ? { apiKey } : {}) },
-            models: modelEntries,
-          } } })
-          toast.show({ variant: "success", message: `Provider "${name}" saved globally on this server with ${ids.length} models!` })
+          await saveCustomProvider(api, { id, name, baseURL, apiKey, models: modelEntries })
+          toast.show({ variant: "success", message: `Provider "${name}" saved globally with ${ids.length} models (API key in SQLite)!` })
           dialog.clear()
         }}
       />
@@ -245,13 +240,8 @@ async function fetchAndConfirmModels(
             for (const m of models) {
               modelEntries[m.id] = { name: m.name || m.id }
             }
-            await api.experimental.config.update({ providers: { [id]: {
-              name,
-              package: "@opencode/ai/providers/openai-compatible",
-              settings: { baseURL, ...(apiKey ? { apiKey } : {}) },
-              models: modelEntries,
-            } } })
-            toast.show({ variant: "success", message: `Provider "${name}" saved globally on this server with ${models.length} models!` })
+            await saveCustomProvider(api, { id, name, baseURL, apiKey, models: modelEntries })
+            toast.show({ variant: "success", message: `Provider "${name}" saved globally with ${models.length} models (API key in SQLite)!` })
             dialog.clear()
           },
         },
@@ -272,33 +262,121 @@ async function fetchAndConfirmModels(
   ))
 }
 
-export async function updateCustomProviderBaseURL(
-  api: ReturnType<typeof useClient>["api"],
-  provider: CustomProviderRecord,
-  baseURL: string,
+type ClientApi = ReturnType<typeof useClient>["api"]
+
+export async function saveCustomProviderCredential(
+  api: ClientApi,
+  providerID: string,
+  label: string,
+  apiKey: string | undefined,
 ) {
-  const rawUrl = baseURL.trim().replace(/\/+$/, "")
-  if (!rawUrl) return
+  const existing = await api.credential.list()
+  for (const entry of existing) {
+    if (entry.integrationID !== providerID) continue
+    await api.credential.remove({ credentialID: entry.id })
+  }
+  if (!apiKey) return
+  await api.credential.create({
+    integrationID: providerID,
+    label,
+    value: { type: "key", key: apiKey },
+  })
+}
+
+async function migrateLegacyApiKey(api: ClientApi, provider: CustomProviderRecord) {
+  if (!provider.apiKey) return
+  const existing = await api.credential.list()
+  if (existing.some((entry) => entry.integrationID === provider.id)) return
+  await api.credential.create({
+    integrationID: provider.id,
+    label: provider.name,
+    value: { type: "key", key: provider.apiKey },
+  })
+}
+
+async function readCustomProviderApiKey(api: ClientApi, provider: CustomProviderRecord) {
+  const existing = await api.credential.list().catch(() => [])
+  const match =
+    existing.find((entry) => entry.integrationID === provider.id && entry.active && entry.value.type === "key") ??
+    existing.find((entry) => entry.integrationID === provider.id && entry.value.type === "key")
+  if (match?.value.type === "key") return match.value.key
+  return provider.apiKey
+}
+
+export async function saveCustomProvider(
+  api: ClientApi,
+  input: {
+    readonly id: string
+    readonly name: string
+    readonly baseURL: string
+    readonly apiKey?: string
+    readonly models: Record<string, { readonly name?: string; readonly type?: "chat" | "image" }>
+  },
+) {
+  await api.experimental.config.update({
+    providers: {
+      [input.id]: {
+        name: input.name,
+        package: "@opencode/ai/providers/openai-compatible",
+        settings: { baseURL: input.baseURL },
+        models: input.models,
+      },
+    },
+  })
+  if (input.apiKey !== undefined) {
+    await saveCustomProviderCredential(api, input.id, input.name, input.apiKey)
+  }
+}
+
+export async function updateCustomProviderApiKey(
+  api: ClientApi,
+  provider: CustomProviderRecord,
+  apiKey: string | undefined,
+) {
+  await saveCustomProviderCredential(api, provider.id, provider.name, apiKey)
+  if (!provider.apiKey) return
   await api.experimental.config.update({
     providers: {
       [provider.id]: {
         name: provider.name,
         package: "@opencode/ai/providers/openai-compatible",
-        settings: {
-          baseURL: rawUrl,
-          ...(provider.apiKey ? { apiKey: provider.apiKey } : {}),
-        },
+        settings: { baseURL: provider.baseURL ?? "" },
         models: provider.models,
       },
     },
   })
 }
 
+export async function updateCustomProviderBaseURL(
+  api: ClientApi,
+  provider: CustomProviderRecord,
+  baseURL: string,
+) {
+  const rawUrl = baseURL.trim().replace(/\/+$/, "")
+  if (!rawUrl) return
+  await migrateLegacyApiKey(api, provider)
+  await api.experimental.config.update({
+    providers: {
+      [provider.id]: {
+        name: provider.name,
+        package: "@opencode/ai/providers/openai-compatible",
+        settings: { baseURL: rawUrl },
+        models: provider.models,
+      },
+    },
+  })
+}
+
+export async function removeCustomProvider(api: ClientApi, provider: CustomProviderRecord) {
+  await saveCustomProviderCredential(api, provider.id, provider.name, undefined)
+  await api.experimental.config.update({ providers: { [provider.id]: null } })
+}
+
 export function manageCustomProvider(
   provider: CustomProviderRecord,
   dialog: ReturnType<typeof useDialog>,
   toast: ReturnType<typeof useToast>,
-  api: ReturnType<typeof useClient>["api"],
+  api: ClientApi,
 ) {
   dialog.replace(() => (
     <DialogSelect
@@ -326,7 +404,8 @@ export function manageCustomProvider(
                   placeholder=""
                 />
               ))
-              const models = await fetchModelsFromEndpoint(baseURL, provider.apiKey).catch(
+              const apiKey = await readCustomProviderApiKey(api, provider)
+              const models = await fetchModelsFromEndpoint(baseURL, apiKey).catch(
                 (err: Error) => err,
               )
               if (models instanceof Error) {
@@ -338,10 +417,11 @@ export function manageCustomProvider(
               for (const m of models) {
                 modelEntries[m.id] = m.type === "image" ? { name: m.name || m.id, type: "image" } : { name: m.name || m.id }
               }
+              await migrateLegacyApiKey(api, provider)
               await api.experimental.config.update({ providers: { [provider.id]: {
                 name: provider.name,
                 package: "@opencode/ai/providers/openai-compatible",
-                settings: { baseURL, ...(provider.apiKey ? { apiKey: provider.apiKey } : {}) },
+                settings: { baseURL },
                 models: modelEntries,
               } } })
               toast.show({
@@ -355,23 +435,17 @@ export function manageCustomProvider(
         {
           title: "🔑 Change API Key",
           value: "change_key",
-          description: "Update the provider authentication key",
+          description: "Update the provider authentication key (stored in local SQLite)",
           onSelect: () => {
             dialog.replace(() => (
               <DialogPrompt
                 title={`Change API Key (${provider.name})`}
-                subtitle="Enter new authentication key (or leave empty)"
-                value={provider.apiKey ?? ""}
+                subtitle="Enter new authentication key (stored in local SQLite; leave empty to remove)"
                 placeholder="sk-..."
                 onConfirm={async (keyVal) => {
                   const apiKey = keyVal.trim() || undefined
-                  await api.experimental.config.update({ providers: { [provider.id]: {
-                    name: provider.name,
-                    package: "@opencode/ai/providers/openai-compatible",
-                    settings: { baseURL: provider.baseURL ?? "", ...(apiKey ? { apiKey } : {}) },
-                    models: provider.models,
-                  } } })
-                  toast.show({ variant: "success", message: `API Key for "${provider.name}" updated globally on this server!` })
+                  await updateCustomProviderApiKey(api, provider, apiKey)
+                  toast.show({ variant: "success", message: `API Key for "${provider.name}" saved in local SQLite!` })
                   dialog.clear()
                 }}
               />
@@ -406,7 +480,7 @@ export function manageCustomProvider(
         {
           title: "🗑 Remove Custom Provider",
           value: "remove",
-          description: `Remove "${provider.name}" and its models from config`,
+          description: `Remove "${provider.name}", its models, and its SQLite credential`,
           onSelect: () => {
             dialog.replace(() => (
               <DialogSelect
@@ -416,8 +490,8 @@ export function manageCustomProvider(
                     title: `Yes, remove "${provider.name}"`,
                     value: "confirm",
                     onSelect: async () => {
-                      await api.experimental.config.update({ providers: { [provider.id]: null } })
-                      toast.show({ variant: "success", message: `Provider "${provider.name}" removed globally from this server!` })
+                      await removeCustomProvider(api, provider)
+                      toast.show({ variant: "success", message: `Provider "${provider.name}" removed from config and local SQLite!` })
                       dialog.clear()
                     },
                   },
