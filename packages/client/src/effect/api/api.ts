@@ -44,6 +44,7 @@ import type { Vcs } from "@opencode/schema/vcs"
 import type { WebSearch } from "@opencode/schema/websearch"
 import type { UsageLimits } from "@opencode/schema/usage-limits"
 import type { Config } from "@opencode/schema/config"
+import type { ConfigProvider } from "@opencode/schema/config/provider"
 
 export type ServerInfoOutput = {
   readonly version: string
@@ -2739,130 +2740,7 @@ export interface ConfigApi<E = never> {
 
 export type ExperimentalConfigUpdateInput = {
   readonly shell?: string | null | undefined
-  readonly providers?:
-    | {
-        readonly [x: string]: {
-          readonly canonical?: Provider.ID | undefined
-          readonly name?: string | undefined
-          readonly env?: ReadonlyArray<string> | undefined
-          readonly package?: string | undefined
-          readonly compatibility?:
-            | {
-                readonly reasoningField?: Model.ReasoningField | undefined
-                readonly requireReasoning?: boolean | undefined
-                readonly maxTokensField?: Model.MaxTokensField | undefined
-                readonly requireFinishReason?: boolean | undefined
-                readonly requireAssistantAfterTool?: boolean | undefined
-                readonly supportsPromptCacheKey?: boolean | undefined
-                readonly streamUsage?: boolean | undefined
-                readonly cacheFormat?: ("anthropic" | "alibaba") | undefined
-                readonly mediaInput?: Model.MediaInput | undefined
-              }
-            | undefined
-          readonly settings?:
-            | ({
-                readonly timeout?: number | false | undefined
-                readonly headerTimeout?: number | false | undefined
-                readonly chunkTimeout?: number | false | undefined
-                readonly compaction?: Provider.Compaction | undefined
-                readonly cache?: Provider.Cache | undefined
-                readonly transport?: Provider.Transport | undefined
-                readonly encoding?: Provider.Encoding | undefined
-              } & { readonly [x: string]: Schema.Json | undefined })
-            | undefined
-          readonly headers?: { readonly [x: string]: string } | undefined
-          readonly body?: { readonly [x: string]: Schema.Json } | undefined
-          readonly models?:
-            | {
-                readonly [x: string]: {
-                  readonly modelID?: string | undefined
-                  readonly type?: Model.Type | undefined
-                  readonly family?: string | undefined
-                  readonly name?: string | undefined
-                  readonly releaseDate?: string | undefined
-                  readonly compatibility?: Model.Compatibility | undefined
-                  readonly package?: string | undefined
-                  readonly settings?:
-                    | ({
-                        readonly compaction?: Provider.Compaction | undefined
-                        readonly cache?: Provider.Cache | undefined
-                        readonly encoding?: Provider.Encoding | undefined
-                      } & { readonly [x: string]: Schema.Json | undefined })
-                    | undefined
-                  readonly headers?: { readonly [x: string]: string } | undefined
-                  readonly body?: { readonly [x: string]: Schema.Json } | undefined
-                  readonly capabilities?:
-                    | {
-                        readonly tools?: boolean | undefined
-                        readonly input?: ReadonlyArray<string> | undefined
-                        readonly output?: ReadonlyArray<string> | undefined
-                        readonly temperature?: boolean | undefined
-                        readonly reasoning?:
-                          | (
-                              | { readonly supported: false }
-                              | {
-                                  readonly supported: true
-                                  readonly toggle?: boolean | undefined
-                                  readonly effort?: ReadonlyArray<string> | undefined
-                                  readonly budget?:
-                                    | { readonly min?: number | undefined; readonly max?: number | undefined }
-                                    | undefined
-                                }
-                            )
-                          | undefined
-                      }
-                    | undefined
-                  readonly variants?:
-                    | ReadonlyArray<{
-                        readonly id: string
-                        readonly settings?:
-                          | ({
-                              readonly compaction?: Provider.Compaction | undefined
-                              readonly encoding?: Provider.Encoding | undefined
-                            } & { readonly [x: string]: Schema.Json | undefined })
-                          | undefined
-                        readonly headers?: { readonly [x: string]: string } | undefined
-                        readonly body?: { readonly [x: string]: Schema.Json } | undefined
-                      }>
-                    | undefined
-                  readonly cost?:
-                    | {
-                        readonly tier?: { readonly type: "context"; readonly size: number } | undefined
-                        readonly input: Money.USDPerMillionTokens
-                        readonly output: Money.USDPerMillionTokens
-                        readonly cache?:
-                          | {
-                              readonly read?: Money.USDPerMillionTokens | undefined
-                              readonly write?: Money.USDPerMillionTokens | undefined
-                            }
-                          | undefined
-                      }
-                    | ReadonlyArray<{
-                        readonly tier?: { readonly type: "context"; readonly size: number } | undefined
-                        readonly input: Money.USDPerMillionTokens
-                        readonly output: Money.USDPerMillionTokens
-                        readonly cache?:
-                          | {
-                              readonly read?: Money.USDPerMillionTokens | undefined
-                              readonly write?: Money.USDPerMillionTokens | undefined
-                            }
-                          | undefined
-                      }>
-                    | undefined
-                  readonly disabled?: boolean | undefined
-                  readonly limit?:
-                    | {
-                        readonly context?: number | undefined
-                        readonly input?: number | undefined
-                        readonly output?: number | undefined
-                      }
-                    | undefined
-                }
-              }
-            | undefined
-        } | null
-      }
-    | undefined
+  readonly providers?: { readonly [x: string]: ConfigProvider.Info | null } | undefined
 }
 export type ExperimentalConfigUpdateOutput = void
 export type ExperimentalConfigUpdateOperation<E = never> = (
