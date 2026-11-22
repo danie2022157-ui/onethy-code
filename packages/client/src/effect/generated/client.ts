@@ -109,6 +109,10 @@ import type {
   ExperimentalSessionInstructionsEntryRemoveOutput,
   ExperimentalSessionLogInput,
   ExperimentalSessionLogOutput,
+  ExperimentalSessionReviewListInput,
+  ExperimentalSessionReviewListOutput,
+  ExperimentalSessionReviewDecideInput,
+  ExperimentalSessionReviewDecideOutput,
   MessageListInput,
   MessageListOutput,
   ModelListInput,
@@ -866,6 +870,33 @@ const EndpointExperimentalSessionLog = (raw: RawClient["server.session"]) => (in
     ),
   )
 
+const EndpointExperimentalSessionReviewList =
+  (raw: RawClient["server.session"]) => (input: ExperimentalSessionReviewListInput) =>
+    preserveEffect<ExperimentalSessionReviewListOutput>()(
+      raw["session.review.list"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointExperimentalSessionReviewDecide =
+  (raw: RawClient["server.session"]) => (input: ExperimentalSessionReviewDecideInput) =>
+    preserveEffect<ExperimentalSessionReviewDecideOutput>()(
+      raw["session.review.decide"]({
+        params: { sessionID: input["sessionID"] },
+        payload: {
+          file: input["file"],
+          decision: input["decision"],
+          startSnapshot: input["startSnapshot"],
+          endSnapshot: input["endSnapshot"],
+          expectVersion: input["expectVersion"],
+        },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
 const adaptGroupExperimentalSession = (raw: RawClient["server.session"]) => ({
   stats: EndpointExperimentalSessionStats(raw),
   import: EndpointExperimentalSessionImport(raw),
@@ -880,6 +911,7 @@ const adaptGroupExperimentalSession = (raw: RawClient["server.session"]) => ({
     },
   },
   log: EndpointExperimentalSessionLog(raw),
+  review: { list: EndpointExperimentalSessionReviewList(raw), decide: EndpointExperimentalSessionReviewDecide(raw) },
 })
 
 const EndpointMessageList = (raw: RawClient["server.message"]) => (input: MessageListInput) =>
@@ -1857,9 +1889,11 @@ const adaptGroupConfig = (raw: RawClient["server.config"]) => ({
   shells: EndpointConfigShells(raw),
 })
 
-const EndpointExperimentalConfigUpdate = (raw: RawClient["server.config"]) => (input: ExperimentalConfigUpdateInput) =>
+const EndpointExperimentalConfigUpdate = (raw: RawClient["server.config"]) => (input?: ExperimentalConfigUpdateInput) =>
   preserveEffect<ExperimentalConfigUpdateOutput>()(
-    raw["config.update"]({ payload: { shell: input["shell"] } }).pipe(Effect.mapError(mapClientError)),
+    raw["config.update"]({ payload: { shell: input?.["shell"], providers: input?.["providers"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
   )
 
 const adaptGroupExperimentalConfig = (raw: RawClient["server.config"]) => ({
@@ -1936,6 +1970,13 @@ const adaptClient = (raw: RawClient) => {
       },
       /** @deprecated Use `client.experimental.session.log`. Removed in the next minor. */
       log: client.experimental.session.log,
+      /** @deprecated Use `client.experimental.session.review`. Removed in the next minor. */
+      review: {
+        /** @deprecated Use `client.experimental.session.review.list`. Removed in the next minor. */
+        list: client.experimental.session.review.list,
+        /** @deprecated Use `client.experimental.session.review.decide`. Removed in the next minor. */
+        decide: client.experimental.session.review.decide,
+      },
     },
     /** @deprecated Use `client.experimental.generate`. Removed in the next minor. */
     generate: {

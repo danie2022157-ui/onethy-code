@@ -36,6 +36,8 @@ import { SessionEvent } from "@opencode/schema/session-event"
 import { EventLog } from "@opencode/schema/event-log"
 import { FileDiff } from "@opencode/schema/file-diff"
 import { Form } from "@opencode/schema/form"
+import { Snapshot } from "@opencode/schema/snapshot"
+import { RelativePath } from "@opencode/schema/schema"
 import { PublicSessionMessage } from "./message.js"
 
 const SessionActive = Schema.Struct({
@@ -671,6 +673,65 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
             "Experimental durable session event log. Reads events after an exclusive aggregate sequence and continues with live events when follow=true.",
         }),
       ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.review.list", "/api/experimental/session/:sessionID/review", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({
+          data: Schema.Array(
+            Schema.Struct({
+              sessionID: Session.ID,
+              file: RelativePath,
+              status: Schema.Literals(["keep", "reject"]),
+              startSnapshot: Snapshot.ID,
+              endSnapshot: Snapshot.ID,
+              version: PositiveInt,
+              timeCreated: DateTimeUtcFromMillis,
+              timeUpdated: DateTimeUtcFromMillis,
+            }).annotate({ identifier: "SessionReview.Decision" }),
+          ),
+        }),
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.review.list",
+            summary: "List session review decisions",
+            description: "Experimental: may change without compatibility guarantees. List file review decisions for a session.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.put("session.review.decide", "/api/experimental/session/:sessionID/review", {
+        params: { sessionID: Session.ID },
+        payload: Schema.Struct({
+          file: RelativePath,
+          decision: Schema.Literals(["keep", "reject"]),
+          startSnapshot: Snapshot.ID,
+          endSnapshot: Snapshot.ID,
+          expectVersion: PositiveInt.pipe(Schema.optional),
+        }),
+        success: Schema.Struct({ data: Schema.Struct({
+          sessionID: Session.ID,
+          file: RelativePath,
+          status: Schema.Literals(["keep", "reject"]),
+          startSnapshot: Snapshot.ID,
+          endSnapshot: Snapshot.ID,
+          version: PositiveInt,
+          timeCreated: DateTimeUtcFromMillis,
+          timeUpdated: DateTimeUtcFromMillis,
+        }).annotate({ identifier: "SessionReview.Decision" }) }),
+        error: [SessionNotFoundError, ConflictError, InvalidRequestError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.review.decide",
+            summary: "Decide session review",
+            description: "Experimental: may change without compatibility guarantees. Keep or reject a reviewed file change.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.post("session.interrupt", "/api/session/:sessionID/interrupt", {

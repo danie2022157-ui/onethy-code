@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test"
-import { Effect, Layer } from "effect"
+import { describe, expect } from "bun:test"
+import { Effect, Layer, Schema } from "effect"
 import { Command } from "@opencode/core/command"
 import { Model } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
@@ -133,11 +133,11 @@ describe("CommandPlugin.Plugin", () => {
 
       expect(yield* command.get("init")).toMatchObject({
         name: "init",
-        description: "guided AGENTS.md setup",
+        description: "Guided AGENTS.md setup for the project",
       })
       expect(yield* command.get("review")).toMatchObject({
         name: "review",
-        description: "review changes [commit|branch|pr], defaults to uncommitted",
+        description: "Review changes [commit|branch|pr], defaults to uncommitted",
       })
       yield* command.execute({
         name: "init",
@@ -194,6 +194,7 @@ describe("CommandPlugin.Plugin", () => {
         },
       ])
     }),
+  )
 
   it.effect("registers built-in grillme interview command", () =>
     Effect.gen(function* () {
@@ -205,6 +206,12 @@ describe("CommandPlugin.Plugin", () => {
             list: () => Effect.die("unused command.list"),
             transform: command.transform,
             reload: command.reload,
+          },
+          storage: {
+            get: () => Effect.succeed(undefined),
+            set: () => Effect.void,
+            remove: () => Effect.void,
+            scan: () => Effect.succeed({ entries: [] }),
           },
           session: {
             prompt: (input) =>
@@ -244,11 +251,12 @@ describe("CommandPlugin.Plugin", () => {
 
       expect(prompts).toHaveLength(1)
       expect(prompts[0].delivery).toBe("steer")
-      expect(prompts[0].text).toContain("[GRILLME — INTERVIEW AND SPECIFICATION MODE]")
-      expect(prompts[0].text).toContain("Do not implement, edit, write")
-      expect(prompts[0].text).toContain("Approval is a separate explicit user decision")
-      expect(prompts[0].text).toContain("User request:\nadd a checkout feature")
+      expect(prompts[0].text).toContain("[GRILLME — ITERATIVE TECHNICAL INTERVIEW]")
+      expect(prompts[0].text).toContain("Do not implement during the interview")
+      expect(prompts[0].text).toContain("This prompt is guidance, not a tool-level authorization barrier")
+      expect(prompts[0].text).toContain("Latest user input: add a checkout feature")
     }),
+  )
 
   it.effect("grillme passes empty prompt text when invoked without arguments", () =>
     Effect.gen(function* () {
@@ -260,6 +268,12 @@ describe("CommandPlugin.Plugin", () => {
             list: () => Effect.die("unused command.list"),
             transform: command.transform,
             reload: command.reload,
+          },
+          storage: {
+            get: () => Effect.succeed(undefined),
+            set: () => Effect.void,
+            remove: () => Effect.void,
+            scan: () => Effect.succeed({ entries: [] }),
           },
           session: {
             prompt: (input) =>
@@ -294,8 +308,416 @@ describe("CommandPlugin.Plugin", () => {
 
       expect(prompts).toHaveLength(1)
       expect(prompts[0].delivery).toBe("queue")
-      expect(prompts[0].text).toContain("[GRILLME — INTERVIEW AND SPECIFICATION MODE]")
-      expect(prompts[0].text).toContain("User request:\n")
+      expect(prompts[0].text).toContain("[GRILLME — ITERATIVE TECHNICAL INTERVIEW]")
+      expect(prompts[0].text).toContain("Latest user input: (resume)")
+    }),
+  )
+
+  // ===== Focused grillme state machine tests with stateful in-memory storage =====
+
+  it.effect("grillme: approve before spec_ready keeps interviewing", () =>
+    Effect.gen(function* () {
+      const command = yield* Command.Service
+      const prompts: Array<{ text: string; delivery: string }> = []
+      const storage = new Map<string, unknown>()
+      yield* CommandPlugin.Plugin.effect(
+        host({
+          command: {
+            list: () => Effect.die("unused command.list"),
+            transform: command.transform,
+            reload: command.reload,
+          },
+          storage: {
+            get: (key: string) => Effect.sync(() => storage.get(key) as Schema.Json | undefined),
+            set: (key, value) => Effect.sync(() => void storage.set(key, value)),
+            remove: () => Effect.void,
+            scan: () => Effect.succeed({ entries: [] }),
+          },
+          session: {
+            prompt: (input) =>
+              Effect.sync(() => {
+                prompts.push({ text: input.text, delivery: input.delivery ?? "steer" })
+                return SessionInbox.User.make({
+                  id: SessionMessage.ID.make("msg_test"),
+                  sessionID: input.sessionID,
+                  time: { created: DateTime.makeUnsafe(0) },
+                  type: "user",
+                  payload: { text: input.text },
+                  delivery: input.delivery ?? "steer",
+                })
+              }),
+          },
+        }),
+      ).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory }, { projectDirectory: project })),
+        ),
+      )
+
+      const sessionID = Session.ID.make("ses_approve_before_ready")
+      yield* command.execute({
+        name: "grillme",
+        invocation: { sessionID, prompt: { text: "add feature" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("[GRILLME — ITERATIVE TECHNICAL INTERVIEW]")
+      prompts.length = 0
+
+      // Say "approve" before "spec ready" — should stay in interviewing
+      yield* command.execute({
+        name: "grillme",
+        invocation: { sessionID, prompt: { text: "approve" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: interviewing")
+    }),
+  )
+
+  it.effect("grillme: interview -> spec_ready -> approve transitions to approved", () =>
+    Effect.gen(function* () {
+      const command = yield* Command.Service
+      const prompts: Array<{ text: string; delivery: string }> = []
+      const storage = new Map<string, unknown>()
+      yield* CommandPlugin.Plugin.effect(
+        host({
+          command: {
+            list: () => Effect.die("unused command.list"),
+            transform: command.transform,
+            reload: command.reload,
+          },
+          storage: {
+            get: (key: string) => Effect.sync(() => storage.get(key) as Schema.Json | undefined),
+            set: (key, value) => Effect.sync(() => void storage.set(key, value)),
+            remove: () => Effect.void,
+            scan: () => Effect.succeed({ entries: [] }),
+          },
+          session: {
+            prompt: (input) =>
+              Effect.sync(() => {
+                prompts.push({ text: input.text, delivery: input.delivery ?? "steer" })
+                return SessionInbox.User.make({
+                  id: SessionMessage.ID.make("msg_test"),
+                  sessionID: input.sessionID,
+                  time: { created: DateTime.makeUnsafe(0) },
+                  type: "user",
+                  payload: { text: input.text },
+                  delivery: input.delivery ?? "steer",
+                })
+              }),
+          },
+        }),
+      ).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory }, { projectDirectory: project })),
+        ),
+      )
+
+      const sessionID = Session.ID.make("ses_interview_approve")
+      // Initial prompt
+      yield* command.execute({
+        name: "grillme",
+        invocation: { sessionID, prompt: { text: "add auth" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("[GRILLME — ITERATIVE TECHNICAL INTERVIEW]")
+      prompts.length = 0
+
+      // Answer a question (stays interviewing)
+      yield* command.execute({
+        name: "grillme",
+        invocation: { sessionID, prompt: { text: "using JWT tokens" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: interviewing")
+      prompts.length = 0
+
+      // Say "spec ready" — moves to spec_ready
+      yield* command.execute({
+        name: "grillme",
+        invocation: { sessionID, prompt: { text: "spec ready" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: spec_ready")
+      prompts.length = 0
+
+      // Say "approve" — moves to approved
+      yield* command.execute({
+        name: "grillme",
+        invocation: { sessionID, prompt: { text: "approve" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: approved")
+    }),
+  )
+
+  it.effect("grillme: substantive answer after spec_ready invalidates specReady gate", () =>
+    Effect.gen(function* () {
+      const command = yield* Command.Service
+      const prompts: Array<{ text: string; delivery: string }> = []
+      const storage = new Map<string, unknown>()
+      yield* CommandPlugin.Plugin.effect(
+        host({
+          command: {
+            list: () => Effect.die("unused command.list"),
+            transform: command.transform,
+            reload: command.reload,
+          },
+          storage: {
+            get: (key: string) => Effect.sync(() => storage.get(key) as Schema.Json | undefined),
+            set: (key, value) => Effect.sync(() => void storage.set(key, value)),
+            remove: () => Effect.void,
+            scan: () => Effect.succeed({ entries: [] }),
+          },
+          session: {
+            prompt: (input) =>
+              Effect.sync(() => {
+                prompts.push({ text: input.text, delivery: input.delivery ?? "steer" })
+                return SessionInbox.User.make({
+                  id: SessionMessage.ID.make("msg_test"),
+                  sessionID: input.sessionID,
+                  time: { created: DateTime.makeUnsafe(0) },
+                  type: "user",
+                  payload: { text: input.text },
+                  delivery: input.delivery ?? "steer",
+                })
+              }),
+          },
+        }),
+      ).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory }, { projectDirectory: project })),
+        ),
+      )
+
+      const sessionID = Session.ID.make("ses_spec_ready_invalidated")
+      // Initial prompt
+      yield* command.execute({
+        name: "grillme",
+        invocation: { sessionID, prompt: { text: "add auth" }, delivery: "steer" },
+      })
+      prompts.length = 0
+
+      // Say "spec ready" — moves to spec_ready
+      yield* command.execute({
+        name: "grillme",
+        invocation: { sessionID, prompt: { text: "spec ready" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: spec_ready")
+      prompts.length = 0
+
+      // Substantive follow-up answer — should clear specReady and return to interviewing
+      yield* command.execute({
+        name: "grillme",
+        invocation: { sessionID, prompt: { text: "also need refresh tokens" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: interviewing")
+      prompts.length = 0
+
+      // Now "approve" without re-saying "spec ready" — should stay interviewing
+      yield* command.execute({
+        name: "grillme",
+        invocation: { sessionID, prompt: { text: "approve" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: interviewing")
+    }),
+  )
+
+  it.effect("grillme: terminal approved state is completely frozen (no appends, no timestamp change)", () =>
+    Effect.gen(function* () {
+      const command = yield* Command.Service
+      const prompts: Array<{ text: string; delivery: string }> = []
+      const storage = new Map<string, unknown>()
+      yield* CommandPlugin.Plugin.effect(
+        host({
+          command: {
+            list: () => Effect.die("unused command.list"),
+            transform: command.transform,
+            reload: command.reload,
+          },
+          storage: {
+            get: (key: string) => Effect.sync(() => storage.get(key) as Schema.Json | undefined),
+            set: (key, value) => Effect.sync(() => void storage.set(key, value)),
+            remove: () => Effect.void,
+            scan: () => Effect.succeed({ entries: [] }),
+          },
+          session: {
+            prompt: (input) =>
+              Effect.sync(() => {
+                prompts.push({ text: input.text, delivery: input.delivery ?? "steer" })
+                return SessionInbox.User.make({
+                  id: SessionMessage.ID.make("msg_test"),
+                  sessionID: input.sessionID,
+                  time: { created: DateTime.makeUnsafe(0) },
+                  type: "user",
+                  payload: { text: input.text },
+                  delivery: input.delivery ?? "steer",
+                })
+              }),
+          },
+        }),
+      ).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory }, { projectDirectory: project })),
+        ),
+      )
+
+      const sessionID = Session.ID.make("ses_terminal_frozen")
+      // Reach approved state
+      yield* command.execute({ name: "grillme", invocation: { sessionID, prompt: { text: "add auth" }, delivery: "steer" } })
+      prompts.length = 0
+      yield* command.execute({ name: "grillme", invocation: { sessionID, prompt: { text: "spec ready" }, delivery: "steer" } })
+      prompts.length = 0
+      yield* command.execute({ name: "grillme", invocation: { sessionID, prompt: { text: "approve" }, delivery: "steer" } })
+      expect(prompts[0].text).toContain("Status: approved")
+      prompts.length = 0
+
+      // Capture stored state after approval
+      const key = `grillme:v1:${sessionID}`
+      const stateAfterApprove = storage.get(key) as { status: string; answers: string[]; updatedAt: string }
+      expect(stateAfterApprove.status).toBe("approved")
+      const answersAtApproval = [...stateAfterApprove.answers]
+      const updatedAtAtApproval = stateAfterApprove.updatedAt
+
+      // Send arbitrary follow-up input — state must NOT change
+      yield* command.execute({ name: "grillme", invocation: { sessionID, prompt: { text: "random follow-up" }, delivery: "steer" } })
+      expect(prompts[0].text).toContain("Status: approved")
+      prompts.length = 0
+
+      const stateAfterFollowup = storage.get(key) as { status: string; answers: string[]; updatedAt: string }
+      expect(stateAfterFollowup.status).toBe("approved")
+      expect(stateAfterFollowup.answers).toEqual(answersAtApproval)
+      expect(stateAfterFollowup.updatedAt).toBe(updatedAtAtApproval)
+    }),
+  )
+
+  it.effect("grillme: terminal cancelled state is completely frozen", () =>
+    Effect.gen(function* () {
+      const command = yield* Command.Service
+      const prompts: Array<{ text: string; delivery: string }> = []
+      const storage = new Map<string, unknown>()
+      yield* CommandPlugin.Plugin.effect(
+        host({
+          command: {
+            list: () => Effect.die("unused command.list"),
+            transform: command.transform,
+            reload: command.reload,
+          },
+          storage: {
+            get: (key: string) => Effect.sync(() => storage.get(key) as Schema.Json | undefined),
+            set: (key, value) => Effect.sync(() => void storage.set(key, value)),
+            remove: () => Effect.void,
+            scan: () => Effect.succeed({ entries: [] }),
+          },
+          session: {
+            prompt: (input) =>
+              Effect.sync(() => {
+                prompts.push({ text: input.text, delivery: input.delivery ?? "steer" })
+                return SessionInbox.User.make({
+                  id: SessionMessage.ID.make("msg_test"),
+                  sessionID: input.sessionID,
+                  time: { created: DateTime.makeUnsafe(0) },
+                  type: "user",
+                  payload: { text: input.text },
+                  delivery: input.delivery ?? "steer",
+                })
+              }),
+          },
+        }),
+      ).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory }, { projectDirectory: project })),
+        ),
+      )
+
+      const sessionID = Session.ID.make("ses_terminal_cancelled")
+      yield* command.execute({ name: "grillme", invocation: { sessionID, prompt: { text: "add auth" }, delivery: "steer" } })
+      prompts.length = 0
+      yield* command.execute({ name: "grillme", invocation: { sessionID, prompt: { text: "cancel" }, delivery: "steer" } })
+      expect(prompts[0].text).toContain("Status: cancelled")
+      prompts.length = 0
+
+      const key = `grillme:v1:${sessionID}`
+      const stateAfterCancel = storage.get(key) as { status: string; answers: string[]; updatedAt: string }
+      expect(stateAfterCancel.status).toBe("cancelled")
+      const answersAtCancel = [...stateAfterCancel.answers]
+      const updatedAtAtCancel = stateAfterCancel.updatedAt
+
+      // Send arbitrary follow-up input — state must NOT change
+      yield* command.execute({ name: "grillme", invocation: { sessionID, prompt: { text: "random follow-up" }, delivery: "steer" } })
+      expect(prompts[0].text).toContain("Status: cancelled")
+      prompts.length = 0
+
+      const stateAfterFollowup = storage.get(key) as { status: string; answers: string[]; updatedAt: string }
+      expect(stateAfterFollowup.status).toBe("cancelled")
+      expect(stateAfterFollowup.answers).toEqual(answersAtCancel)
+      expect(stateAfterFollowup.updatedAt).toBe(updatedAtAtCancel)
+    }),
+  )
+
+  it.effect("grillme: per-session key isolation (different sessions do not share state)", () =>
+    Effect.gen(function* () {
+      const command = yield* Command.Service
+      const prompts: Array<{ text: string; delivery: string }> = []
+      const storage = new Map<string, unknown>()
+      yield* CommandPlugin.Plugin.effect(
+        host({
+          command: {
+            list: () => Effect.die("unused command.list"),
+            transform: command.transform,
+            reload: command.reload,
+          },
+          storage: {
+            get: (key: string) => Effect.sync(() => storage.get(key) as Schema.Json | undefined),
+            set: (key, value) => Effect.sync(() => void storage.set(key, value)),
+            remove: () => Effect.void,
+            scan: () => Effect.succeed({ entries: [] }),
+          },
+          session: {
+            prompt: (input) =>
+              Effect.sync(() => {
+                prompts.push({ text: input.text, delivery: input.delivery ?? "steer" })
+                return SessionInbox.User.make({
+                  id: SessionMessage.ID.make("msg_test"),
+                  sessionID: input.sessionID,
+                  time: { created: DateTime.makeUnsafe(0) },
+                  type: "user",
+                  payload: { text: input.text },
+                  delivery: input.delivery ?? "steer",
+                })
+              }),
+          },
+        }),
+      ).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory }, { projectDirectory: project })),
+        ),
+      )
+
+      const sessionA = Session.ID.make("ses_isolation_a")
+      const sessionB = Session.ID.make("ses_isolation_b")
+
+      // Session A starts
+      yield* command.execute({ name: "grillme", invocation: { sessionID: sessionA, prompt: { text: "feature A" }, delivery: "steer" } })
+      prompts.length = 0
+      yield* command.execute({ name: "grillme", invocation: { sessionID: sessionA, prompt: { text: "spec ready" }, delivery: "steer" } })
+      prompts.length = 0
+      yield* command.execute({ name: "grillme", invocation: { sessionID: sessionA, prompt: { text: "approve" }, delivery: "steer" } })
+      expect(prompts[0].text).toContain("Status: approved")
+      prompts.length = 0
+
+      // Session B starts — should be fresh interviewing state
+      yield* command.execute({ name: "grillme", invocation: { sessionID: sessionB, prompt: { text: "feature B" }, delivery: "steer" } })
+      expect(prompts[0].text).toContain("[GRILLME — ITERATIVE TECHNICAL INTERVIEW]")
+      expect(prompts[0].text).toContain("Status: interviewing")
+      prompts.length = 0
+
+      // Session A remains approved
+      yield* command.execute({ name: "grillme", invocation: { sessionID: sessionA, prompt: { text: "random" }, delivery: "steer" } })
+      expect(prompts[0].text).toContain("Status: approved")
+
+      // Verify storage keys are separate
+      expect(storage.has(`grillme:v1:${sessionA}`)).toBe(true)
+      expect(storage.has(`grillme:v1:${sessionB}`)).toBe(true)
     }),
   )
 })

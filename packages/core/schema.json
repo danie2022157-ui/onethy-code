@@ -1,8 +1,8 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "0ac88673-a402-45a0-b931-e694d59ccefa",
-  "prevIds": ["e5daa0af-cae7-4057-919a-ebf44dfced0a"],
+  "id": "4792efac-8191-4e05-8e5b-65a66f5068f9",
+  "prevIds": ["0ac88673-a402-45a0-b931-e694d59ccefa"],
   "ddl": [
     {
       "name": "account_state",
@@ -78,6 +78,10 @@
     },
     {
       "name": "session_part",
+      "entityType": "tables"
+    },
+    {
+      "name": "session_review",
       "entityType": "tables"
     },
     {
@@ -1424,6 +1428,86 @@
     },
     {
       "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "session_id",
+      "entityType": "columns",
+      "table": "session_review"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "file",
+      "entityType": "columns",
+      "table": "session_review"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "status",
+      "entityType": "columns",
+      "table": "session_review"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "start_snapshot",
+      "entityType": "columns",
+      "table": "session_review"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "end_snapshot",
+      "entityType": "columns",
+      "table": "session_review"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "version",
+      "entityType": "columns",
+      "table": "session_review"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_created",
+      "entityType": "columns",
+      "table": "session_review"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_updated",
+      "entityType": "columns",
+      "table": "session_review"
+    },
+    {
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -2026,6 +2110,17 @@
       "table": "session_part"
     },
     {
+      "columns": ["session_id"],
+      "tableTo": "session_v2",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_session_review_session_id_session_v2_id_fk",
+      "entityType": "fks",
+      "table": "session_review"
+    },
+    {
       "columns": ["project_id"],
       "tableTo": "project",
       "columnsTo": ["id"],
@@ -2081,6 +2176,13 @@
       "name": "session_part_pk",
       "entityType": "pks",
       "table": "session_part"
+    },
+    {
+      "columns": ["session_id", "file"],
+      "nameExplicit": false,
+      "name": "session_review_pk",
+      "entityType": "pks",
+      "table": "session_review"
     },
     {
       "columns": ["project_id", "directory"],

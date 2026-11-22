@@ -1,6 +1,5 @@
 import type { ConfigEntry } from "@opencode/client"
-import { applyEdits, modify } from "jsonc-parser"
-import path from "path"
+import type { useClient } from "../context/client"
 import { useDialog } from "../ui/dialog"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogSelect } from "../ui/dialog-select"
@@ -19,38 +18,27 @@ export interface CustomProviderRecord {
   readonly baseURL?: string
   readonly apiKey?: string
   readonly modelCount: number
-  readonly filePath: string
   readonly models: Record<string, { readonly name?: string; readonly type?: string }>
-}
-
-export function targetConfigFile(entries: readonly ConfigEntry[] = []): string {
-  const docs = entries.flatMap((entry) =>
-    entry.type === "document" && entry.path && /\.jsonc?$/i.test(entry.path) ? [entry.path] : [],
-  )
-  if (docs.length > 0) return docs[docs.length - 1]
-
-  const home = process.env.USERPROFILE || process.env.HOME || ""
-  const configDir = process.env.XDG_CONFIG_HOME || (home ? path.join(home, ".config") : "")
-  return path.join(configDir, "opencode", "opencode.json")
 }
 
 export function extractCustomProviders(entries: readonly ConfigEntry[] = []): CustomProviderRecord[] {
   const list: CustomProviderRecord[] = []
   for (const entry of entries) {
-    if (entry.type !== "document" || !entry.path || !entry.info.providers) continue
+    if (entry.type !== "document" || !entry.info.providers) continue
     for (const [id, prov] of Object.entries(entry.info.providers)) {
-      if (list.some((item) => item.id === id)) continue
+      const index = list.findIndex((item) => item.id === id)
       const provModels = (prov.models ?? {}) as Record<string, { readonly name?: string; readonly type?: string }>
       const modelKeys = Object.keys(provModels)
-      list.push({
+      const record = {
         id,
         name: prov.name || id,
         baseURL: typeof prov.settings?.baseURL === "string" ? prov.settings.baseURL : undefined,
         apiKey: typeof prov.settings?.apiKey === "string" ? prov.settings.apiKey : undefined,
         modelCount: modelKeys.length,
-        filePath: entry.path,
         models: provModels,
-      })
+      }
+      if (index === -1) list.push(record)
+      else list[index] = record // last definition wins (effective/lowest-to-highest precedence)
     }
   }
   return list
@@ -124,45 +112,11 @@ function parseModelsData(data: unknown): DiscoveredModel[] {
   return result
 }
 
-export async function saveCustomProviderToConfig(
-  filePath: string,
-  providerID: string,
-  providerInfo: {
-    readonly name: string
-    readonly package: string
-    readonly settings: {
-      readonly baseURL: string
-      readonly apiKey?: string
-    }
-    readonly models: Record<string, { readonly name?: string; readonly type?: "chat" | "image" }>
-  },
-) {
-  const file = Bun.file(filePath)
-  const exists = await file.exists()
-  const content = exists ? await file.text() : '{\n  "$schema": "https://opencode.ai/config.json"\n}\n'
-  const edits = modify(content, ["providers", providerID], providerInfo, {
-    formattingOptions: { tabSize: 2, insertSpaces: true },
-  })
-  const updated = applyEdits(content, edits)
-  await Bun.write(filePath, updated.endsWith("\n") ? updated : `${updated}\n`)
-}
-
-export async function removeCustomProviderFromConfig(filePath: string, providerID: string) {
-  const file = Bun.file(filePath)
-  const exists = await file.exists()
-  if (!exists) return
-  const content = await file.text()
-  const edits = modify(content, ["providers", providerID], undefined, {
-    formattingOptions: { tabSize: 2, insertSpaces: true },
-  })
-  const updated = applyEdits(content, edits)
-  await Bun.write(filePath, updated.endsWith("\n") ? updated : `${updated}\n`)
-}
-
 export function promptAddCustomProvider(
   dialog: ReturnType<typeof useDialog>,
   entries: readonly ConfigEntry[],
   toast: ReturnType<typeof useToast>,
+  api: ReturnType<typeof useClient>["api"],
 ) {
   dialog.replace(() => (
     <DialogPrompt
@@ -173,7 +127,7 @@ export function promptAddCustomProvider(
         const name = nameVal.trim()
         if (!name) return
         const id = name.toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-")
-        promptProviderBaseURL(id, name, dialog, entries, toast)
+        promptProviderBaseURL(id, name, dialog, entries, toast, api)
       }}
     />
   ))
@@ -185,17 +139,18 @@ function promptProviderBaseURL(
   dialog: ReturnType<typeof useDialog>,
   entries: readonly ConfigEntry[],
   toast: ReturnType<typeof useToast>,
+  api: ReturnType<typeof useClient>["api"],
 ) {
   dialog.replace(() => (
     <DialogPrompt
       title={`Endpoint / Base URL (${name}) (2/3)`}
       subtitle="URL base da API (OpenAI-compatible). Ex: https://api.cosmospro.dev/v1"
       placeholder="https://api.cosmospro.dev/v1"
-      onCancel={() => promptAddCustomProvider(dialog, entries, toast)}
+      onCancel={() => promptAddCustomProvider(dialog, entries, toast, api)}
       onConfirm={(urlVal) => {
         const rawUrl = urlVal.trim().replace(/\/+$/, "")
         if (!rawUrl) return
-        promptProviderApiKey(id, name, rawUrl, dialog, entries, toast)
+        promptProviderApiKey(id, name, rawUrl, dialog, entries, toast, api)
       }}
     />
   ))
@@ -208,16 +163,17 @@ function promptProviderApiKey(
   dialog: ReturnType<typeof useDialog>,
   entries: readonly ConfigEntry[],
   toast: ReturnType<typeof useToast>,
+  api: ReturnType<typeof useClient>["api"],
 ) {
   dialog.replace(() => (
     <DialogPrompt
       title={`API Key (${name}) (3/3)`}
       subtitle="Authentication key (leave empty if local/no auth)"
       placeholder="sk-... (optional)"
-      onCancel={() => promptProviderBaseURL(id, name, dialog, entries, toast)}
+      onCancel={() => promptProviderBaseURL(id, name, dialog, entries, toast, api)}
       onConfirm={(keyVal) => {
         const apiKey = keyVal.trim() || undefined
-        void fetchAndConfirmModels(id, name, baseURL, apiKey, dialog, entries, toast)
+        void fetchAndConfirmModels(id, name, baseURL, apiKey, dialog, entries, toast, api)
       }}
     />
   ))
@@ -231,6 +187,7 @@ async function fetchAndConfirmModels(
   dialog: ReturnType<typeof useDialog>,
   entries: readonly ConfigEntry[],
   toast: ReturnType<typeof useToast>,
+  api: ReturnType<typeof useClient>["api"],
 ) {
   dialog.replace(() => (
     <DialogPrompt
@@ -258,24 +215,15 @@ async function fetchAndConfirmModels(
             .map((s) => s.trim())
             .filter(Boolean)
           if (!ids.length) return
-          const targetFile = targetConfigFile(entries)
           const modelEntries: Record<string, { readonly name?: string }> = {}
-          for (const mId of ids) {
-            modelEntries[mId] = { name: mId }
-          }
-          await saveCustomProviderToConfig(targetFile, id, {
+          for (const mId of ids) modelEntries[mId] = { name: mId }
+          await api.experimental.config.update({ providers: { [id]: {
             name,
             package: "@opencode/ai/providers/openai-compatible",
-            settings: {
-              baseURL,
-              ...(apiKey ? { apiKey } : {}),
-            },
+            settings: { baseURL, ...(apiKey ? { apiKey } : {}) },
             models: modelEntries,
-          })
-          toast.show({
-            variant: "success",
-            message: `Provider "${name}" saved with ${ids.length} models to ${path.basename(targetFile)}!`,
-          })
+          } } })
+          toast.show({ variant: "success", message: `Provider "${name}" saved globally on this server with ${ids.length} models!` })
           dialog.clear()
         }}
       />
@@ -293,24 +241,17 @@ async function fetchAndConfirmModels(
           value: "import_all",
           description: `Save provider "${name}" with all retrieved models`,
           onSelect: async () => {
-            const targetFile = targetConfigFile(entries)
             const modelEntries: Record<string, { readonly name?: string }> = {}
             for (const m of models) {
               modelEntries[m.id] = { name: m.name || m.id }
             }
-            await saveCustomProviderToConfig(targetFile, id, {
+            await api.experimental.config.update({ providers: { [id]: {
               name,
               package: "@opencode/ai/providers/openai-compatible",
-              settings: {
-                baseURL,
-                ...(apiKey ? { apiKey } : {}),
-              },
+              settings: { baseURL, ...(apiKey ? { apiKey } : {}) },
               models: modelEntries,
-            })
-            toast.show({
-              variant: "success",
-              message: `Provider "${name}" saved with ${models.length} models to ${path.basename(targetFile)}!`,
-            })
+            } } })
+            toast.show({ variant: "success", message: `Provider "${name}" saved globally on this server with ${models.length} models!` })
             dialog.clear()
           },
         },
@@ -331,10 +272,33 @@ async function fetchAndConfirmModels(
   ))
 }
 
+export async function updateCustomProviderBaseURL(
+  api: ReturnType<typeof useClient>["api"],
+  provider: CustomProviderRecord,
+  baseURL: string,
+) {
+  const rawUrl = baseURL.trim().replace(/\/+$/, "")
+  if (!rawUrl) return
+  await api.experimental.config.update({
+    providers: {
+      [provider.id]: {
+        name: provider.name,
+        package: "@opencode/ai/providers/openai-compatible",
+        settings: {
+          baseURL: rawUrl,
+          ...(provider.apiKey ? { apiKey: provider.apiKey } : {}),
+        },
+        models: provider.models,
+      },
+    },
+  })
+}
+
 export function manageCustomProvider(
   provider: CustomProviderRecord,
   dialog: ReturnType<typeof useDialog>,
   toast: ReturnType<typeof useToast>,
+  api: ReturnType<typeof useClient>["api"],
 ) {
   dialog.replace(() => (
     <DialogSelect
@@ -374,15 +338,12 @@ export function manageCustomProvider(
               for (const m of models) {
                 modelEntries[m.id] = m.type === "image" ? { name: m.name || m.id, type: "image" } : { name: m.name || m.id }
               }
-              await saveCustomProviderToConfig(provider.filePath, provider.id, {
+              await api.experimental.config.update({ providers: { [provider.id]: {
                 name: provider.name,
                 package: "@opencode/ai/providers/openai-compatible",
-                settings: {
-                  baseURL,
-                  ...(provider.apiKey ? { apiKey: provider.apiKey } : {}),
-                },
+                settings: { baseURL, ...(provider.apiKey ? { apiKey: provider.apiKey } : {}) },
                 models: modelEntries,
-              })
+              } } })
               toast.show({
                 variant: "success",
                 message: `Models updated: ${models.length} models imported for "${provider.name}"!`,
@@ -404,15 +365,13 @@ export function manageCustomProvider(
                 placeholder="sk-..."
                 onConfirm={async (keyVal) => {
                   const apiKey = keyVal.trim() || undefined
-                  const targetFile = provider.filePath
-                  const file = Bun.file(targetFile)
-                  const content = await file.text()
-                  const edits = modify(content, ["providers", provider.id, "settings", "apiKey"], apiKey, {
-                    formattingOptions: { tabSize: 2, insertSpaces: true },
-                  })
-                  const updated = applyEdits(content, edits)
-                  await Bun.write(targetFile, updated.endsWith("\n") ? updated : `${updated}\n`)
-                  toast.show({ variant: "success", message: `API Key for "${provider.name}" updated!` })
+                  await api.experimental.config.update({ providers: { [provider.id]: {
+                    name: provider.name,
+                    package: "@opencode/ai/providers/openai-compatible",
+                    settings: { baseURL: provider.baseURL ?? "", ...(apiKey ? { apiKey } : {}) },
+                    models: provider.models,
+                  } } })
+                  toast.show({ variant: "success", message: `API Key for "${provider.name}" updated globally on this server!` })
                   dialog.clear()
                 }}
               />
@@ -433,15 +392,11 @@ export function manageCustomProvider(
                 onConfirm={async (urlVal) => {
                   const rawUrl = urlVal.trim().replace(/\/+$/, "")
                   if (!rawUrl) return
-                  const targetFile = provider.filePath
-                  const file = Bun.file(targetFile)
-                  const content = await file.text()
-                  const edits = modify(content, ["providers", provider.id, "settings", "baseURL"], rawUrl, {
-                    formattingOptions: { tabSize: 2, insertSpaces: true },
+                  await updateCustomProviderBaseURL(api, provider, rawUrl)
+                  toast.show({
+                    variant: "success",
+                    message: `Base URL for "${provider.name}" updated globally on this server!`,
                   })
-                  const updated = applyEdits(content, edits)
-                  await Bun.write(targetFile, updated.endsWith("\n") ? updated : `${updated}\n`)
-                  toast.show({ variant: "success", message: `Base URL for "${provider.name}" updated!` })
                   dialog.clear()
                 }}
               />
@@ -461,8 +416,8 @@ export function manageCustomProvider(
                     title: `Yes, remove "${provider.name}"`,
                     value: "confirm",
                     onSelect: async () => {
-                      await removeCustomProviderFromConfig(provider.filePath, provider.id)
-                      toast.show({ variant: "success", message: `Provider "${provider.name}" removed!` })
+                      await api.experimental.config.update({ providers: { [provider.id]: null } })
+                      toast.show({ variant: "success", message: `Provider "${provider.name}" removed globally from this server!` })
                       dialog.clear()
                     },
                   },

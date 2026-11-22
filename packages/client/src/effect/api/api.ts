@@ -472,6 +472,15 @@ export interface SessionApi<E = never> {
 
   /** @deprecated Use `client.experimental.session.log`. Removed in the next minor. */
   readonly log: ExperimentalSessionLogOperation<E>
+
+  /** @deprecated Use `client.experimental.session.review`. Removed in the next minor. */
+  readonly review: {
+    /** @deprecated Use `client.experimental.session.review.list`. Removed in the next minor. */
+    readonly list: ExperimentalSessionReviewListOperation<E>
+
+    /** @deprecated Use `client.experimental.session.review.decide`. Removed in the next minor. */
+    readonly decide: ExperimentalSessionReviewDecideOperation<E>
+  }
 }
 
 export type ExperimentalSessionStatsInput = {
@@ -1418,6 +1427,43 @@ export type ExperimentalSessionLogOperation<E = never> = (
   input: ExperimentalSessionLogInput,
 ) => Stream.Stream<ExperimentalSessionLogOutput, E>
 
+export type ExperimentalSessionReviewListInput = { readonly sessionID: Session.ID }
+export type ExperimentalSessionReviewListOutput = ReadonlyArray<{
+  readonly sessionID: Session.ID
+  readonly file: RelativePath
+  readonly status: "keep" | "reject"
+  readonly startSnapshot: Snapshot.ID
+  readonly endSnapshot: Snapshot.ID
+  readonly version: number
+  readonly timeCreated: DateTime.Utc
+  readonly timeUpdated: DateTime.Utc
+}>
+export type ExperimentalSessionReviewListOperation<E = never> = (
+  input: ExperimentalSessionReviewListInput,
+) => Effect.Effect<ExperimentalSessionReviewListOutput, E>
+
+export type ExperimentalSessionReviewDecideInput = {
+  readonly sessionID: Session.ID
+  readonly file: RelativePath
+  readonly decision: "keep" | "reject"
+  readonly startSnapshot: Snapshot.ID
+  readonly endSnapshot: Snapshot.ID
+  readonly expectVersion?: number | undefined
+}
+export type ExperimentalSessionReviewDecideOutput = {
+  readonly sessionID: Session.ID
+  readonly file: RelativePath
+  readonly status: "keep" | "reject"
+  readonly startSnapshot: Snapshot.ID
+  readonly endSnapshot: Snapshot.ID
+  readonly version: number
+  readonly timeCreated: DateTime.Utc
+  readonly timeUpdated: DateTime.Utc
+}
+export type ExperimentalSessionReviewDecideOperation<E = never> = (
+  input: ExperimentalSessionReviewDecideInput,
+) => Effect.Effect<ExperimentalSessionReviewDecideOutput, E>
+
 export interface ExperimentalSessionApi<E = never> {
   readonly stats: ExperimentalSessionStatsOperation<E>
   readonly import: ExperimentalSessionImportOperation<E>
@@ -1432,6 +1478,10 @@ export interface ExperimentalSessionApi<E = never> {
     }
   }
   readonly log: ExperimentalSessionLogOperation<E>
+  readonly review: {
+    readonly list: ExperimentalSessionReviewListOperation<E>
+    readonly decide: ExperimentalSessionReviewDecideOperation<E>
+  }
 }
 
 export type MessageListInput = {
@@ -2687,10 +2737,136 @@ export interface ConfigApi<E = never> {
   readonly update: ExperimentalConfigUpdateOperation<E>
 }
 
-export type ExperimentalConfigUpdateInput = { readonly shell: string | null }
+export type ExperimentalConfigUpdateInput = {
+  readonly shell?: string | null | undefined
+  readonly providers?:
+    | {
+        readonly [x: string]: {
+          readonly canonical?: Provider.ID | undefined
+          readonly name?: string | undefined
+          readonly env?: ReadonlyArray<string> | undefined
+          readonly package?: string | undefined
+          readonly compatibility?:
+            | {
+                readonly reasoningField?: Model.ReasoningField | undefined
+                readonly requireReasoning?: boolean | undefined
+                readonly maxTokensField?: Model.MaxTokensField | undefined
+                readonly requireFinishReason?: boolean | undefined
+                readonly requireAssistantAfterTool?: boolean | undefined
+                readonly supportsPromptCacheKey?: boolean | undefined
+                readonly streamUsage?: boolean | undefined
+                readonly cacheFormat?: ("anthropic" | "alibaba") | undefined
+                readonly mediaInput?: Model.MediaInput | undefined
+              }
+            | undefined
+          readonly settings?:
+            | ({
+                readonly timeout?: number | false | undefined
+                readonly headerTimeout?: number | false | undefined
+                readonly chunkTimeout?: number | false | undefined
+                readonly compaction?: Provider.Compaction | undefined
+                readonly cache?: Provider.Cache | undefined
+                readonly transport?: Provider.Transport | undefined
+                readonly encoding?: Provider.Encoding | undefined
+              } & { readonly [x: string]: Schema.Json | undefined })
+            | undefined
+          readonly headers?: { readonly [x: string]: string } | undefined
+          readonly body?: { readonly [x: string]: Schema.Json } | undefined
+          readonly models?:
+            | {
+                readonly [x: string]: {
+                  readonly modelID?: string | undefined
+                  readonly type?: Model.Type | undefined
+                  readonly family?: string | undefined
+                  readonly name?: string | undefined
+                  readonly releaseDate?: string | undefined
+                  readonly compatibility?: Model.Compatibility | undefined
+                  readonly package?: string | undefined
+                  readonly settings?:
+                    | ({
+                        readonly compaction?: Provider.Compaction | undefined
+                        readonly cache?: Provider.Cache | undefined
+                        readonly encoding?: Provider.Encoding | undefined
+                      } & { readonly [x: string]: Schema.Json | undefined })
+                    | undefined
+                  readonly headers?: { readonly [x: string]: string } | undefined
+                  readonly body?: { readonly [x: string]: Schema.Json } | undefined
+                  readonly capabilities?:
+                    | {
+                        readonly tools?: boolean | undefined
+                        readonly input?: ReadonlyArray<string> | undefined
+                        readonly output?: ReadonlyArray<string> | undefined
+                        readonly temperature?: boolean | undefined
+                        readonly reasoning?:
+                          | (
+                              | { readonly supported: false }
+                              | {
+                                  readonly supported: true
+                                  readonly toggle?: boolean | undefined
+                                  readonly effort?: ReadonlyArray<string> | undefined
+                                  readonly budget?:
+                                    | { readonly min?: number | undefined; readonly max?: number | undefined }
+                                    | undefined
+                                }
+                            )
+                          | undefined
+                      }
+                    | undefined
+                  readonly variants?:
+                    | ReadonlyArray<{
+                        readonly id: string
+                        readonly settings?:
+                          | ({
+                              readonly compaction?: Provider.Compaction | undefined
+                              readonly encoding?: Provider.Encoding | undefined
+                            } & { readonly [x: string]: Schema.Json | undefined })
+                          | undefined
+                        readonly headers?: { readonly [x: string]: string } | undefined
+                        readonly body?: { readonly [x: string]: Schema.Json } | undefined
+                      }>
+                    | undefined
+                  readonly cost?:
+                    | {
+                        readonly tier?: { readonly type: "context"; readonly size: number } | undefined
+                        readonly input: Money.USDPerMillionTokens
+                        readonly output: Money.USDPerMillionTokens
+                        readonly cache?:
+                          | {
+                              readonly read?: Money.USDPerMillionTokens | undefined
+                              readonly write?: Money.USDPerMillionTokens | undefined
+                            }
+                          | undefined
+                      }
+                    | ReadonlyArray<{
+                        readonly tier?: { readonly type: "context"; readonly size: number } | undefined
+                        readonly input: Money.USDPerMillionTokens
+                        readonly output: Money.USDPerMillionTokens
+                        readonly cache?:
+                          | {
+                              readonly read?: Money.USDPerMillionTokens | undefined
+                              readonly write?: Money.USDPerMillionTokens | undefined
+                            }
+                          | undefined
+                      }>
+                    | undefined
+                  readonly disabled?: boolean | undefined
+                  readonly limit?:
+                    | {
+                        readonly context?: number | undefined
+                        readonly input?: number | undefined
+                        readonly output?: number | undefined
+                      }
+                    | undefined
+                }
+              }
+            | undefined
+        } | null
+      }
+    | undefined
+}
 export type ExperimentalConfigUpdateOutput = void
 export type ExperimentalConfigUpdateOperation<E = never> = (
-  input: ExperimentalConfigUpdateInput,
+  input?: ExperimentalConfigUpdateInput,
 ) => Effect.Effect<ExperimentalConfigUpdateOutput, E>
 
 export interface ExperimentalConfigApi<E = never> {
@@ -2777,6 +2953,24 @@ export type SessionLogOutput = ExperimentalSessionLogOutput
 
 /** @deprecated Use `ExperimentalSessionLogOperation`. Removed in the next minor. */
 export type SessionLogOperation<E = never> = ExperimentalSessionLogOperation<E>
+
+/** @deprecated Use `ExperimentalSessionReviewListInput`. Removed in the next minor. */
+export type SessionReviewListInput = ExperimentalSessionReviewListInput
+
+/** @deprecated Use `ExperimentalSessionReviewListOutput`. Removed in the next minor. */
+export type SessionReviewListOutput = ExperimentalSessionReviewListOutput
+
+/** @deprecated Use `ExperimentalSessionReviewListOperation`. Removed in the next minor. */
+export type SessionReviewListOperation<E = never> = ExperimentalSessionReviewListOperation<E>
+
+/** @deprecated Use `ExperimentalSessionReviewDecideInput`. Removed in the next minor. */
+export type SessionReviewDecideInput = ExperimentalSessionReviewDecideInput
+
+/** @deprecated Use `ExperimentalSessionReviewDecideOutput`. Removed in the next minor. */
+export type SessionReviewDecideOutput = ExperimentalSessionReviewDecideOutput
+
+/** @deprecated Use `ExperimentalSessionReviewDecideOperation`. Removed in the next minor. */
+export type SessionReviewDecideOperation<E = never> = ExperimentalSessionReviewDecideOperation<E>
 
 /** @deprecated Use `ExperimentalGenerateTextInput`. Removed in the next minor. */
 export type GenerateTextInput = ExperimentalGenerateTextInput

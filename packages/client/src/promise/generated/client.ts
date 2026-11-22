@@ -103,6 +103,10 @@ import type {
   ExperimentalSessionInstructionsEntryRemoveOutput,
   ExperimentalSessionLogInput,
   ExperimentalSessionLogOutput,
+  ExperimentalSessionReviewListInput,
+  ExperimentalSessionReviewListOutput,
+  ExperimentalSessionReviewDecideInput,
+  ExperimentalSessionReviewDecideOutput,
   MessageListInput,
   MessageListOutput,
   ModelListInput,
@@ -1156,6 +1160,37 @@ export function make(options: ClientOptions) {
             },
             requestOptions,
           ),
+        review: {
+          list: (input: ExperimentalSessionReviewListInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: ExperimentalSessionReviewListOutput }>(
+              {
+                method: "GET",
+                path: `/api/experimental/session/${encodeURIComponent(input.sessionID)}/review`,
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
+          decide: (input: ExperimentalSessionReviewDecideInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: ExperimentalSessionReviewDecideOutput }>(
+              {
+                method: "PUT",
+                path: `/api/experimental/session/${encodeURIComponent(input.sessionID)}/review`,
+                body: {
+                  file: input["file"],
+                  decision: input["decision"],
+                  startSnapshot: input["startSnapshot"],
+                  endSnapshot: input["endSnapshot"],
+                  expectVersion: input["expectVersion"],
+                },
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404, 409, 500],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
+        },
       },
       generate: {
         text: (input: ExperimentalGenerateTextInput, requestOptions?: RequestOptions) =>
@@ -1597,12 +1632,12 @@ export function make(options: ClientOptions) {
           ),
       },
       config: {
-        update: (input: ExperimentalConfigUpdateInput, requestOptions?: RequestOptions) =>
+        update: (input?: ExperimentalConfigUpdateInput, requestOptions?: RequestOptions) =>
           request<ExperimentalConfigUpdateOutput>(
             {
               method: "PATCH",
               path: `/api/experimental/config`,
-              body: { shell: input["shell"] },
+              body: { shell: input?.["shell"], providers: input?.["providers"] },
               successStatus: 204,
               declaredStatuses: [400, 401, 404],
               empty: true,
@@ -2582,6 +2617,13 @@ export function make(options: ClientOptions) {
       },
       /** @deprecated Use `client.experimental.session.log`. Removed in the next minor. */
       log: client.experimental.session.log,
+      /** @deprecated Use `client.experimental.session.review`. Removed in the next minor. */
+      review: {
+        /** @deprecated Use `client.experimental.session.review.list`. Removed in the next minor. */
+        list: client.experimental.session.review.list,
+        /** @deprecated Use `client.experimental.session.review.decide`. Removed in the next minor. */
+        decide: client.experimental.session.review.decide,
+      },
     },
     /** @deprecated Use `client.experimental.generate`. Removed in the next minor. */
     generate: {

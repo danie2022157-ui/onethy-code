@@ -4,6 +4,8 @@ import { SessionStats } from "@opencode/core/session/stats"
 import { SessionTitle } from "@opencode/core/session/title"
 import { SessionTransfer } from "@opencode/core/session/transfer"
 import { InstructionEntry } from "@opencode/core/session/instruction-entry"
+import { SessionReview } from "@opencode/core/session/review"
+
 import { Form } from "@opencode/core/form"
 import { DateTime, Effect, Stream } from "effect"
 import { HttpServerResponse } from "effect/http"
@@ -555,6 +557,52 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               : session.queueInbox({ sessionID: ctx.params.sessionID, inboxID: ctx.params.inboxID }),
             `Pending input cannot change to ${ctx.payload.delivery}`,
           )
+        }),
+      )
+      .handle(
+        "session.review.list",
+        Effect.fn(function* (ctx) {
+          yield* requireSession(ctx.params.sessionID)
+          return {
+            data: yield* SessionReview.Service.use((review) => review.list(ctx.params.sessionID)).pipe(
+              Effect.map((decisions) =>
+                decisions.map((decision) => ({
+                  ...decision,
+                  timeCreated: DateTime.makeUnsafe(decision.timeCreated),
+                  timeUpdated: DateTime.makeUnsafe(decision.timeUpdated),
+                })),
+              ),
+              locationErrors,
+            ),
+          }
+        }),
+      )
+      .handle(
+        "session.review.decide",
+        Effect.fn(function* (ctx) {
+          yield* requireSession(ctx.params.sessionID)
+          return {
+            data: yield* SessionReview.Service.use((review) =>
+              review.decide({ sessionID: ctx.params.sessionID, ...ctx.payload }),
+            ).pipe(
+              Effect.map((decision) => ({
+                ...decision,
+                timeCreated: DateTime.makeUnsafe(decision.timeCreated),
+                timeUpdated: DateTime.makeUnsafe(decision.timeUpdated),
+              })),
+              Effect.catchTags({
+                "SessionReview.Error": (error) =>
+                  error.message.toLowerCase().includes("conflict")
+                    ? Effect.fail(new ConflictError({ message: error.message, resource: String(ctx.payload.file) }))
+                    : Effect.fail(new InvalidRequestError({ message: error.message, field: "file" })),
+                "Snapshot.Error": (error) =>
+                  error.operation === "restore"
+                    ? Effect.fail(new ConflictError({ message: error.message, resource: String(ctx.payload.file) }))
+                    : Effect.fail(new InvalidRequestError({ message: error.message, field: "file" })),
+              }),
+              locationErrors,
+            ),
+          }
         }),
       )
       .handle(

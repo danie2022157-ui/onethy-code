@@ -1,6 +1,7 @@
 import { blob, sqliteTable, text, integer, index, primaryKey, real, uniqueIndex } from "drizzle-orm/sqlite-core"
 import { sql } from "drizzle-orm"
 import { directoryColumn, pathColumn } from "../database/path.js"
+import { RelativePath } from "../schema.js"
 import { ProjectTable } from "../project/sql.js"
 import type { SessionMessage } from "./message.js"
 import type { SessionInbox } from "./inbox.js"
@@ -102,6 +103,24 @@ export const SessionMessageTable = sqliteTable(
     index("session_message_session_time_created_id_idx").on(table.session_id, table.time_created, table.id),
     index("session_message_time_created_idx").on(table.time_created),
   ],
+)
+
+export const SessionReviewTable = sqliteTable(
+  "session_review",
+  {
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    file: text().$type<RelativePath>().notNull(),
+    status: text().$type<"keep" | "reject">().notNull(),
+    start_snapshot: text().notNull(),
+    end_snapshot: text().notNull(),
+    version: integer().notNull(),
+    time_created: integer().notNull(),
+    time_updated: integer().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.session_id, table.file] })],
 )
 
 export const SessionPartTable = sqliteTable(

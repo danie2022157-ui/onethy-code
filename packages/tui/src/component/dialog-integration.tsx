@@ -124,6 +124,7 @@ export function connectionSummary(integration: IntegrationInfo) {
 export function DialogIntegration(
   props: { onConnected?: OnIntegrationConnected; integrationID?: string; autoConnect?: boolean } = {},
 ) {
+  const client = useClient()
   const data = useData()
   const currentLocation = useLocation()
   const dialog = useDialog()
@@ -162,7 +163,7 @@ export function DialogIntegration(
       description: `${prov.baseURL ?? "Endpoint customizado"} • ${prov.modelCount} modelo(s)`,
       category: "Provedores Personalizados",
       gutter: () => <text fg={theme.text.feedback.success.base}>✓</text>,
-      onSelect: () => manageCustomProvider(prov, dialog, toast),
+      onSelect: () => manageCustomProvider(prov, dialog, toast, client.api),
     }))
 
     const addCustomOption = {
@@ -171,7 +172,7 @@ export function DialogIntegration(
       description: "Configurar endpoint (Cosmos, OneAPI, Ollama, etc.) e buscar modelos",
       category: "Popular",
       gutter: () => <text fg={theme.text.feedback.info.base}>+</text>,
-      onSelect: () => promptAddCustomProvider(dialog, data.location.config.list(location) ?? [], toast),
+      onSelect: () => promptAddCustomProvider(dialog, data.location.config.list(location) ?? [], toast, client.api),
     }
 
     const standardOptions = integrations()

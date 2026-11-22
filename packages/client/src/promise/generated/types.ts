@@ -444,6 +444,17 @@ export type UsageLimitsBudgetModel = { providerID: ProviderID; modelID: string; 
 
 export type FileSystemEntry = { path: RelativePath; type: "file" | "directory" }
 
+export type SessionReviewDecision = {
+  sessionID: SessionID
+  file: RelativePath
+  status: "keep" | "reject"
+  startSnapshot: SnapshotID
+  endSnapshot: SnapshotID
+  version: number
+  timeCreated: number
+  timeUpdated: number
+}
+
 export type SessionRevert = {
   messageID: SessionMessageID
   partID?: string
@@ -3776,6 +3787,21 @@ export type ExperimentalSessionLogInput = {
 
 export type ExperimentalSessionLogOutput = SessionLogItem
 
+export type ExperimentalSessionReviewListInput = { readonly sessionID: string }
+
+export type ExperimentalSessionReviewListOutput = { data: Array<SessionReviewDecision> }["data"]
+
+export type ExperimentalSessionReviewDecideInput = {
+  readonly sessionID: string
+  readonly file: string
+  readonly decision: "keep" | "reject"
+  readonly startSnapshot: string
+  readonly endSnapshot: string
+  readonly expectVersion?: number | undefined
+}
+
+export type ExperimentalSessionReviewDecideOutput = { data: SessionReviewDecision }["data"]
+
 export type MessageListInput = {
   readonly sessionID: string
   readonly limit?: number | undefined
@@ -4633,7 +4659,109 @@ export type ConfigGetOutput = Array<ConfigEntry>
 
 export type ConfigShellsOutput = Array<ConfigShellOption>
 
-export type ExperimentalConfigUpdateInput = { readonly shell: string | null }
+export type ExperimentalConfigUpdateInput = {
+  readonly shell?: string | null | undefined
+  readonly providers?:
+    | {
+        readonly [x: string]: {
+          readonly canonical?: string
+          readonly name?: string
+          readonly env?: ReadonlyArray<string>
+          readonly package?: string
+          readonly compatibility?: {
+            readonly reasoningField?: "reasoning" | "reasoning_content" | "reasoning_text" | (string & {})
+            readonly requireReasoning?: boolean
+            readonly maxTokensField?: "max_completion_tokens" | "max_tokens"
+            readonly requireFinishReason?: boolean
+            readonly requireAssistantAfterTool?: boolean
+            readonly supportsPromptCacheKey?: boolean
+            readonly streamUsage?: boolean
+            readonly cacheFormat?: "anthropic" | "alibaba"
+            readonly mediaInput?: "assets" | "state" | "root"
+          }
+          readonly settings?: {
+            readonly timeout?: number | false
+            readonly headerTimeout?: number | false
+            readonly chunkTimeout?: number | false
+            readonly compaction?: { readonly type: "summary" } | { readonly type: "native" }
+            readonly cache?: { readonly ttl?: `${number}${"ms" | "s" | "m" | "h" | "d"}` }
+            readonly transport?: "http" | "websocket"
+            readonly encoding?: "zstd" | "gzip" | "none"
+          } & { readonly [x: string]: JsonValue | null }
+          readonly headers?: { readonly [x: string]: string }
+          readonly body?: { readonly [x: string]: JsonValue }
+          readonly models?: {
+            readonly [x: string]: {
+              readonly modelID?: string
+              readonly type?: "chat" | "decision" | "image" | (string & {})
+              readonly family?: string
+              readonly name?: string
+              readonly releaseDate?: string
+              readonly compatibility?: {
+                readonly reasoningField?: "reasoning" | "reasoning_content" | "reasoning_text" | (string & {})
+                readonly requireReasoning?: boolean
+                readonly maxTokensField?: "max_completion_tokens" | "max_tokens"
+                readonly requireFinishReason?: boolean
+                readonly requireAssistantAfterTool?: boolean
+                readonly supportsPromptCacheKey?: boolean
+                readonly streamUsage?: boolean
+                readonly cacheFormat?: "anthropic" | "alibaba"
+                readonly supportsThinkingBlockBinding?: boolean
+                readonly supportsEffortUpdates?: boolean
+                readonly mediaInput?: "assets" | "state" | "root"
+              }
+              readonly package?: string
+              readonly settings?: {
+                readonly compaction?: { readonly type: "summary" } | { readonly type: "native" }
+                readonly cache?: { readonly ttl?: `${number}${"ms" | "s" | "m" | "h" | "d"}` }
+                readonly encoding?: "zstd" | "gzip" | "none"
+              } & { readonly [x: string]: JsonValue | null }
+              readonly headers?: { readonly [x: string]: string }
+              readonly body?: { readonly [x: string]: JsonValue }
+              readonly capabilities?: {
+                readonly tools?: boolean
+                readonly input?: ReadonlyArray<string>
+                readonly output?: ReadonlyArray<string>
+                readonly temperature?: boolean
+                readonly reasoning?:
+                  | { readonly supported: false }
+                  | {
+                      readonly supported: true
+                      readonly toggle?: boolean
+                      readonly effort?: ReadonlyArray<string>
+                      readonly budget?: { readonly min?: number; readonly max?: number }
+                    }
+              }
+              readonly variants?: ReadonlyArray<{
+                readonly id: string
+                readonly settings?: {
+                  readonly compaction?: { readonly type: "summary" } | { readonly type: "native" }
+                  readonly encoding?: "zstd" | "gzip" | "none"
+                } & { readonly [x: string]: JsonValue | null }
+                readonly headers?: { readonly [x: string]: string }
+                readonly body?: { readonly [x: string]: JsonValue }
+              }>
+              readonly cost?:
+                | {
+                    readonly tier?: { readonly type: "context"; readonly size: number }
+                    readonly input: number
+                    readonly output: number
+                    readonly cache?: { readonly read?: number; readonly write?: number }
+                  }
+                | ReadonlyArray<{
+                    readonly tier?: { readonly type: "context"; readonly size: number }
+                    readonly input: number
+                    readonly output: number
+                    readonly cache?: { readonly read?: number; readonly write?: number }
+                  }>
+              readonly disabled?: boolean
+              readonly limit?: { readonly context?: number; readonly input?: number; readonly output?: number }
+            }
+          }
+        } | null
+      }
+    | undefined
+}
 
 export type ExperimentalConfigUpdateOutput = void
 
@@ -4690,6 +4818,18 @@ export type SessionLogInput = ExperimentalSessionLogInput
 
 /** @deprecated Use `ExperimentalSessionLogOutput`. Removed in the next minor. */
 export type SessionLogOutput = ExperimentalSessionLogOutput
+
+/** @deprecated Use `ExperimentalSessionReviewListInput`. Removed in the next minor. */
+export type SessionReviewListInput = ExperimentalSessionReviewListInput
+
+/** @deprecated Use `ExperimentalSessionReviewListOutput`. Removed in the next minor. */
+export type SessionReviewListOutput = ExperimentalSessionReviewListOutput
+
+/** @deprecated Use `ExperimentalSessionReviewDecideInput`. Removed in the next minor. */
+export type SessionReviewDecideInput = ExperimentalSessionReviewDecideInput
+
+/** @deprecated Use `ExperimentalSessionReviewDecideOutput`. Removed in the next minor. */
+export type SessionReviewDecideOutput = ExperimentalSessionReviewDecideOutput
 
 /** @deprecated Use `ExperimentalGenerateTextInput`. Removed in the next minor. */
 export type GenerateTextInput = ExperimentalGenerateTextInput

@@ -48,6 +48,7 @@ import { Snapshot } from "./snapshot.js"
 import { InstructionDiscovery } from "./instruction-discovery.js"
 import { InstructionBuiltIns } from "./instructions/builtins.js"
 import { SessionInstructions } from "./session/instructions.js"
+import { SessionReview } from "./session/review.js"
 import { McpTool } from "./tool/mcp.js"
 import { ReadToolFileSystem } from "./tool/read-filesystem.js"
 import { Tool } from "./tool.js"
@@ -102,6 +103,7 @@ const nodes = [
   ReadToolFileSystem.node,
   McpTool.node,
   SessionInstructions.node,
+  SessionReview.node,
   SessionRunnerModel.node,
   SessionCompaction.node,
   SessionTitle.node,

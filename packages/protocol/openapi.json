@@ -4163,6 +4163,216 @@
         "summary": "Read the session log"
       }
     },
+    "/api/experimental/session/{sessionID}/review": {
+      "get": {
+        "tags": ["session"],
+        "operationId": "experimental.session.review.list",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Session.ID"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SessionReview.Decision"
+                      }
+                    }
+                  },
+                  "required": ["data"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError | LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Experimental: may change without compatibility guarantees. List file review decisions for a session.",
+        "summary": "List session review decisions"
+      },
+      "put": {
+        "tags": ["session"],
+        "operationId": "experimental.session.review.decide",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Session.ID"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SessionReview.Decision_1"
+                    }
+                  },
+                  "required": ["data"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "SessionNotFoundError | LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ConflictError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictErrorEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "UnknownError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnknownErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Experimental: may change without compatibility guarantees. Keep or reject a reviewed file change.",
+        "summary": "Decide session review",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/RelativePath"
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": ["keep", "reject"]
+                  },
+                  "startSnapshot": {
+                    "$ref": "#/components/schemas/Snapshot.ID"
+                  },
+                  "endSnapshot": {
+                    "$ref": "#/components/schemas/Snapshot.ID"
+                  },
+                  "expectVersion": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 9007199254740991,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["file", "decision", "startSnapshot", "endSnapshot"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/session/{sessionID}/interrupt": {
       "post": {
         "tags": ["session"],
@@ -16132,6 +16342,12 @@
                     }
                   ]
                 }
+              },
+              "overrides": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "boolean"
+                }
               }
             },
             "additionalProperties": false
@@ -16252,46 +16468,6 @@
               },
               "media_blob": {
                 "type": "boolean"
-              },
-              "image_generate": {
-                "anyOf": [
-                  {
-                    "type": "boolean"
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "model": {
-                        "anyOf": [
-                          {
-                            "type": "string",
-                            "pattern": "^[^/#]+\\/[^#]+(?:#[^#]+)?$"
-                          },
-                          {
-                            "type": "object",
-                            "properties": {
-                              "providerID": {
-                                "type": "string",
-                                "pattern": "^[^/#]+$"
-                              },
-                              "model": {
-                                "type": "string",
-                                "pattern": "^[^#]+$"
-                              },
-                              "variant": {
-                                "type": "string",
-                                "pattern": "^[^#]+$"
-                              }
-                            },
-                            "required": ["providerID", "model"],
-                            "additionalProperties": false
-                          }
-                        ]
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                ]
               },
               "schedules": {
                 "type": "boolean"
@@ -16658,9 +16834,21 @@
                 "type": "null"
               }
             ]
+          },
+          "providers": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Config.ProviderEncoded"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
           }
         },
-        "required": ["shell"],
         "additionalProperties": false
       },
       "Config.Plugin.EntryEncoded": {
@@ -19314,6 +19502,9 @@
                 "$ref": "#/components/schemas/Mcp.Status.Pending"
               },
               {
+                "$ref": "#/components/schemas/Mcp.Status.Standby"
+              },
+              {
                 "$ref": "#/components/schemas/Mcp.Status.Disabled"
               },
               {
@@ -19390,6 +19581,17 @@
           "status": {
             "type": "string",
             "enum": ["pending"]
+          }
+        },
+        "required": ["status"],
+        "additionalProperties": false
+      },
+      "Mcp.Status.Standby": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["standby"]
           }
         },
         "required": ["status"],
@@ -23048,6 +23250,92 @@
           }
         },
         "required": ["_tag", "sessionID", "message"],
+        "additionalProperties": false
+      },
+      "SessionReview.Decision": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "$ref": "#/components/schemas/Session.ID"
+          },
+          "file": {
+            "$ref": "#/components/schemas/RelativePath"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["keep", "reject"]
+          },
+          "startSnapshot": {
+            "$ref": "#/components/schemas/Snapshot.ID"
+          },
+          "endSnapshot": {
+            "$ref": "#/components/schemas/Snapshot.ID"
+          },
+          "version": {
+            "type": "integer",
+            "maximum": 9007199254740991,
+            "exclusiveMinimum": 0
+          },
+          "timeCreated": {
+            "type": "number"
+          },
+          "timeUpdated": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sessionID",
+          "file",
+          "status",
+          "startSnapshot",
+          "endSnapshot",
+          "version",
+          "timeCreated",
+          "timeUpdated"
+        ],
+        "additionalProperties": false
+      },
+      "SessionReview.Decision_1": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "$ref": "#/components/schemas/Session.ID"
+          },
+          "file": {
+            "$ref": "#/components/schemas/RelativePath"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["keep", "reject"]
+          },
+          "startSnapshot": {
+            "$ref": "#/components/schemas/Snapshot.ID"
+          },
+          "endSnapshot": {
+            "$ref": "#/components/schemas/Snapshot.ID"
+          },
+          "version": {
+            "type": "integer",
+            "maximum": 9007199254740991,
+            "exclusiveMinimum": 0
+          },
+          "timeCreated": {
+            "type": "number"
+          },
+          "timeUpdated": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sessionID",
+          "file",
+          "status",
+          "startSnapshot",
+          "endSnapshot",
+          "version",
+          "timeCreated",
+          "timeUpdated"
+        ],
         "additionalProperties": false
       },
       "SessionStats.Activity": {

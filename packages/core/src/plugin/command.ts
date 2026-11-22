@@ -5,7 +5,6 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Effect, Option, Schema, Stream } from "effect"
 import { Bus } from "../bus.js"
 import { Location } from "../location.js"
-import { KV } from "../kv.js"
 import { Mcp } from "../mcp/index.js"
 import { Model } from "../model.js"
 import { OmniBus } from "../omni-bus.js"
@@ -396,25 +395,54 @@ export const Plugin = define({
         description: "Interview me about a feature, then produce a specification for explicit review",
         execute: (input) =>
           Effect.gen(function* () {
-            const kv = yield* KV.Service
             const key = `grillme:v1:${input.sessionID}`
-            const saved = yield* kv.get(key)
-            const state = Option.getOrElse(Schema.decodeUnknownOption(GrillmeState)(saved), () => ({
-              version: 1 as const,
-              status: "interviewing" as const,
-              answers: [] as string[],
-              updatedAt: new Date().toISOString(),
-            }))
+            const saved = yield* ctx.storage.get(key)
+            const state = Option.getOrElse(
+              Schema.decodeUnknownOption(GrillmeState)(saved),
+              () => ({
+                version: 1 as const,
+                status: "interviewing" as const,
+                specReady: false,
+                answers: [] as string[],
+                updatedAt: new Date().toISOString(),
+              }),
+            )
             const answer = input.prompt.text.trim()
             const approved = /^(?:i\s+)?approve(?:\s+implementation)?[.!]?$/i.test(answer)
             const cancelled = /^(?:cancel|stop grillme)[.!]?$/i.test(answer)
-            const updated = {
-              ...state,
-              status: approved ? "approved" : cancelled ? "cancelled" : "interviewing",
-              answers: answer && !approved && !cancelled ? [...state.answers, answer] : state.answers,
-              updatedAt: new Date().toISOString(),
-            }
-            yield* kv.set(key, updated)
+            const confirmsSpec = /^(?:spec|specification) ready[.!]?$/i.test(answer)
+
+            const isTerminal = state.status === "approved" || state.status === "cancelled"
+
+            // A substantive answer (not control commands) clears specReady.
+            const isSubstantiveAnswer = answer && !approved && !cancelled && !confirmsSpec
+            const nextSpecReady = confirmsSpec
+              ? true
+              : isSubstantiveAnswer
+                ? false
+                : state.specReady ?? false
+
+            const nextStatus = isTerminal
+              ? state.status
+              : cancelled
+                ? "cancelled"
+                : confirmsSpec
+                  ? "spec_ready"
+                  : approved && nextSpecReady
+                    ? "approved"
+                    : "interviewing"
+
+            // Keep terminal sessions fully immutable, including their timestamps and answers.
+            const updated = isTerminal
+              ? state
+              : {
+                  ...state,
+                  status: nextStatus,
+                  specReady: nextSpecReady,
+                  answers: isSubstantiveAnswer ? [...state.answers, answer] : state.answers,
+                  updatedAt: new Date().toISOString(),
+                }
+            yield* ctx.storage.set(key, updated)
             yield* ctx.session.prompt({
               ...input.prompt,
               sessionID: input.sessionID,
@@ -424,11 +452,15 @@ export const Plugin = define({
                 "Inspect relevant repository code, keep a concise record of requirements, decisions, affected files/modules, tests, acceptance criteria, and implementation plan. Ask exactly ONE focused clarification question in each response.",
                 "When discovery is sufficient, provide a specification with exactly 14 sections: 1. Summary, 2. Goals, 3. Non-goals, 4. User stories, 5. Requirements, 6. Decisions, 7. Architecture, 8. Files/modules, 9. Data/API changes, 10. Security/privacy, 11. Testing, 12. Acceptance criteria, 13. Risks/open questions, 14. Implementation plan. Then stop and wait for explicit user approval.",
                 "Do not implement during the interview. This prompt is guidance, not a tool-level authorization barrier; existing tool permissions still apply.",
-                approved
-                  ? "The user explicitly approved implementation. Record this decision in the handoff; do not bypass tool or workspace policy."
-                  : cancelled
+                updated.status === "approved"
+                  ? "The user explicitly approved implementation after the specification was marked ready. Record this decision in the handoff; do not bypass tool or workspace policy."
+                  : updated.status === "cancelled"
                     ? "The user explicitly cancelled. Acknowledge cancellation and do not continue unless restarted."
-                    : "Do not infer approval from requirements being complete, silence, or ambiguous text. Only a standalone explicit approval phrase counts.",
+                    : approved && !(updated.specReady ?? false)
+                      ? "The user attempted to approve before the specification was marked ready. Do not implement; explain that the interview must produce and present the complete specification first."
+                      : updated.status === "spec_ready"
+                        ? "The specification is ready. Present it now and ask the user to reply 'approve' to authorize implementation, or continue discussing/revise/cancel."
+                        : "Do not infer approval from requirements being complete, silence, or ambiguous text. Only a standalone explicit approval phrase counts after the specification is presented.",
                 `Latest user input: ${answer || "(resume)"}`,
               ].join("\n"),
               delivery: input.delivery,
@@ -495,6 +527,7 @@ export const Plugin = define({
 const GrillmeState = Schema.Struct({
   version: Schema.Literal(1),
   status: Schema.Literals(["interviewing", "spec_ready", "approved", "cancelled"]),
+  specReady: Schema.optionalKey(Schema.Boolean),
   answers: Schema.Array(Schema.String),
   updatedAt: Schema.String,
 })

@@ -157,14 +157,14 @@ test("preserves current navigation defaults", () => {
   const config = resolve({}, { terminalSuspend: true })
 
   expect(config.keybinds.get("open.menu")).toMatchObject([{ key: "ctrl+o" }])
-  expect(config.keybinds.get("session.tab.next")).toMatchObject([{ key: "ctrl+tab,alt+down" }])
-  expect(config.keybinds.get("session.tab.previous")).toMatchObject([{ key: "ctrl+shift+tab,alt+up" }])
+  expect(config.keybinds.get("session.tab.next")).toMatchObject([{ key: "ctrl+tab" }])
+  expect(config.keybinds.get("session.tab.previous")).toMatchObject([{ key: "ctrl+shift+tab" }])
   expect(config.keybinds.get("session.tab.next_unread")).toMatchObject([{ key: "alt+shift+down" }])
   expect(config.keybinds.get("session.tab.previous_unread")).toMatchObject([{ key: "alt+shift+up" }])
   expect(config.keybinds.get("session.tab.reopen")).toMatchObject([{ key: "ctrl+shift+t" }])
-  expect(config.keybinds.get("session.tab.select.10")).toMatchObject([{ key: "<leader>0,ctrl+0" }])
-  expect(config.keybinds.get("session.message.next")).toEqual([])
-  expect(config.keybinds.get("session.message.previous")).toEqual([])
+  expect(config.keybinds.get("session.tab.select.10")).toMatchObject([{ key: "<leader>0" }])
+  expect(config.keybinds.get("session.message.next")).toMatchObject([{ key: "alt+down" }])
+  expect(config.keybinds.get("session.message.previous")).toMatchObject([{ key: "alt+up" }])
   expect(config.keybinds.get("session.message.user.next")).toEqual([])
   expect(config.keybinds.get("session.message.user.previous")).toEqual([])
   expect(config.keybinds.get("input.buffer.home")).toEqual([])
@@ -230,21 +230,21 @@ test("centralizes named command defaults and resolves explicit none", () => {
     "composer.shell.up": "up",
     "composer.shell.down": "down",
     "composer.shell.kill": "ctrl+d",
-    "diff.down": "j,down",
-    "diff.up": "k,up",
-    "diff.page.down": "pagedown,ctrl+f",
-    "diff.page.up": "pageup,ctrl+b",
+    "diff.down": "j",
+    "diff.up": "k",
+    "diff.page.down": "pagedown",
+    "diff.page.up": "pageup",
     "diff.half_page.down": "ctrl+d",
     "diff.half_page.up": "ctrl+u",
-    "diff.first": "gg,home",
-    "diff.last": "shift+g,end",
-    "diff.next_file": "n,alt+down",
-    "diff.previous_file": "p,alt+up",
+    "diff.first": "gg",
+    "diff.last": "shift+g",
+    "diff.next_file": "n",
+    "diff.previous_file": "p",
     "diff.next_hunk": "]",
     "diff.previous_hunk": "[",
     "diff.mark_reviewed": "m",
     "diff.toggle_fullscreen": "f",
-    "diff.help": "?,shift+?,shift+/",
+    "diff.help": "h",
   }
   const config = resolve({}, { terminalSuspend: true })
   Object.entries(defaults).forEach(([command, key]) => expect(config.keybinds.get(command)).toMatchObject([{ key }]))
@@ -271,7 +271,7 @@ test("rejects orphaned keybind definitions", () => {
 test("uses ctrl+z for input undo when terminal suspend is unavailable", () => {
   const config = resolve({}, { terminalSuspend: false })
   expect(config.keybinds.has("terminal.suspend")).toBe(false)
-  expect(config.keybinds.get("input.undo")).toMatchObject([{ key: "ctrl+z,ctrl+-,super+z" }])
+  expect(config.keybinds.get("input.undo")).toMatchObject([{ key: "ctrl+z,ctrl+-" }])
 
   const overridden = resolve(
     { keybinds: { "terminal.suspend": "ctrl+s", "input.undo": "ctrl+u" } },
