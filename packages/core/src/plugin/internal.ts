@@ -91,6 +91,7 @@ import { OmniHealTool } from "../tool/plugin/omni-heal.js"
 import { OmniIntelligenceTool } from "../tool/plugin/omni-intelligence.js"
 import { OmniMcpTool } from "../tool/plugin/omni-mcp.js"
 import { DesktopControlTool } from "../tool/plugin/desktop-control.js"
+import { LocalBrowserTool } from "../tool/plugin/local-browser.js"
 import { OmniCommitTool } from "../tool/plugin/omni-commit.js"
 import { OpenCodeTools } from "../tool/plugin/opencode.js"
 import { QuestionTool } from "../tool/plugin/question.js"
@@ -285,6 +286,7 @@ const pre = [
   OmniIntelligenceTool.Plugin,
   OmniMcpTool.Plugin,
   DesktopControlTool.Plugin,
+  LocalBrowserTool.Plugin,
   OmniCommitTool.Plugin,
   OpenCodeTools.Plugin,
   McpResourceTools.Plugin,

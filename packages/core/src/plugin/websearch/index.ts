@@ -1,3 +1,4 @@
+import { WebSearchDuckDuckGo } from "./duckduckgo.js"
 import { WebSearchExa } from "./exa.js"
 import { WebSearchFirecrawl } from "./firecrawl.js"
 import { WebSearchParallel } from "./parallel.js"
@@ -6,6 +7,7 @@ import { WebSearchTinyFish } from "./tinyfish.js"
 
 export const WebSearchPlugins = [
   WebSearchExa.Plugin,
+  WebSearchDuckDuckGo.Plugin,
   WebSearchFirecrawl.Plugin,
   WebSearchParallel.Plugin,
   WebSearchTavily.Plugin,

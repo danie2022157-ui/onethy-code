@@ -17,12 +17,16 @@ const httpErrors = new Map([
   [401, "Web search authentication failed (HTTP 401)"],
 ])
 
-export const description = `Search the web using the user's selected search integration. Use this for current information beyond knowledge cutoff.
+export const description = `Search the web using the user's selected search integration and return summarized results with URL citations. Use this for current information beyond knowledge cutoff.
 
+Optionally pass \`domain\` to prioritize results from a specific website (for example "docs.python.org" or "developer.mozilla.org").
 The current year is ${new Date().getFullYear()}. Use this year when searching for recent information or current events.`
 
 export const Input = Schema.Struct({
   query: Schema.String.annotate({ description: "Websearch query" }),
+  domain: Schema.optionalKey(Schema.String).annotate({
+    description: "Optional domain to prioritize results from (for example 'docs.python.org').",
+  }),
 })
 
 const Output = Schema.Struct({
@@ -46,9 +50,10 @@ export const Plugin = {
           output: Output,
           execute: (input, context) =>
             Effect.gen(function* () {
+              const query = applyDomainFilter(input.query, input.domain)
               yield* permission.assert({
                 action: name,
-                resources: [input.query],
+                resources: [query],
                 save: ["*"],
                 metadata: input,
                 sessionID: context.sessionID,
@@ -57,7 +62,7 @@ export const Plugin = {
               })
               const search = (providerID?: WebSearch.ID) =>
                 websearch.query(
-                  { ...input, providerID },
+                  { query, providerID },
                   {
                     sessionID: context.sessionID,
                     onProvider: (provider) => context.progress({ provider: provider.id }),
@@ -193,4 +198,10 @@ export const Plugin = {
     yield* ctx.session.hook("compaction", hook)
     yield* ctx.session.hook("generate", hook)
   }),
+}
+
+export function applyDomainFilter(query: string, domain?: string) {
+  const cleaned = domain?.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "")
+  if (!cleaned || /\bsite:/i.test(query)) return query
+  return `site:${cleaned} ${query}`
 }
