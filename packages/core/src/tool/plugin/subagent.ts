@@ -183,8 +183,13 @@ export const Input = Schema.Struct({
     description:
       "Run the subagent in the background and return immediately. You will be notified when it completes. DO NOT sleep, poll, or proactively check on its progress.",
   }),
+  workspace: Schema.optionalKey(Schema.Literals(["inherit", "share", "branch"])).annotate({
+    description:
+      "Workspace mode for a NEW child agent. 'inherit' (default) uses the parent workspace. 'share' or 'branch' creates an isolated Git worktree so the child can edit and run builds independently.",
+  }),
   worktree: Schema.optionalKey(Schema.Boolean).annotate({
-    description: "Create and use a native Git worktree for a NEW child agent. Default off unless ONETHY_AGENT_WORKTREES=1 for coding agents. Changes remain for review.",
+    description:
+      "Alias for workspace='share'. Create and use a native Git worktree for a NEW child agent. Changes remain for review.",
   }),
 })
 
@@ -200,7 +205,7 @@ export const description = [
   "Foreground (default) runs the subagent to completion and returns its final response.",
   "Background mode (background=true) launches it asynchronously and returns immediately; you are notified when it finishes.",
   "Use background only for independent work that can run while you continue elsewhere.",
-  "worktree=true isolates a new child in a separate detached Git worktree, with permission approval and verification.",
+  "workspace='share' or workspace='branch' (or worktree=true) isolates a new child in a separate Git worktree, with permission approval and verification.",
   "OnethyCode: agent=auto performs local specialist lookup among enabled agents; user permissions and model constraints still apply.",
 ].join("\n")
 
@@ -502,8 +507,17 @@ export const Plugin = {
                   ? parent.model
                   : undefined) ??
                 routedModel
-              const isolate = existing === undefined && process.env.OMNICODE_ACTIVE === "1" &&
-                (input.worktree ?? (process.env.ONETHY_AGENT_WORKTREES === "1" && agent.id === "coder"))
+              const requestedWorkspace =
+                input.workspace ??
+                (input.worktree === true ? "share" : input.worktree === false ? "inherit" : undefined)
+              const isolate =
+                existing === undefined &&
+                (requestedWorkspace === "share" ||
+                  requestedWorkspace === "branch" ||
+                  (requestedWorkspace === undefined &&
+                    process.env.OMNICODE_ACTIVE === "1" &&
+                    process.env.ONETHY_AGENT_WORKTREES === "1" &&
+                    agent.id === "coder"))
               let isolatedDirectory: string | undefined
               if (isolate) {
                 if (Option.isNone(worktreesOpt)) return yield* new ToolFailure({ message: "Native worktree service is unavailable." })

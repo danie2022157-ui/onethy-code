@@ -2172,4 +2172,56 @@ describe("Config", () => {
       }),
     ),
   )
+
+  it.live("inherits canonical project configuration for external worktrees with worktree precedence", () =>
+    Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+      Effect.flatMap((tmp) => {
+        const global = path.join(tmp.path, "global")
+        const canonical = path.join(tmp.path, "repo")
+        const worktree = path.join(tmp.path, "worktrees", "feature")
+        return Effect.gen(function* () {
+          yield* Effect.promise(async () => {
+            await fs.mkdir(global, { recursive: true })
+            await fs.mkdir(path.join(canonical, ".opencode"), { recursive: true })
+            await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })
+            await Promise.all([
+              fs.writeFile(
+                path.join(canonical, ".opencode", "opencode.jsonc"),
+                JSON.stringify({
+                  $schema: "canonical-dot",
+                  providers: {
+                    "custom-a": {
+                      name: "Custom A",
+                      package: "@opencode/ai/providers/openai-compatible",
+                      settings: { baseURL: "https://custom-a.example/v1" },
+                    },
+                  },
+                }),
+              ),
+              fs.writeFile(
+                path.join(worktree, ".opencode", "opencode.jsonc"),
+                JSON.stringify({ $schema: "worktree-dot" }),
+              ),
+            ])
+          })
+
+          return yield* Effect.gen(function* () {
+            const config = yield* Config.Service
+            const entries = (yield* config.entries()).filter((entry) => !entry.path || inFixture(tmp.path, entry.path))
+            const documents = entries.filter((entry) => entry.type === "document")
+
+            expect(documents.map((document) => document.info.$schema)).toEqual(["canonical-dot", "worktree-dot"])
+            expect(documents.some((document) => document.info.providers?.["custom-a"]?.name === "Custom A")).toBe(true)
+          }).pipe(
+            Effect.provide(
+              testLayer(worktree, global, canonical, {
+                type: "git",
+                store: AbsolutePath.make(path.join(canonical, ".git")),
+              }),
+            ),
+          )
+        })
+      }),
+    ),
+  )
 })

@@ -761,6 +761,101 @@ test("refreshes global credential events across every loaded location", async ()
   }
 })
 
+test("aliases non-canonical worktree paths across integration, config, and live updates", async () => {
+  const listeners = new Set<Parameters<CreateDataInput["event"]["listen"]>[0]>()
+  const requested = { directory: "c:\\worktrees\\feature" }
+  const canonical = { directory: "C:\\worktrees\\feature" }
+  let integrationName = "Anthropic"
+  let configModel = "anthropic/claude-1"
+  const api = OpenCode.make({
+    baseUrl: "http://opencode.local",
+    fetch: async (input, init) => {
+      const request = input instanceof Request ? input : new Request(input, init)
+      const url = new URL(request.url)
+      if (url.pathname === "/api/location") {
+        return Response.json({
+          directory: canonical.directory,
+          project: { id: "prj_1", directory: canonical.directory, canonical: "C:\\repo" },
+        })
+      }
+      if (url.pathname === "/api/integration") {
+        return Response.json({
+          location: canonical,
+          data: [
+            {
+              id: "anthropic",
+              name: integrationName,
+              methods: [],
+              connections: [{ type: "credential", id: "cred_1", label: "Work" }],
+            },
+          ],
+        })
+      }
+      if (url.pathname === "/api/config") {
+        return Response.json([{ type: "document", info: { model: configModel } }])
+      }
+      return Response.json({ location: canonical, data: [] })
+    },
+  })
+  const setup = createRoot((dispose) => ({
+    data: createData({
+      api: () => api,
+      directory: "C:\\repo",
+      event: {
+        on: () => () => {},
+        listen(handler) {
+          listeners.add(handler)
+          return () => listeners.delete(handler)
+        },
+      },
+      connection: { status: () => "connected" },
+    }),
+    dispose,
+  }))
+
+  try {
+    await setup.data.location.syncInfo(requested)
+    await Promise.all([
+      setup.data.location.integration.sync(requested),
+      setup.data.location.config.sync(requested),
+    ])
+
+    expect(setup.data.location.info(requested)?.directory).toBe(canonical.directory)
+    expect(setup.data.location.integration.list(requested)?.[0]?.name).toBe("Anthropic")
+    expect(setup.data.location.config.list(requested)).toEqual([{ type: "document", info: { model: "anthropic/claude-1" } }])
+
+    integrationName = "Anthropic Updated"
+    configModel = "anthropic/claude-2"
+    const integrationEvent: OpenCodeEvent = {
+      id: "evt_integration",
+      created: 1,
+      type: "integration.updated",
+      location: canonical,
+      data: {},
+    }
+    const configEvent: OpenCodeEvent = {
+      id: "evt_config",
+      created: 2,
+      type: "config.updated",
+      location: canonical,
+      data: {},
+    }
+    listeners.forEach((listener) => {
+      listener({ name: integrationEvent.type, details: integrationEvent })
+      listener({ name: configEvent.type, details: configEvent })
+    })
+
+    await wait(
+      () =>
+        setup.data.location.integration.list(requested)?.[0]?.name === "Anthropic Updated" &&
+        setup.data.location.config.list(requested)?.[0]?.type === "document" &&
+        setup.data.location.config.list(requested)?.[0]?.info.model === "anthropic/claude-2",
+    )
+  } finally {
+    setup.dispose()
+  }
+})
+
 for (const resource of ["provider", "model"] as const) {
   test(`refreshes ${resource} values only at the location named by ${resource}.updated`, async () => {
     const listeners = new Set<Parameters<CreateDataInput["event"]["listen"]>[0]>()

@@ -74,10 +74,30 @@ export const discover = Effect.fn("ConfigDiscovery.discover")(function* (options
     (item) => fs.resolve(item),
   )
   const current = yield* fs.resolve(location.directory)
-  const directories =
+  const localDirectories =
     globalRoots.slice(0, configDirectories.length).includes(current) || options?.project === false
       ? []
       : yield* fs.up({ targets: ["."], start: location.directory, stop: os.homedir() }).pipe(Effect.orDie)
+  const localResolved = yield* Effect.forEach(localDirectories, (directory) => fs.resolve(directory))
+  // Linked worktrees often live outside the project's primary checkout (for example under global data).
+  // Include the canonical checkout at lower precedence so untracked project config and skills are inherited,
+  // while the worktree itself still overrides them.
+  const canonical =
+    localDirectories.length > 0 && location.project.canonical !== "/"
+      ? yield* fs.resolve(location.project.canonical)
+      : undefined
+  const canonicalDirectories =
+    canonical &&
+    !globalRoots.slice(0, configDirectories.length).includes(canonical) &&
+    !localResolved.includes(canonical) &&
+    (yield* fs.isDir(location.project.canonical))
+      ? yield* fs.up({ targets: ["."], start: location.project.canonical, stop: os.homedir() }).pipe(Effect.orDie)
+      : []
+  const canonicalResolved = new Set(yield* Effect.forEach(canonicalDirectories, (directory) => fs.resolve(directory)))
+  const directories = [
+    ...localDirectories.filter((_, index) => !canonicalResolved.has(localResolved[index])),
+    ...canonicalDirectories,
+  ]
   const discovered = yield* Effect.forEach(directories, (directory) =>
     Effect.gen(function* () {
       // Resolve the parent too: missing children must honor symlinked global roots.

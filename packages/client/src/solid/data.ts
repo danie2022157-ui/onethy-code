@@ -305,6 +305,35 @@ export function createData(config: CreateDataInput) {
   })
 
   const [defaultLocation, setDefaultLocation] = createSignal<LocationRef>({ directory: config.directory })
+  const [locationAliases, setLocationAliases] = createStore<Record<string, string>>({})
+
+  function resolveLocationKey(ref?: LocationRef) {
+    const id = locationKey(ref ?? defaultLocation())
+    return locationAliases[id] ?? id
+  }
+
+  function allLocationKeys(id: string) {
+    const canonical = locationAliases[id] ?? id
+    const keys = [canonical]
+    for (const [alias, target] of Object.entries(locationAliases)) {
+      if (target === canonical) keys.push(alias)
+    }
+    return keys
+  }
+
+  function recordAlias(canonical: string, requested: string) {
+    if (canonical === requested) return
+    if (store.location[requested]) {
+      setStore(
+        "location",
+        produce((draft) => {
+          draft[canonical] = { ...draft[requested], ...draft[canonical] }
+          delete draft[requested]
+        }),
+      )
+    }
+    setLocationAliases(requested, canonical)
+  }
   const sessions = createMemo(() =>
     Object.values(store.session.info).toSorted((a, b) => b.time.updated - a.time.updated),
   )
@@ -345,11 +374,11 @@ export function createData(config: CreateDataInput) {
   function removeForm(sessionID: string, formID: string, ref?: LocationRef) {
     const forms = store.session.form[sessionID]
     if (!forms) return false
-    const location = ref && locationKey(ref)
+    const location = ref && resolveLocationKey(ref)
     const next = forms.filter((form) => {
       if (form.id !== formID) return true
       if (sessionID !== "global" || !location) return false
-      return !form.location || locationKey(form.location) !== location
+      return !form.location || resolveLocationKey(form.location) !== location
     })
     if (next.length === forms.length) return false
     setStore("session", "form", sessionID, next)
@@ -1336,7 +1365,7 @@ export function createData(config: CreateDataInput) {
         ])
         break
       case "shell.created":
-        setStore("location", locationKey(location), (data) => ({
+        setStore("location", resolveLocationKey(location), (data) => ({
           shell: {
             ...data?.shell,
             [event.data.info.id]: { ...event.data.info, location },
@@ -1345,8 +1374,8 @@ export function createData(config: CreateDataInput) {
         break
       case "shell.exited":
       case "shell.deleted":
-        if (!store.location[locationKey(location)]?.shell?.[event.data.id]) break
-        setStore("location", locationKey(location), (data) => ({
+        if (!store.location[resolveLocationKey(location)]?.shell?.[event.data.id]) break
+        setStore("location", resolveLocationKey(location), (data) => ({
           shell: Object.fromEntries(Object.entries(data?.shell ?? {}).filter(([id]) => id !== event.data.id)),
         }))
         break
@@ -1394,7 +1423,9 @@ export function createData(config: CreateDataInput) {
 
   function hasLocation<Field extends keyof LocationData>(field: Field, ref?: LocationRef) {
     const id = locationKey(ref ?? defaultLocation())
-    return store.location[id]?.[field] !== undefined || sync.has(`location.${field}:${id}`)
+    return allLocationKeys(id).some(
+      (key) => store.location[key]?.[field] !== undefined || sync.has(`location.${field}:${key}`),
+    )
   }
 
   function refreshLocation<Field extends keyof LocationData>(
@@ -1407,14 +1438,11 @@ export function createData(config: CreateDataInput) {
     if (active) refresh(() => resource.sync(location))
   }
 
-  // A cached per-location catalog. `sync` loads once per invalidation, keyed by the
-  // effective location, and publishes under the server's canonical location; `alias`
-  // also publishes under the requested key when the two differ.
+  // A cached per-location catalog. `sync` loads once per invalidation, publishes under the
+  // server's canonical location, and aliases any differently formatted requested key to it.
   // Reloads usage limits only where something has read them, since each load asks OpenCode Console.
   function refreshUsageLimits(location: LocationRef) {
-    const loaded =
-      store.location[locationKey(location)]?.usageLimits !== undefined ||
-      sync.has(`location.usageLimits:${locationKey(location)}`)
+    const loaded = hasLocation("usageLimits", location)
     usageLimits.invalidate(location)
     if (loaded) refresh(() => usageLimits.sync(location))
   }
@@ -1422,22 +1450,25 @@ export function createData(config: CreateDataInput) {
   function locationResource<Field extends keyof LocationData>(
     field: Field,
     load: (location: ReturnType<typeof locationQuery>) => Promise<{ location: LocationRef; data: LocationData[Field] }>,
-    options?: { alias?: boolean },
   ) {
-    const publish = (key: string, value: LocationData[Field]) => setStore("location", key, { [field]: value })
     return {
-      list: (ref?: LocationRef) => store.location[locationKey(ref ?? defaultLocation())]?.[field],
+      list: (ref?: LocationRef) => store.location[resolveLocationKey(ref)]?.[field],
       sync: (ref?: LocationRef) => {
         const location = ref ?? defaultLocation()
         const id = locationKey(location)
-        return sync.run(`location.${field}:${id}`, async () => {
+        const syncKey = resolveLocationKey(location)
+        return sync.run(`location.${field}:${syncKey}`, async () => {
           const response = await load(locationQuery(location))
-          const key = locationKey(response.location)
-          publish(key, response.data)
-          if (options?.alias && key !== id) publish(id, response.data)
+          const responseKey = locationKey(response.location)
+          const key = locationAliases[responseKey] ?? responseKey
+          recordAlias(key, id)
+          setStore("location", key, { [field]: response.data })
         })
       },
-      invalidate: (ref?: LocationRef) => sync.invalidate(`location.${field}:${locationKey(ref ?? defaultLocation())}`),
+      invalidate: (ref?: LocationRef) => {
+        const id = locationKey(ref ?? defaultLocation())
+        for (const key of allLocationKeys(id)) sync.invalidate(`location.${field}:${key}`)
+      },
     }
   }
 
@@ -1605,7 +1636,7 @@ export function createData(config: CreateDataInput) {
           sessionOutbox.add(id)
           result.session.remember({
             id,
-            projectID: projectID ?? store.location[locationKey(location)]?.info?.project.id ?? "",
+            projectID: projectID ?? store.location[resolveLocationKey(location)]?.info?.project.id ?? "",
             agent: payload.agent,
             model: payload.model,
             cost: 0,
@@ -1897,8 +1928,8 @@ export function createData(config: CreateDataInput) {
           const forms = store.session.form[sessionID]
           if (sessionID !== "global") return forms
           if (!ref) return
-          const key = locationKey(ref)
-          return forms?.filter((form) => form.location && locationKey(form.location) === key)
+          const key = resolveLocationKey(ref)
+          return forms?.filter((form) => form.location && resolveLocationKey(form.location) === key)
         },
         sessions() {
           return Object.entries(store.session.form).flatMap(([sessionID, forms]) =>
@@ -1906,19 +1937,22 @@ export function createData(config: CreateDataInput) {
           )
         },
         sync(sessionID: string, ref?: LocationRef) {
-          const key = `session.form:${sessionID}:${sessionID === "global" ? locationKey(ref ?? defaultLocation()) : ""}`
+          const target = ref ?? defaultLocation()
+          const id = locationKey(target)
+          const key = `session.form:${sessionID}:${sessionID === "global" ? resolveLocationKey(target) : ""}`
           return sync.run(key, async () => {
             if (sessionID === "global") {
               const response = await api().form.list({
-                location: locationQuery(ref ?? defaultLocation()),
+                location: locationQuery(target),
               })
               const location = {
                 directory: response.location.directory,
               }
               const locationID = locationKey(location)
+              recordAlias(locationID, id)
               setStore("session", "form", sessionID, [
                 ...(store.session.form[sessionID] ?? []).filter(
-                  (form) => form.location && locationKey(form.location) !== locationID,
+                  (form) => form.location && resolveLocationKey(form.location) !== locationID,
                 ),
                 ...response.data.filter((form) => form.sessionID === "global").map((form) => ({ ...form, location })),
               ])
@@ -1928,9 +1962,12 @@ export function createData(config: CreateDataInput) {
           })
         },
         invalidate(sessionID: string, ref?: LocationRef) {
-          sync.invalidate(
-            `session.form:${sessionID}:${sessionID === "global" ? locationKey(ref ?? defaultLocation()) : ""}`,
-          )
+          if (sessionID !== "global") {
+            sync.invalidate(`session.form:${sessionID}:`)
+            return
+          }
+          const id = locationKey(ref ?? defaultLocation())
+          for (const key of allLocationKeys(id)) sync.invalidate(`session.form:${sessionID}:${key}`)
         },
         reply(input: SessionFormReplyInput, ref?: LocationRef) {
           return settleForm(input, ref, api().session.form.reply(input, formRequestOptions(input.sessionID, ref)))
@@ -1991,16 +2028,19 @@ export function createData(config: CreateDataInput) {
     },
     location: {
       info(ref?: LocationRef) {
-        return store.location[locationKey(ref ?? defaultLocation())]?.info
+        return store.location[resolveLocationKey(ref)]?.info
       },
       default() {
         return defaultLocation()
       },
       syncInfo(ref?: LocationRef) {
         const current = ref ?? defaultLocation()
-        return sync.run(`location:${locationKey(current)}`, async () => {
+        const id = locationKey(current)
+        const syncKey = resolveLocationKey(current)
+        return sync.run(`location:${syncKey}`, async () => {
           const location = await api().location.get({ location: locationQuery(current) })
           const key = locationKey(location)
+          recordAlias(key, id)
           if (!store.location[key]) setStore("location", key, {})
           setStore("location", key, "info", location)
           if (!ref) {
@@ -2028,7 +2068,7 @@ export function createData(config: CreateDataInput) {
       },
       invalidate(ref?: LocationRef) {
         const location = ref ?? defaultLocation()
-        sync.invalidate(`location:${locationKey(location)}`)
+        for (const key of allLocationKeys(locationKey(location))) sync.invalidate(`location:${key}`)
         result.location.vcs.invalidate(location)
         result.location.agent.invalidate(location)
         result.location.command.invalidate(location)
@@ -2059,17 +2099,20 @@ export function createData(config: CreateDataInput) {
           return { location: response.location, data: response.data.resources }
         }),
       },
-      model: locationResource("model", (location) => api().model.list({ location }), { alias: true }),
-      provider: locationResource("provider", (location) => api().provider.list({ location }), { alias: true }),
+      model: locationResource("model", (location) => api().model.list({ location })),
+      provider: locationResource("provider", (location) => api().provider.list({ location })),
       reference: locationResource("reference", (location) => api().reference.list({ location })),
       websearch: {
         list(location?: LocationRef) {
-          return store.location[locationKey(location ?? defaultLocation())]?.websearch
+          return store.location[resolveLocationKey(location)]?.websearch
         },
         async refresh(ref?: LocationRef) {
-          const input = { location: locationQuery(ref ?? defaultLocation()) }
+          const target = ref ?? defaultLocation()
+          const id = locationKey(target)
+          const input = { location: locationQuery(target) }
           const providers = await api().websearch.providers(input)
           const key = locationKey(providers.location)
+          recordAlias(key, id)
           setStore("location", key, { websearch: providers.data })
         },
       },
