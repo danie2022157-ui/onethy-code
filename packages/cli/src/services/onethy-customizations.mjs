@@ -193,26 +193,61 @@ try {
     }
     if (type === "skills") {
       // Flatten category/name into a stable native name; include all skill assets.
-      const categories = await readdir(root, { withFileTypes: true })
+      const seenSkillBase = new Set()
+      const seenSkillBody = new Set()
+      const seenSkillTitle = new Set()
+      const seenAssetHashes = new Set()
+      const distinctTitles = new Set(["scientific-pptx-posters", "database-postgresql"])
+      const categories = (await readdir(root, { withFileTypes: true })).toSorted((a, b) => a.name.localeCompare(b.name))
       for (const category of categories.filter(x => x.isDirectory())) {
-        const folders = await readdir(join(root, category.name), { withFileTypes: true })
+        const folders = (await readdir(join(root, category.name), { withFileTypes: true })).toSorted((a, b) => a.name.localeCompare(b.name))
         for (const folder of folders.filter(x => x.isDirectory())) {
           const skillDir = join(root, category.name, folder.name)
-          if (!(await exists(join(skillDir, "SKILL.md")))) continue
+          const skillMdPath = join(skillDir, "SKILL.md")
+          if (!(await exists(skillMdPath))) continue
           const name = slug(category.name + "-" + folder.name)
+          const baseName = slug(folder.name)
+          const rawSkillMd = await readFile(skillMdPath, "utf8")
+          const body = rawSkillMd.replace(/\r\n/g, "\n").replace(/^---\n[\s\S]*?\n---\n/, "").trim()
+          const bodyHash = createHash("sha256").update(body.replace(/\s+/g, " ").toLowerCase()).digest("hex")
+          const h1Match = body.match(/^#\s+(.+)$/m)
+          const h1 = h1Match ? h1Match[1].trim().toLowerCase() : ""
+          if (seenSkillBase.has(baseName) || seenSkillBody.has(bodyHash) || (h1 && seenSkillTitle.has(h1) && !distinctTitles.has(name))) {
+            continue
+          }
+          seenSkillBase.add(baseName)
+          seenSkillBody.add(bodyHash)
+          if (h1) seenSkillTitle.add(h1)
           for await (const file of traverse(skillDir)) {
             const rel = relative(skillDir, file)
+            const isMainSkillMd = rel === "SKILL.md"
+            if (!isMainSkillMd && basename(file) === "SKILL.md") continue
+            if (!isMainSkillMd) {
+              const assetHash = createHash("sha256").update(await readFile(file)).digest("hex")
+              if (seenAssetHashes.has(assetHash)) continue
+              seenAssetHashes.add(assetHash)
+            }
             const out = join(destination, "skills", name, rel)
             report.components[type].files++
-            await record(type, name, file, out, basename(file) === "SKILL.md")
+            await record(type, name, file, out, isMainSkillMd)
           }
         }
       }
       continue
     }
+    const seenBaseNames = new Set()
+    const seenBodyHashes = new Set()
     for await (const file of traverse(root)) {
       if (!["agents", "commands"].includes(type) || extname(file).toLowerCase() !== ".md") continue
-      const name = slug(relative(root, file).slice(0, -3).split(sep).join("-"))
+      const relParts = relative(root, file).slice(0, -3).split(sep)
+      const name = slug(relParts.join("-"))
+      const baseName = slug(relParts.length > 1 ? relParts.slice(1).join("-") : relParts[0])
+      const rawText = await readFile(file, "utf8")
+      const body = rawText.replace(/\r\n/g, "\n").replace(/^---\n[\s\S]*?\n---\n/, "").trim()
+      const bodyHash = createHash("sha256").update(body.replace(/\s+/g, " ").toLowerCase()).digest("hex")
+      if (seenBaseNames.has(baseName) || seenBodyHashes.has(bodyHash)) continue
+      seenBaseNames.add(baseName)
+      seenBodyHashes.add(bodyHash)
       const out = join(destination, type, name + ".md")
       report.components[type].files++
       await record(type, name, file, out, true)

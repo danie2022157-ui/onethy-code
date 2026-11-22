@@ -720,4 +720,88 @@ describe("CommandPlugin.Plugin", () => {
       expect(storage.has(`grillme:v1:${sessionB}`)).toBe(true)
     }),
   )
+
+  it.effect("grillme: supports /grill-me and /grilme aliases, Portuguese control phrases, and reset from terminal state", () =>
+    Effect.gen(function* () {
+      const command = yield* Command.Service
+      const prompts: Array<{ text: string; delivery: string }> = []
+      const storage = new Map<string, unknown>()
+      yield* CommandPlugin.Plugin.effect(
+        host({
+          command: {
+            list: () => Effect.die("unused command.list"),
+            transform: command.transform,
+            reload: command.reload,
+          },
+          storage: {
+            get: (key: string) => Effect.sync(() => storage.get(key) as Schema.Json | undefined),
+            set: (key, value) => Effect.sync(() => void storage.set(key, value)),
+            remove: () => Effect.void,
+            scan: () => Effect.succeed({ entries: [] }),
+          },
+          session: {
+            prompt: (input) =>
+              Effect.sync(() => {
+                prompts.push({ text: input.text, delivery: input.delivery ?? "steer" })
+                return SessionInbox.User.make({
+                  id: SessionMessage.ID.make("msg_test"),
+                  sessionID: input.sessionID,
+                  time: { created: DateTime.makeUnsafe(0) },
+                  type: "user",
+                  payload: { text: input.text },
+                  delivery: input.delivery ?? "steer",
+                })
+              }),
+          },
+        }),
+      ).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory }, { projectDirectory: project })),
+        ),
+      )
+
+      const sessionID = Session.ID.make("ses_aliases_pt_reset")
+
+      // Start via /grill-me
+      yield* command.execute({
+        name: "grill-me",
+        invocation: { sessionID, prompt: { text: "criar autenticacao oauth" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: interviewing")
+      expect(prompts[0].text).toContain("criar autenticacao oauth")
+      prompts.length = 0
+
+      // Cancel in Portuguese via /grilme
+      yield* command.execute({
+        name: "grilme",
+        invocation: { sessionID, prompt: { text: "cancelar" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: cancelled")
+      prompts.length = 0
+
+      // Reset and start a new topic in the same session
+      yield* command.execute({
+        name: "grill-me",
+        invocation: { sessionID, prompt: { text: "reset novo fluxo de pagamento" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: interviewing")
+      expect(prompts[0].text).toContain('Persisted answers/context: ["novo fluxo de pagamento"]')
+      prompts.length = 0
+
+      // Mark spec ready and approve in Portuguese
+      yield* command.execute({
+        name: "grill-me",
+        invocation: { sessionID, prompt: { text: "especificação pronta" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: spec_ready")
+      prompts.length = 0
+
+      yield* command.execute({
+        name: "grill-me",
+        invocation: { sessionID, prompt: { text: "eu aprovo implementação" }, delivery: "steer" },
+      })
+      expect(prompts[0].text).toContain("Status: approved")
+    }),
+  )
 })
