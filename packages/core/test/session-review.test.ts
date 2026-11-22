@@ -18,7 +18,7 @@ import { Event } from "@opencode/schema/event"
 import { SessionEvent } from "@opencode/schema/session-event"
 import { Snapshot as SnapshotSchema } from "@opencode/schema/snapshot"
 import { ProjectTable } from "@opencode/core/project/sql"
-import { SessionMessageTable, SessionPartTable, SessionReviewTable, SessionTable } from "@opencode/core/session/sql"
+import { SessionReviewTable } from "@opencode/core/session/sql"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { testEffect } from "./lib/effect"
 
@@ -43,7 +43,8 @@ const it = testEffect(
         Layer.succeed(
           Snapshot.Service,
           Snapshot.Service.of({
-            ...Snapshot.Service.of(),
+            transform: () => Effect.succeed({ dispose: Effect.void }),
+            reload: () => Effect.void,
             capture: () => Effect.succeed(SnapshotSchema.ID.make("current")),
             files: ({ from, to }) => {
               if (
