@@ -5,8 +5,8 @@ import path from "node:path"
 import { copyBuiltCliToResources, downloadCliToResources, getCurrentCli, resolveChannel } from "./utils"
 
 // Prepares resources/ (icons, metainfo, the bundled CLI) for OPENCODE_CHANNEL and builds the app into out/.
-// The CLI comes from ../cli/dist when it holds the target; otherwise dev downloads the published dev CLI,
-// beta the beta CLI, and prod fails.
+// Reuse a matching local CLI artifact. Production builds compile the native CLI automatically when absent;
+// dev/beta builds may download their published CLI.
 const dir = path.resolve(import.meta.dir, "..")
 
 const cli = path.resolve(dir, "../cli/dist")
