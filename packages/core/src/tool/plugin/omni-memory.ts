@@ -37,7 +37,7 @@ const SENSITIVE_PATTERNS: ReadonlyArray<RegExp> = [
 function containsSensitiveData(content: string): string | undefined {
   for (const pattern of SENSITIVE_PATTERNS) {
     const match = content.match(pattern)
-    if (match) return `Potential sensitive data detected: ${match[0].slice(0, 50)}...`
+    if (match) return "Potential sensitive data detected. Remove credentials before saving this memory."
   }
   return undefined
 }

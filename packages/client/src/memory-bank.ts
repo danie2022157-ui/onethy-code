@@ -108,12 +108,14 @@ Descobertas técnicas reutilizáveis entre projetos, sem dados confidenciais.
 }
 
 export function getMemoryFilePath(scope: MemoryScope, filename: string): string {
-  if (scope === "global") return `memory-bank/${filename}`
+  // The app's file API is Location-scoped; never pretend this relative path is the global config bank.
+  if (scope === "global") throw new Error("Global memory is only available through the Core memory service.")
   return `.omnicode/memory-bank/${filename}`
 }
 
 export function getMemoryFiles(scope: MemoryScope): MemoryFileInfo[] {
   const templates = scope === "global" ? GLOBAL_MEMORY_TEMPLATES : PROJECT_MEMORY_TEMPLATES
+  if (scope === "global") return []
   return Object.entries(templates).map(([name, meta]) => ({
     id: name,
     name,
