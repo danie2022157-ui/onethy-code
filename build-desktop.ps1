@@ -11,8 +11,10 @@ if ([string]::IsNullOrWhiteSpace($bunPath) -or -not (Test-Path -LiteralPath $bun
 
 $previousChannel = $env:OPENCODE_CHANNEL
 $previousTarget = $env:OPENCODE_TARGET
+$previousDesktopApp = $env:OPENCODE_DESKTOP_APP
 try {
   $env:OPENCODE_CHANNEL = "prod"
+  $env:OPENCODE_DESKTOP_APP = $null
   $bunArch = (& $bunPath -p "process.arch").Trim()
   if ($LASTEXITCODE -ne 0) { throw "Could not detect Bun architecture." }
   if ($bunArch -eq "arm64") { $env:OPENCODE_TARGET = "windows-arm64" }
@@ -38,4 +40,5 @@ try {
 } finally {
   $env:OPENCODE_CHANNEL = $previousChannel
   $env:OPENCODE_TARGET = $previousTarget
+  $env:OPENCODE_DESKTOP_APP = $previousDesktopApp
 }
