@@ -23,6 +23,25 @@ import {
 
 export const name = "omni_memory"
 
+const SENSITIVE_PATTERNS: ReadonlyArray<RegExp> = [
+  /(api[_-]?key|apikey)\s*[:=]\s*["']?[a-zA-Z0-9_\-]{20,}/i,
+  /(access[_-]?token|accesstoken)\s*[:=]\s*["']?[a-zA-Z0-9_\-]{20,}/i,
+  /(secret[_-]?key|secretkey)\s*[:=]\s*["']?[a-zA-Z0-9_\-]{20,}/i,
+  /(password|passwd)\s*[:=]\s*["']?[^\s]{8,}/i,
+  /(authorization|bearer)\s+[a-zA-Z0-9_\-]{20,}/i,
+  /(private[_-]?key|privatekey)\s*[:=]/i,
+  /(ssh[_-]?key|sshkey)\s*[:=]/i,
+  /(database[_-]?url|db[_-]?url|connection[_-]?string)\s*[:=]\s*["']?[^\s]{10,}/i,
+]
+
+function containsSensitiveData(content: string): string | undefined {
+  for (const pattern of SENSITIVE_PATTERNS) {
+    const match = content.match(pattern)
+    if (match) return `Potential sensitive data detected: ${match[0].slice(0, 50)}...`
+  }
+  return undefined
+}
+
 export const Input = Schema.Struct({
   scope: Schema.optionalKey(Schema.Literals(["project", "global"])).annotate({
     description: "project (default) keeps project context isolated; global shares preferences across workspaces.",
@@ -30,9 +49,9 @@ export const Input = Schema.Struct({
   confirm: Schema.optionalKey(Schema.Boolean).annotate({
     description: "Required to delete or clear global memory (only after the user explicitly asks).",
   }),
-  action: Schema.Literals(["read", "search", "update", "init", "status", "delete", "clear"]).annotate({
+  action: Schema.Literals(["read", "search", "update", "capture", "init", "status", "delete", "clear"]).annotate({
     description:
-      "Action to perform: 'read' reads memory bank files; 'update' updates a memory bank file; 'init' initializes the 4 memory bank files; 'status' checks memory bank readiness; 'delete' deletes a specific memory bank file; 'clear' clears all memory bank files.",
+      "Action to perform: 'read' reads memory bank files; 'update' updates a memory bank file; 'capture' writes with sensitive-data validation; 'init' initializes the 4 memory bank files; 'status' checks memory bank readiness; 'delete' deletes a specific memory bank file; 'clear' clears all memory bank files.",
   }),
   file: Schema.optionalKey(
     Schema.String,
@@ -40,7 +59,7 @@ export const Input = Schema.Struct({
     description: "Specific memory bank file to target (e.g. 'project-brief', 'system-patterns', 'tech-context', 'active-context', 'all', or filename).",
   }),
   content: Schema.optionalKey(Schema.String).annotate({
-    description: "New markdown content when action is 'update'.",
+    description: "New markdown content when action is 'update' or 'capture'.",
   }),
   query: Schema.optionalKey(Schema.String).annotate({ description: "Search query for relevant project or global memory sections." }),
   limit: Schema.optionalKey(Schema.Number).annotate({ description: "Maximum returned memory sections, 1-10; default 5." }),
@@ -57,7 +76,7 @@ export const Output = Schema.Struct({
 })
 
 export const description = [
-  "Persistent project and global memory banks.",
+  "Persistent project and global memory banks. Capture only concise content explicitly reviewed by the user; never persist raw conversations, prompts, or errors.",
   "scope='project' (default): .omnicode/memory-bank/; scope='global': user config/memory-bank/.",
   "Global memory is available in all projects, but modifications require an explicit user request.",
   "Never store credentials, passwords, tokens, customer data or secrets in global memory.",
@@ -194,23 +213,44 @@ export const Plugin = {
                 }
               }
 
-              if (params.action === "update") {
+              if (params.action === "update" || params.action === "capture") {
                 if (scope === "global" && !params.content?.trim()) {
                   return yield* new ToolFailure({
                     message: "Global memory updates require nonempty content. Use delete with confirmation to remove entries.",
                   })
                 }
-                ensureDir()
-                const fileName = selectFilename(params.file ?? (scope === "global" ? "preferences" : "active-context"))
                 const contentToWrite = params.content ?? ""
-                // New global preferences append by default: never overwrite earlier memory by accident.
-                writeMemoryFile(memoryDir, fileName, contentToWrite, params.append ?? (scope === "global"))
+                if (params.action === "capture" && scope === "global" && !params.confirm) {
+                  return yield* new ToolFailure({ message: "Global memory capture requires explicit user confirmation." })
+                }
+                if (params.action === "capture") {
+                  if (!contentToWrite.trim()) {
+                    return yield* new ToolFailure({ message: "Memory capture requires nonempty, reviewed content." })
+                  }
+                  const sensitive = containsSensitiveData(contentToWrite)
+                  if (sensitive) return yield* new ToolFailure({ message: sensitive })
+                }
+                ensureDir()
+                const fileName = selectFilename(params.file ?? (scope === "global" ? "knowledge" : "active-context"))
+                // New global memory appends by default: never overwrite earlier memory by accident.
+                const append = params.append ?? (scope === "global")
+                const existing = append ? readMemoryFile(memoryDir, fileName) : undefined
+                if (params.action === "capture" && existing?.split(/\n{2,}/).includes(contentToWrite.trim())) {
+                  const summary = `Conteúdo já existe em '${fileName}' no Memory Bank ${scopeLabel}.`
+                  return {
+                    output: { action: "capture", summary },
+                    content: summary,
+                    metadata: { action: "capture", file: fileName, duplicate: "true" },
+                  }
+                }
+                writeMemoryFile(memoryDir, fileName, contentToWrite, append)
 
+                const action = params.action
                 const summary = `Arquivo '${fileName}' atualizado no Memory Bank ${scopeLabel}.`
                 return {
-                  output: { action: "update", summary },
+                  output: { action, summary },
                   content: summary,
-                  metadata: { action: "update", file: fileName },
+                  metadata: { action, file: fileName },
                 }
               }
 

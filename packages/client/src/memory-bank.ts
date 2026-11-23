@@ -10,47 +10,38 @@ export interface MemoryFileInfo {
 }
 
 export const PROJECT_MEMORY_TEMPLATES: Record<string, { label: string; description: string; defaultContent: string }> = {
-  "active-context.md": {
-    label: "Active Context",
-    description: "Current sprint, immediate goals, active decisions and next steps.",
-    defaultContent: `# Active Context
-
-## Current Goals
-- Implementation of full parity between OnethyCode Desktop App and TUI
-- Zero code duplication between client packages
-
-## Active Decisions
-- All business logic lives in shared packages (@opencode/client)
-
-## Next Steps
-- Verify desktop app functionality
-`,
-  },
   "project-brief.md": {
     label: "Project Brief",
     description: "Core vision, high-level scope, key requirements and target users.",
     defaultContent: `# Project Brief
 
-## Overview
-OnethyCode is an intelligent coding assistant combining terminal TUI and desktop interfaces.
+## 1. Visão Geral e Objetivos
+- Propósito central do projeto.
+- Problemas que resolve e valor para os usuários.
 
-## Core Vision
-Deliver full feature parity, maximum performance, and persistent memory across developer workflows.
+## 2. Requisitos e Escopo
+- Funcionalidades essenciais.
+- O que está explicitamente FORA de escopo.
+
+## 3. Critérios de Sucesso
+- Estabilidade, cobertura de testes e aderência aos requisitos.
 `,
   },
   "system-patterns.md": {
     label: "System Patterns",
     description: "Architectural patterns, key conventions, data flow, and code structure.",
-    defaultContent: `# System Patterns
+    defaultContent: `# System Patterns & Arquitetura
 
-## Architecture
-- Client-Server architecture with Effect-TS protocol
-- Shared client modules in @opencode/client
-- Reactive SolidJS frontends for both TUI and Desktop App
+## 1. Arquitetura Geral
+- Camadas do sistema e separação de responsabilidades.
+- Direção de dependências e regras de importação.
 
-## Code Conventions
-- No code duplication across frontends
-- Strict schema validation at boundaries
+## 2. Padrões de Código e Convenções
+- Nomenclatura, tratamento de erros e convenções de estilo.
+- Regras de schema e tipagem.
+
+## 3. Decisões Arquiteturais Chave (ADRs)
+- Decisões importantes e suas justificativas técnicas.
 `,
   },
   "tech-context.md": {
@@ -58,24 +49,31 @@ Deliver full feature parity, maximum performance, and persistent memory across d
     description: "Technology stack, dependencies, runtime environments, and development commands.",
     defaultContent: `# Tech Context
 
-## Runtime & Stack
-- Bun runtime
-- SolidJS + Kobalte UI
-- Electron Desktop App
-- OpenTUI Terminal Interface
+## 1. Stack Tecnológica
+- Runtime / Linguagens principais.
+- Frameworks, bibliotecas e bancos de dados.
 
-## Build & Test Commands
-- bun run build
-- bun test
-- bun typecheck
+## 2. Comandos e Scripts de Desenvolvimento
+- Testes: comando para rodar testes.
+- Build / Lint / Typecheck: scripts de validação.
+
+## 3. Restrições do Ambiente
+- Compatibilidade de SO, variáveis de ambiente e requisitos de segurança.
 `,
   },
-  "memory.md": {
-    label: "Project Notes",
-    description: "Durable project notes, historical context, and team decisions.",
-    defaultContent: `# Durable Project Memory
+  "active-context.md": {
+    label: "Active Context",
+    description: "Current sprint, immediate goals, active decisions and next steps.",
+    defaultContent: `# Active Context
 
-Important technical decisions and long-term knowledge.
+## 1. Foco Atual
+- Funcionalidade ou refatoração sendo desenvolvida no momento.
+
+## 2. Tarefas e Próximos Passos
+- [ ] Próxima tarefa imediata.
+
+## 3. Descobertas e Decisões Recentes
+- Notas para os próximos subagentes e sessões futuras.
 `,
   },
 }
@@ -84,41 +82,33 @@ export const GLOBAL_MEMORY_TEMPLATES: Record<string, { label: string; descriptio
   "preferences.md": {
     label: "User Preferences",
     description: "Coding style preferences, favorite tools, and global conventions.",
-    defaultContent: `# Global Preferences
+    defaultContent: `# Preferências globais de desenvolvimento
 
-## Coding Style
-- Clean, concise code
-- Early returns over nested conditionals
-- Type inference where possible
+Preferências que devem valer em todos os projetos Onethy Code.
+Não armazenar chaves de API, tokens, senhas nem dados privados de clientes.
 `,
   },
   "rules.md": {
     label: "Global Rules",
     description: "User-wide safety and behavioral rules applied to all projects.",
-    defaultContent: `# Global Rules
+    defaultContent: `# Regras globais
 
-- Follow conventional commits
-- Never duplicate business logic between UI and CLI
-- Run typecheck and tests before finalizing tasks
+Convenções gerais e limites para os agentes em todos os projetos.
+As regras deste arquivo não substituem permissões nem as instruções do sistema.
 `,
   },
   "knowledge.md": {
     label: "Global Knowledge",
     description: "Cross-project knowledge base, tips, and reusable patterns.",
-    defaultContent: `# Global Knowledge Base
+    defaultContent: `# Conhecimento reutilizável
 
-Reusable technical patterns, tips, and cross-project knowledge.
+Descobertas técnicas reutilizáveis entre projetos, sem dados confidenciais.
 `,
   },
 }
 
 export function getMemoryFilePath(scope: MemoryScope, filename: string): string {
-  if (scope === "global") {
-    return `.config/opencode/memory-bank/${filename}`
-  }
-  if (filename === "memory.md") {
-    return `.omnicode/${filename}`
-  }
+  if (scope === "global") return `memory-bank/${filename}`
   return `.omnicode/memory-bank/${filename}`
 }
 

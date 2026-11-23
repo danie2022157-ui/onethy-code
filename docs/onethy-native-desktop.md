@@ -47,7 +47,9 @@ Read/status: `status`, `permissions`, `version`, `list-apps`, `list-windows`, `l
 
 Operate: `click`, `double-click`, `right-click`, `type`, `set-value`, `clear`, `focus`, `select`, `toggle`, `check`, `uncheck`, `expand`, `collapse`, `scroll`, `scroll-to`, `press`, `focus-window`, `launch`, `close-app`, `minimize`, `maximize`, `restore`, `wait`.
 
-Some advanced upstream commands, including screenshots, clipboard reads and raw coordinate actions, are intentionally not exposed in this first-party tool. Users who need them can assess the upstream tool's security implications separately.
+Physical pointer actions: `mouse-move`, `mouse-click`, `mouse-wheel`, `hover`, and `drag`. These require `headed: true` and normal session permission approval because they move or click the real system pointer. Coordinates are absolute screen coordinates; use an explicitly authorized app/window and verify after acting with a fresh snapshot. The wrapper bounds coordinates to ±100,000, wheel deltas to ±100 lines, click count to 1–3, and drag timing to safe limits.
+
+`mouse-down` and `mouse-up` remain unavailable: the upstream runtime fails closed for held-button commands in stateless mode. A native `drag` gesture is supported instead. Automation is performed as bounded agent tool calls in the normal observe/act/verify loop; this does not create an unattended infinite loop or guarantee low-latency continuous control. Screenshots and clipboard reads remain unexposed.
 
 ## Limitations
 

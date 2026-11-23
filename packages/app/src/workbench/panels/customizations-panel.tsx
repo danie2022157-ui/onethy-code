@@ -30,8 +30,8 @@ type CustomizationEntry = {
 }
 
 type LoadErrorState = {
-  scope?: "skills" | "commands"
-  message: string
+  skills?: string
+  commands?: string
 }
 
 const CATEGORY_IDS: readonly CategoryFilter[] = ["all", "skills", "hooks", "mods", "settings", "commands"]
@@ -100,13 +100,12 @@ export function CustomizationsPanel() {
   const loadErrorText = createMemo(() => {
     const err = loadError()
 
-    if (!err) return undefined
+    if (!err) return []
 
-    if (err.scope === "skills") return tr("Skills: {{message}}", "Skills: {{message}}", { message: err.message })
-
-    if (err.scope === "commands") return tr("Commands: {{message}}", "Comandos: {{message}}", { message: err.message })
-
-    return err.message
+    return [
+      err.skills && tr("Skills: {{message}}", "Skills: {{message}}", { message: err.skills }),
+      err.commands && tr("Commands: {{message}}", "Comandos: {{message}}", { message: err.commands }),
+    ].filter((message): message is string => Boolean(message))
   })
 
   const counts = createMemo<Record<CategoryFilter, number>>(() => {
@@ -168,20 +167,11 @@ export function CustomizationsPanel() {
     batch(() => {
       setLoading(false)
 
-      if (!skillRes.ok && !cmdRes.ok) {
-        setLoadError({ message: skillRes.message })
-
-        return
-      }
-
-      if (!skillRes.ok) {
-        setLoadError({ scope: "skills", message: skillRes.message })
-
-        return
-      }
-
-      if (!cmdRes.ok) {
-        setLoadError({ scope: "commands", message: cmdRes.message })
+      if (!skillRes.ok || !cmdRes.ok) {
+        setLoadError({
+          skills: skillRes.ok ? undefined : skillRes.message,
+          commands: cmdRes.ok ? undefined : cmdRes.message,
+        })
 
         return
       }
@@ -345,13 +335,13 @@ export function CustomizationsPanel() {
 
         {/* Item list */}
         <div data-slot="workbench-scroll" class="min-h-0 flex-1 overflow-y-auto p-2">
-          <Show when={loadErrorText()}>
+          <For each={loadErrorText()}>
             {(message) => (
               <div class="mb-2 rounded-md border border-v2-state-border-danger bg-v2-state-bg-danger px-2.5 py-1.5 text-[11px] text-v2-state-fg-danger">
-                {message()}
+                {message}
               </div>
             )}
-          </Show>
+          </For>
 
           <Show
             when={!loading() || allItems().length > 0}

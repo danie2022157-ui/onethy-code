@@ -27,7 +27,6 @@ export const DialogMemoryBank: Component<{
     if (file.id === "project-brief.md") return tr(file.label, "Resumo do Projeto")
     if (file.id === "system-patterns.md") return tr(file.label, "Padrões do Sistema")
     if (file.id === "tech-context.md") return tr(file.label, "Contexto Técnico")
-    if (file.id === "memory.md") return tr(file.label, "Notas do Projeto")
     if (file.id === "preferences.md") return tr(file.label, "Preferências do Usuário")
     if (file.id === "rules.md") return tr(file.label, "Regras Globais")
     if (file.id === "knowledge.md") return tr(file.label, "Conhecimento Global")
@@ -46,9 +45,6 @@ export const DialogMemoryBank: Component<{
     }
     if (file.id === "tech-context.md") {
       return tr(file.description, "Stack tecnológica, dependências, ambientes de execução e comandos de desenvolvimento.")
-    }
-    if (file.id === "memory.md") {
-      return tr(file.description, "Notas duráveis do projeto, contexto histórico e decisões da equipe.")
     }
     if (file.id === "preferences.md") {
       return tr(file.description, "Preferências de estilo de código, ferramentas favoritas e convenções globais.")

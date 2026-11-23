@@ -13,6 +13,7 @@ export const actions = [
   "click", "double-click", "right-click", "type", "set-value", "clear", "focus", "select",
   "toggle", "check", "uncheck", "expand", "collapse", "scroll", "scroll-to",
   "press", "focus-window", "launch", "close-app", "minimize", "maximize", "restore", "wait",
+  "mouse-move", "mouse-click", "mouse-wheel", "hover", "drag",
 ] as const
 
 export type DesktopAction = (typeof actions)[number]
@@ -31,6 +32,20 @@ export type DesktopRequest = {
   direction?: "up" | "down" | "left" | "right"
   amount?: number
   waitMs?: number
+  x?: number
+  y?: number
+  button?: "left" | "right" | "middle"
+  count?: number
+  dx?: number
+  dy?: number
+  fromRef?: string
+  toRef?: string
+  fromX?: number
+  fromY?: number
+  toX?: number
+  toY?: number
+  durationMs?: number
+  dropDelayMs?: number
   headed?: boolean
 }
 export type DesktopInvocation = {
@@ -57,6 +72,7 @@ const SCOPED = new Set<DesktopAction>([
   "focus-window", "minimize", "maximize", "restore",
 ])
 const NO_APPROVAL = new Set<DesktopAction>(["status", "permissions", "version"])
+const POINTER_ACTIONS = new Set<DesktopAction>(["mouse-move", "mouse-click", "mouse-wheel", "hover", "drag"])
 
 function required(value: string | undefined, field: string, max = 256) {
   if (!value?.trim() || value.length > max || value.includes("\0")) {
@@ -84,9 +100,76 @@ export function buildDesktopInvocation(input: DesktopRequest): DesktopInvocation
   if (SCOPED.has(input.action)) {
     add("--app", input.app)
     add("--window-id", input.windowId)
+    if (input.app?.includes("\0")) throw new Error("--app must not contain null bytes.")
+    if (input.windowId?.includes("\0")) throw new Error("--window-id must not contain null bytes.")
+  }
+
+  if (POINTER_ACTIONS.has(input.action) && !input.headed) {
+    throw new Error("Physical mouse actions require headed: true and explicit approval.")
+  }
+
+  const coordinate = (value: number | undefined, field: string) => {
+    if (!Number.isInteger(value) || Math.abs(value ?? 0) > 100_000) {
+      throw new Error(field + " must be an integer between -100000 and 100000.")
+    }
+    return String(value)
   }
 
   switch (input.action) {
+    case "mouse-move":
+    case "mouse-click":
+    case "mouse-wheel": {
+      const x = coordinate(input.x, "x")
+      const y = coordinate(input.y, "y")
+      if (input.action === "mouse-move") args.push("--xy=" + x + "," + y)
+      if (input.action === "mouse-click") {
+        args.push("--xy=" + x + "," + y)
+        if (input.button && !new Set(["left", "right", "middle"]).has(input.button)) {
+          throw new Error("button must be left, right, or middle.")
+        }
+        args.push("--button=" + (input.button ?? "left"))
+        if (input.count !== undefined) {
+          if (!Number.isInteger(input.count) || input.count < 1 || input.count > 3)
+            throw new Error("count must be an integer between 1 and 3.")
+          args.push("--count=" + input.count)
+        }
+      }
+      if (input.action === "mouse-wheel") {
+        const dx = input.dx ?? 0
+        const dy = input.dy ?? 0
+        if (![dx, dy].every((value) => Number.isInteger(value) && Math.abs(value) <= 100))
+          throw new Error("dx and dy must be integers between -100 and 100.")
+        if (dx === 0 && dy === 0) throw new Error("mouse-wheel requires a non-zero dx or dy.")
+        args.push("--x=" + x, "--y=" + y, "--dx=" + dx, "--dy=" + dy)
+      }
+      break
+    }
+    case "hover":
+      if (input.ref) args.push(reference(input.ref))
+      else args.push("--xy=" + coordinate(input.x, "x") + "," + coordinate(input.y, "y"))
+      break
+    case "drag": {
+      const from = input.fromRef ? reference(input.fromRef) : undefined
+      const to = input.toRef ? reference(input.toRef) : undefined
+      if (from && to && input.fromX === undefined && input.fromY === undefined && input.toX === undefined && input.toY === undefined) {
+        args.push("--from=" + from, "--to=" + to)
+      } else if (!from && !to) {
+        args.push("--from-xy=" + coordinate(input.fromX, "fromX") + "," + coordinate(input.fromY, "fromY"), "--to-xy=" + coordinate(input.toX, "toX") + "," + coordinate(input.toY, "toY"))
+      } else {
+        throw new Error("drag requires both refs or both coordinate endpoints.")
+      }
+      if (input.durationMs !== undefined) {
+        if (!Number.isInteger(input.durationMs) || input.durationMs < 1 || input.durationMs > 30_000)
+          throw new Error("durationMs must be an integer between 1 and 30000.")
+        args.push("--duration=" + input.durationMs)
+      }
+      if (input.dropDelayMs !== undefined) {
+        if (!Number.isInteger(input.dropDelayMs) || input.dropDelayMs < 0 || input.dropDelayMs > 5_000)
+          throw new Error("dropDelayMs must be an integer between 0 and 5000.")
+        args.push("--drop-delay=" + input.dropDelayMs)
+      }
+      break
+    }
     case "snapshot":
       // Do not silently read the active app or whole desktop; scope must be explicit.
       if (!input.app && !input.windowId) throw new Error("snapshot requires app or windowId.")
@@ -196,7 +279,7 @@ export function runAgentDesktop(invocation: DesktopInvocation, options?: {
   timeoutMs?: number
 }): Promise<DesktopResult> {
   const binary = options?.binary ?? resolveDesktopBinary()
-  const timeoutMs = options?.timeoutMs ?? 25_000
+  const timeoutMs = options?.timeoutMs ?? (invocation.args.includes("drag") ? 70_000 : 25_000)
   return new Promise((resolve, reject) => {
     let stdout = ""
     let stderr = ""
