@@ -20,12 +20,21 @@ await $`bun ./script/copy-icons.ts ${channel}`
 await $`bun ./script/copy-metainfo.ts ${channel}`
 
 const targetDir = getCurrentCli().package.replace("@opencode/", "")
-const built =
+const hasBuiltCli = async () =>
   (await exists(path.join(cli, targetDir))) ||
   (await exists(path.join(cli, targetDir.replace(/-baseline$/, ""))))
 
+let built = await hasBuiltCli()
+
+// Production must bundle the CLI built from this checkout. Build it automatically when missing.
+if (channel === "prod" && !built) {
+  console.log(`CLI build not found at ${cli}; building the current target first`)
+  await $`bun run --cwd ../cli build --single`
+  built = await hasBuiltCli()
+}
+
 if (channel === "prod" && !built)
-  throw new Error(`Production desktop builds bundle the CLI from ${cli}; build it first`)
+  throw new Error(`Production desktop build requires the CLI artifact for ${targetDir} in ${cli}; the CLI build completed without producing it`)
 
 if (built) await copyBuiltCliToResources(cli)
 
