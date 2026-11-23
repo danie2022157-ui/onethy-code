@@ -35,8 +35,14 @@ Pré-requisitos: **Git, Node.js 20+, Bun (versão fixada no workspace)** e um pr
 git clone https://github.com/danie2022157-ui/onethy-code.git
 cd onethy-code
 bun install --frozen-lockfile
+$env:OPENCODE_CHANNEL='prod'
+bun run --cwd packages/desktop build
+bun run --cwd packages/desktop pack
 .\install.ps1
 onethy
+
+# Para remover os launchers e o app desktop instalado:
+.\uninstall.ps1
 ```
 
 **Linux / macOS**
@@ -45,11 +51,17 @@ onethy
 git clone https://github.com/danie2022157-ui/onethy-code.git
 cd onethy-code
 bun install --frozen-lockfile
+OPENCODE_CHANNEL=prod bun run --cwd packages/desktop build
+OPENCODE_CHANNEL=prod bun run --cwd packages/desktop pack
 bash ./install.sh
 onethy
 ```
 
-Abra `/help`, conecte o provedor em `/connect` e consulte `/models`. A instalação usa o checkout local: **não exclua a pasta clonada depois de instalar**. Leia [requisitos e instruções completas](#instalação-e-primeiros-passos).
+> **No Windows, o instalador também copia o OnethyCode.exe (aplicação desktop Electron de produção)** para `%LOCALAPPDATA%\Programs\OnethyCode` e cria atalhos na Área de Trabalho e no Menu Iniciar. O executável desktop passa a funcionar independentemente do checkout clonado. Linux/macOS continuam usando os pacotes de desktop específicos da plataforma.
+>
+> **Importante**: execute os comandos de build desktop com `OPENCODE_CHANNEL=prod` **antes** do `install.ps1`/`install.sh` para gerar o build de produção (`OnethyCode.exe`). O checkout clonado continua sendo necessário para a CLI `onethy`/`onethy-code`.
+
+Abra `/help`, conecte o provedor em `/connect` e consulte `/models`. Leia [requisitos e instruções completas](#instalação-e-primeiros-passos).
 
 ---
 
@@ -415,11 +427,16 @@ A instalação atual é feita a partir do **código-fonte**. Não se trata de um
 git clone https://github.com/danie2022157-ui/onethy-code.git
 cd onethy-code
 bun install --frozen-lockfile
+$env:OPENCODE_CHANNEL='prod'
+bun run --cwd packages/desktop build
+bun run --cwd packages/desktop pack
 .\install.ps1
 onethy
 ```
 
 O instalador registra os atalhos do OnethyCode no ambiente do usuário. **Não apague a pasta clonada após instalar**: o comando instalado usa os arquivos existentes nesse checkout.
+
+O `install.ps1` também instala o **OnethyCode.exe** (aplicação desktop Electron de produção) em `%LOCALAPPDATA%\Programs\OnethyCode\app` e cria atalhos na Área de Trabalho e no Menu Iniciar. O executável desktop funciona de forma independente do checkout clonado.
 
 Recomenda-se utilizar uma janela de terminal atualizada e revisar eventuais avisos de compatibilidade da TUI. Se houver problemas na inicialização, obtenha a saída de `onethy --help` e os detalhes do terminal antes de modificar configurações.
 
@@ -447,9 +464,9 @@ O instalador cria atalhos em `~/.local/bin`; verifique se esse diretório está 
 
 ### Aplicação desktop no Windows
 
-O repositório inclui uma aplicação desktop baseada em Electron. O script `install.ps1` instala a CLI/TUI e, se já existir uma build desktop no checkout, pode criar atalhos para ela. **O script não instala um executável desktop isolado chamado `onethycode.exe` nem cria os comandos `onethy-tui` ou `onethycode`.**
+O repositório inclui uma aplicação desktop baseada em Electron. O script `install.ps1` instala a CLI/TUI e copia para `%LOCALAPPDATA%\Programs\OnethyCode\app` a build desktop disponível em `dist/desktop/app`, criando atalhos para o executável. Para a instalação de produção, gere o build com `OPENCODE_CHANNEL=prod` (executável `OnethyCode.exe`).
 
-Para preparar uma build desktop de desenvolvimento a partir do checkout:
+Para preparar uma build desktop de desenvolvimento a partir do checkout (canal padrão `dev`, executável `OnethyCode Dev.exe`):
 
 ```powershell
 # Na raiz do repositório, depois de bun install --frozen-lockfile
