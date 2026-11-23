@@ -20,15 +20,20 @@ await $`bun ./script/copy-icons.ts ${channel}`
 await $`bun ./script/copy-metainfo.ts ${channel}`
 
 const targetDir = getCurrentCli().package.replace("@opencode/", "")
-const built =
+let built =
   (await exists(path.join(cli, targetDir))) ||
   (await exists(path.join(cli, targetDir.replace(/-baseline$/, ""))))
 
-if (channel === "prod" && !built)
-  throw new Error(`Production desktop builds bundle the CLI from ${cli}; build it first`)
+if (channel === "prod" && !built) {
+  console.log(`[desktop] Matching production CLI not found in ${cli}; building it for the current target...`)
+  await $`bun run --cwd ../cli build --single`
+  built =
+    (await exists(path.join(cli, targetDir))) ||
+    (await exists(path.join(cli, targetDir.replace(/-baseline$/, ""))))
+  if (!built) throw new Error(`CLI build completed but the expected artifact is still missing: ${path.join(cli, targetDir)}`)
+}
 
 if (built) await copyBuiltCliToResources(cli)
-
-if (!built) await downloadCliToResources(channel === "beta" ? "beta" : undefined)
+else await downloadCliToResources(channel === "beta" ? "beta" : undefined)
 
 await $`bunx electron-vite build`
