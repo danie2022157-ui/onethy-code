@@ -56,16 +56,15 @@ case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
     DESKTOP_SOURCE="$DIR/dist/desktop/app"
     DESKTOP_EXE="${DESKTOP_SOURCE}/OnethyCode.exe"
-    if [ ! -f "$DESKTOP_EXE" ]; then DESKTOP_EXE="${DESKTOP_SOURCE}/OnethyCode Dev.exe"; fi
     if [ -f "$DESKTOP_EXE" ]; then
       DESKTOP_INSTALL="$LOCALAPPDATA/Programs/OnethyCode/app"
       mkdir -p "$(dirname "$DESKTOP_INSTALL")"
       rm -rf "$(dirname "$DESKTOP_INSTALL")"
       cp -R "$DESKTOP_SOURCE" "$(dirname "$DESKTOP_INSTALL")"
-      powershell.exe -NoProfile -Command "\$ws = New-Object -ComObject WScript.Shell; \$paths = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs')); foreach (\$folder in \$paths) { if (Test-Path \$folder) { \$shortcut = \$ws.CreateShortcut((Join-Path \$folder 'OnethyCode.lnk')); \$shortcut.TargetPath = (Join-Path '$DESKTOP_INSTALL' (Split-Path '$DESKTOP_EXE' -Leaf)); \$shortcut.WorkingDirectory = '$DESKTOP_INSTALL'; \$shortcut.Save() } }"
+      powershell.exe -NoProfile -Command "\$ws = New-Object -ComObject WScript.Shell; \$paths = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs')); foreach (\$folder in \$paths) { if (Test-Path \$folder) { \$shortcut = \$ws.CreateShortcut((Join-Path \$folder 'OnethyCode.lnk')); \$shortcut.TargetPath = (Join-Path '$DESKTOP_INSTALL' 'OnethyCode.exe'); \$shortcut.WorkingDirectory = '$DESKTOP_INSTALL'; \$shortcut.Save() } }"
       echo "OnethyCode desktop installed at: ${DESKTOP_INSTALL}"
     else
-      echo "[INFO] Desktop build not found at ${DESKTOP_EXE}; build packages/desktop with OPENCODE_CHANNEL=prod first."
+      echo "[INFO] Production desktop build not found at ${DESKTOP_EXE}; build packages/desktop with OPENCODE_CHANNEL=prod first."
     fi
     ;;
 esac

@@ -45,21 +45,21 @@ onethy
 .\uninstall.ps1
 ```
 
-**Linux / macOS**
+**Linux / macOS (CLI/TUI)**
 
 ```bash
 git clone https://github.com/danie2022157-ui/onethy-code.git
 cd onethy-code
 bun install --frozen-lockfile
-OPENCODE_CHANNEL=prod bun run --cwd packages/desktop build
-OPENCODE_CHANNEL=prod bun run --cwd packages/desktop pack
 bash ./install.sh
 onethy
 ```
 
+O `install.sh` instala a CLI/TUI. Para pacotes desktop Linux/macOS, use as instruções de build e distribuição em [`packages/desktop/README.md`](packages/desktop/README.md).
+
 > **No Windows, o instalador também copia o OnethyCode.exe (aplicação desktop Electron de produção)** para `%LOCALAPPDATA%\Programs\OnethyCode` e cria atalhos na Área de Trabalho e no Menu Iniciar. O executável desktop passa a funcionar independentemente do checkout clonado. Linux/macOS continuam usando os pacotes de desktop específicos da plataforma.
 >
-> **Importante**: execute os comandos de build desktop com `OPENCODE_CHANNEL=prod` **antes** do `install.ps1`/`install.sh` para gerar o build de produção (`OnethyCode.exe`). O checkout clonado continua sendo necessário para a CLI `onethy`/`onethy-code`.
+> **Importante**: no Windows, execute os comandos de build desktop com `OPENCODE_CHANNEL=prod` **antes** do `install.ps1` para gerar o build de produção (`OnethyCode.exe`). O checkout clonado continua sendo necessário para a CLI `onethy`/`onethy-code`.
 
 Abra `/help`, conecte o provedor em `/connect` e consulte `/models`. Leia [requisitos e instruções completas](#instalação-e-primeiros-passos).
 

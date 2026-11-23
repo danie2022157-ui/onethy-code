@@ -289,50 +289,42 @@ Set-Content -Path $omnicodeCmd -Value $cmdContent -Encoding ASCII
 Write-Host "[OK] Comandos 'onethy', 'onethy-code' e aliases instalados em: $targetDir" -ForegroundColor Green
 Write-Host "[OK] Agora voce pode abrir qualquer terminal e digitar 'onethy' diretamente!" -ForegroundColor Green
 
-# Instala o executavel desktop OnethyCode.exe (producao) em um local permanente,
-# independente do checkout clonado, para que continue funcionando mesmo
-# se o checkout for movido ou removido.
+# Instala apenas o executavel de producao; nunca instala uma build dev por engano.
 $desktopAppSource = Join-Path $currentDir "dist\desktop\app"
-if (Test-Path -LiteralPath $desktopAppSource -PathType Container) {
-  $desktopExeCandidate = Join-Path $desktopAppSource "OnethyCode.exe"
-  if (-not (Test-Path -LiteralPath $desktopExeCandidate -PathType Leaf)) {
-    $desktopExeCandidate = Join-Path $desktopAppSource "OnethyCode Dev.exe"
-  }
-  if (Test-Path -LiteralPath $desktopExeCandidate -PathType Leaf) {
-    $desktopInstallRoot = Join-Path $env:LOCALAPPDATA "Programs\OnethyCode"
-    $desktopInstallApp = Join-Path $desktopInstallRoot "app"
-    try {
-      Remove-Item -LiteralPath $desktopInstallRoot -Recurse -Force -ErrorAction SilentlyContinue
-      Copy-Item -LiteralPath $desktopAppSource -Destination $desktopInstallApp -Recurse -Force
-      Write-Host "[OK] Aplicacao desktop instalada em: $desktopInstallRoot" -ForegroundColor Green
-      $installedExe = Join-Path $desktopInstallApp (Split-Path $desktopExeCandidate -Leaf)
-      $wsh = New-Object -ComObject WScript.Shell
-      $iconPath = Join-Path $currentDir "packages\desktop\resources\icons\icon.ico"
-      $shortcutFolders = @(
-        [Environment]::GetFolderPath("Desktop"),
-        [Environment]::GetFolderPath("Programs")
-      ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_ -PathType Container) }
-      foreach ($folder in $shortcutFolders) {
-        $lnkPath = Join-Path $folder "OnethyCode.lnk"
-        $shortcut = $wsh.CreateShortcut($lnkPath)
-        $shortcut.TargetPath = $installedExe
-        $shortcut.WorkingDirectory = $desktopInstallApp
-        $shortcut.Description = "OnethyCode — AI Coding Studio Desktop"
-        if (Test-Path -LiteralPath $iconPath -PathType Leaf) {
-          $shortcut.IconLocation = "$iconPath,0"
-        } else {
-          $shortcut.IconLocation = "$installedExe,0"
-        }
-        $shortcut.Save()
+$desktopExeCandidate = Join-Path $desktopAppSource "OnethyCode.exe"
+if (Test-Path -LiteralPath $desktopExeCandidate -PathType Leaf) {
+  $desktopInstallRoot = Join-Path $env:LOCALAPPDATA "Programs\OnethyCode"
+  $desktopInstallApp = Join-Path $desktopInstallRoot "app"
+  try {
+    Remove-Item -LiteralPath $desktopInstallRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Copy-Item -LiteralPath $desktopAppSource -Destination $desktopInstallApp -Recurse -Force
+    Write-Host "[OK] Aplicacao desktop de producao instalada em: $desktopInstallRoot" -ForegroundColor Green
+    $installedExe = Join-Path $desktopInstallApp "OnethyCode.exe"
+    $wsh = New-Object -ComObject WScript.Shell
+    $iconPath = Join-Path $currentDir "packages\desktop\resources\icons\icon.ico"
+    $shortcutFolders = @(
+      [Environment]::GetFolderPath("Desktop"),
+      [Environment]::GetFolderPath("Programs")
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_ -PathType Container) }
+    foreach ($folder in $shortcutFolders) {
+      $lnkPath = Join-Path $folder "OnethyCode.lnk"
+      $shortcut = $wsh.CreateShortcut($lnkPath)
+      $shortcut.TargetPath = $installedExe
+      $shortcut.WorkingDirectory = $desktopInstallApp
+      $shortcut.Description = "OnethyCode — AI Coding Studio Desktop"
+      if (Test-Path -LiteralPath $iconPath -PathType Leaf) {
+        $shortcut.IconLocation = "$iconPath,0"
+      } else {
+        $shortcut.IconLocation = "$installedExe,0"
       }
-      Write-Host "[OK] Atalhos do OnethyCode criados na Area de Trabalho e no Menu Iniciar!" -ForegroundColor Green
-    } catch {
-      Write-Warning "Nao foi possivel instalar o executavel desktop OnethyCode: $_"
+      $shortcut.Save()
     }
+    Write-Host "[OK] Atalhos do OnethyCode criados na Area de Trabalho e no Menu Iniciar!" -ForegroundColor Green
+  } catch {
+    Write-Warning "Nao foi possivel instalar o executavel desktop OnethyCode: $_"
   }
 } else {
-  Write-Host "[INFO] Build desktop nao encontrado em dist\desktop\app. Execute:" -ForegroundColor Yellow
-  Write-Host "  \$env:OPENCODE_CHANNEL='prod'; bun run --cwd packages/desktop build; bun run --cwd packages/desktop pack" -ForegroundColor Yellow
+  Write-Host "[INFO] Build desktop de producao nao encontrado em dist\desktop\app\OnethyCode.exe. Gere-a com OPENCODE_CHANNEL=prod antes de executar o instalador." -ForegroundColor Yellow
 }
 Write-Host "==========================================================" -ForegroundColor Cyan
 
