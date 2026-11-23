@@ -58,8 +58,23 @@ if (!app && os === "mac") {
 if (!app && os === "win") {
   await $`bunx electron-builder ${flags} --dir`
   const unpacked = path.join("dist", cli.cpu === "arm64" ? "win-arm64-unpacked" : "win-unpacked")
+  const executableNames = ["OnethyCode.exe", "OpenCode.exe"]
+  let executable: string | undefined
+  for (const name of executableNames) {
+    if (await Bun.file(path.join(unpacked, name)).exists()) {
+      executable = name
+      break
+    }
+  }
+  if (!executable) {
+    throw new Error(`Windows desktop packaging did not produce OnethyCode.exe or OpenCode.exe in ${unpacked}. Check electron-builder output above.`)
+  }
   await writeUpdateConfig(path.join(unpacked, "resources"))
   await cp(unpacked, path.join(out, "app"), { recursive: true })
+  if (!(await Bun.file(path.join(out, "app", executable)).exists())) {
+    throw new Error(`Desktop executable was not copied to ${path.join(out, "app", executable)}`)
+  }
+  console.log(`[desktop] Windows app packaged successfully: ${path.join(out, "app", executable)}`)
 }
 
 // electron-builder writes resources/app-update.yml only for dmg, zip and nsis targets, not for --dir builds.
