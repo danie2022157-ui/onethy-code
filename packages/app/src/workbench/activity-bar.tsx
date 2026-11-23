@@ -24,7 +24,7 @@ type ActivityItem = {
   id: ActivityView
   en: string
   pt: string
-  shortcut: string
+  shortcut?: string
   icon: Component<{ class?: string; size?: number }>
 }
 
@@ -33,11 +33,11 @@ const ITEMS: readonly ActivityItem[] = [
   { id: "search", en: "Global Search", pt: "Busca Global", shortcut: "Ctrl+Shift+F", icon: SearchCodeIcon },
   { id: "git", en: "Git & Worktrees", pt: "Git & Worktrees", shortcut: "Ctrl+Shift+G", icon: GitBranchIcon },
   { id: "agents", en: "Agents & Approvals", pt: "Agentes & Aprovações", shortcut: "Ctrl+Shift+A", icon: AgentsIcon },
-  { id: "sessions", en: "Sessions & Projects", pt: "Sessões & Projetos", shortcut: "Ctrl+Shift+S", icon: SessionsIcon },
-  { id: "mcp", en: "MCP Servers", pt: "Servidores MCP", shortcut: "Ctrl+Shift+P", icon: McpPlugIcon },
-  { id: "skills", en: "Skills & Customizations", pt: "Skills & Customizações", shortcut: "Ctrl+Shift+K", icon: SkillsSparkIcon },
-  { id: "extensions", en: "Extensions & Plugins", pt: "Extensões & Plugins", shortcut: "Ctrl+Shift+X", icon: ExtensionsBlocksIcon },
-  { id: "models", en: "Models & Omni Fusion", pt: "Modelos & Omni Fusion", shortcut: "Ctrl+Shift+L", icon: ModelsChipIcon },
+  { id: "sessions", en: "Sessions & Projects", pt: "Sessões & Projetos", icon: SessionsIcon },
+  { id: "mcp", en: "MCP Servers", pt: "Servidores MCP", icon: McpPlugIcon },
+  { id: "skills", en: "Skills & Customizations", pt: "Skills & Customizações", icon: SkillsSparkIcon },
+  { id: "extensions", en: "Extensions & Plugins", pt: "Extensões & Plugins", icon: ExtensionsBlocksIcon },
+  { id: "models", en: "Models & Omni Fusion", pt: "Modelos & Omni Fusion", icon: ModelsChipIcon },
 ]
 
 export function ActivityBar() {
@@ -142,7 +142,9 @@ export function ActivityBar() {
                 value={
                   <span class="flex items-center gap-2">
                     <span>{label()}</span>
-                    <span class="opacity-65 text-[10px]">{item.shortcut}</span>
+                    <Show when={item.shortcut}>
+                      {(shortcut) => <span class="opacity-65 text-[10px]">{shortcut()}</span>}
+                    </Show>
                   </span>
                 }
               >

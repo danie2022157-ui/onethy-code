@@ -36,6 +36,16 @@ describe("workbench state persistence", () => {
     expect(parsed.bottomHeight).toBe(clampBottomHeight(40))
   })
 
+  test("clamps the bottom panel to the available height on short viewports", () => {
+    const original = window.innerHeight
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 200 })
+    try {
+      expect(clampBottomHeight(560)).toBe(140)
+    } finally {
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: original })
+    }
+  })
+
   test("falls back per-field when enum values are unknown", () => {
     const parsed = parseWorkbenchState(
       JSON.stringify({

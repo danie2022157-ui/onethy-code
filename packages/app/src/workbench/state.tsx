@@ -93,7 +93,7 @@ export function clampSidebarWidth(width: number) {
 }
 
 export function clampBottomHeight(height: number) {
-  const max = typeof window === "undefined" ? 560 : Math.max(260, Math.round(window.innerHeight * 0.65))
+  const max = typeof window === "undefined" ? 560 : Math.max(140, Math.min(560, Math.round(window.innerHeight * 0.65)))
   return Math.max(140, Math.min(max, Math.round(height)))
 }
 

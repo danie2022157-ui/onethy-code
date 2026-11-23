@@ -15,7 +15,7 @@ const BOTTOM_TAB_IDS: readonly BottomTab[] = ["terminal", "output", "problems", 
 
 function computeMaxHeight() {
   if (typeof window === "undefined") return 560
-  return Math.max(260, Math.round(window.innerHeight * 0.65))
+  return Math.max(140, Math.min(560, Math.round(window.innerHeight * 0.65)))
 }
 
 function MaximizeIcon(props: { maximized: boolean }) {

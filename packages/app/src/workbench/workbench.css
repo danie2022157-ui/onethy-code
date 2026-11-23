@@ -31,6 +31,11 @@
   background: color-mix(in srgb, var(--v2-background-bg-accent) 13%, transparent);
 }
 
+[data-slot="workbench-activity-item"]:focus-visible {
+  outline: 2px solid var(--v2-border-border-focus);
+  outline-offset: 2px;
+}
+
 [data-slot="workbench-activity-item"][data-active="true"]::before {
   content: "";
   position: absolute;
@@ -119,25 +124,6 @@
 [data-slot="workbench-status-item"]:hover {
   color: var(--v2-text-text-base);
   background: var(--v2-overlay-simple-overlay-hover);
-}
-
-[data-slot="workbench-scroll"] {
-  scrollbar-width: thin;
-  scrollbar-color: var(--v2-border-border-strong) transparent;
-}
-
-[data-slot="workbench-scroll"]::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-
-[data-slot="workbench-scroll"]::-webkit-scrollbar-thumb {
-  background: var(--v2-border-border-base);
-  border-radius: 999px;
-}
-
-[data-slot="workbench-scroll"]::-webkit-scrollbar-thumb:hover {
-  background: var(--v2-border-border-strong);
 }
 
 @keyframes onethy-pulse-dot {
