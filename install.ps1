@@ -1,4 +1,4 @@
-# OnethyCode - Instalador Global para Windows
+﻿# OnethyCode - Instalador Global para Windows
 $ErrorActionPreference = "Stop"
 try {
   [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -332,5 +332,36 @@ if ($env:ONETHY_SKIP_PRECOMPILE -ne "1" -and $env:GITHUB_ACTIONS -ne "true" -and
     } catch {
       Write-Warning "Unable to build optional local CLI cache: $_"
     }
+  }
+}
+
+$desktopExe = Join-Path $currentDir "dist\desktop\app\OnethyCode.exe"
+if (-not (Test-Path -LiteralPath $desktopExe -PathType Leaf)) {
+  $desktopExe = Join-Path $currentDir "dist\desktop\app\OpenCode.exe"
+}
+if (Test-Path -LiteralPath $desktopExe -PathType Leaf) {
+  try {
+    $wsh = New-Object -ComObject WScript.Shell
+    $iconPath = Join-Path $currentDir "packages\desktop\resources\icons\icon.ico"
+    $shortcutFolders = @(
+      [Environment]::GetFolderPath("Desktop"),
+      [Environment]::GetFolderPath("Programs")
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_ -PathType Container) }
+    foreach ($folder in $shortcutFolders) {
+      $lnkPath = Join-Path $folder "OnethyCode.lnk"
+      $shortcut = $wsh.CreateShortcut($lnkPath)
+      $shortcut.TargetPath = $desktopExe
+      $shortcut.WorkingDirectory = $currentDir
+      $shortcut.Description = "OnethyCode — Multi-Agent AI Coding Studio"
+      if (Test-Path -LiteralPath $iconPath -PathType Leaf) {
+        $shortcut.IconLocation = "$iconPath,0"
+      } else {
+        $shortcut.IconLocation = "$desktopExe,0"
+      }
+      $shortcut.Save()
+    }
+    Write-Host "[OK] Atalho do Aplicativo Desktop 'OnethyCode' criado na Area de Trabalho e no Menu Iniciar!" -ForegroundColor Green
+  } catch {
+    Write-Warning "Nao foi possivel criar atalho do OnethyCode Desktop: $_"
   }
 }

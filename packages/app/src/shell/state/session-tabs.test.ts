@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import {
   closeSessionTab,
+  copySessionTabs,
   moveSessionTab,
   openSessionTab,
   placeSessionTabs,
@@ -136,6 +137,25 @@ test.each<{ name: string; run: () => SessionTabs; expected: SessionTabs }>([
   },
 ])("$name", ({ run, expected }) => {
   expect(run()).toEqual(expected)
+})
+
+test("copy duplicates tab placement state without sharing mutable collections", () => {
+  const source: SessionTabs = {
+    all: [A, T1],
+    active: T1,
+    panes: { [T1]: "bottom" },
+    selected: { side: A, bottom: T1 },
+  }
+  const copied = copySessionTabs(source)
+
+  expect(copied).toEqual(source)
+  expect(copied.all).not.toBe(source.all)
+  expect(copied.panes).not.toBe(source.panes)
+  expect(copied.selected).not.toBe(source.selected)
+})
+
+test("copy treats a missing session as an empty strip", () => {
+  expect(copySessionTabs(undefined)).toEqual({ all: [] })
 })
 
 test("closing the selected tab of a pane selects its neighbour in the same pane", () => {

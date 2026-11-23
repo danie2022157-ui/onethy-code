@@ -273,7 +273,7 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
     forget(entry.conn, entry.session.id)
     queryClient.setQueryData<SessionInfo[]>(
       [archivedAt === undefined ? "inbox-sessions" : "inbox-archived-sessions", entry.conn],
-      (current) => current && [session, ...current],
+      (current) => (current ? [session, ...current] : [session]),
     )
   }
 

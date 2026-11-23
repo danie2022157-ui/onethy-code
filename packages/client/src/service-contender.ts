@@ -16,11 +16,14 @@ export function spawnServiceContender(
   args: ReadonlyArray<string>,
   env?: Readonly<Record<string, string | undefined>>,
 ): ServiceContender {
+  const mergedEnv = Object.fromEntries(
+    Object.entries({ ...process.env, ...env }).filter(([, value]) => value !== undefined),
+  )
   const child = spawn(command, args, {
     detached: true,
     windowsHide: true,
     stdio: ["ignore", "ignore", "pipe"],
-    env: { ...process.env, ...env },
+    env: mergedEnv,
   })
   let error: Error | undefined
   let closed = false

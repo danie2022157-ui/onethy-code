@@ -1,5 +1,13 @@
 #!/usr/bin/env bun
 
+if (process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1") {
+  process.env.OMNICODE_ACTIVE ??= "1"
+  process.env.ONETHY_ACTIVE ??= "1"
+  process.env.ONETHY_ANTIGRAVITY_AUTH ??= "1"
+  process.env.OPENCODE_CLI_NAME ??= "onethy"
+  process.env.OPENCODE_THEME ??= "onethy"
+}
+
 import { ensurePluginRuntime } from "@opencode/plugin/runtime"
 import { NodeRuntime, NodeServices } from "@effect/platform-node"
 import { Cause, Effect } from "effect"

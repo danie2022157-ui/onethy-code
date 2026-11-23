@@ -2,9 +2,9 @@ import { createEffect, For, on, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import { prefersReducedMotion } from "@opencode/ui/motion"
 
-const target = ["o", "p", "e", "n", "c", "o", "d", "e"] as const
+const target = ["o", "n", "e", "t", "h", "y", "c", "o", "d", "e"] as const
 
-const choices = ["o", "p", "e", "n", "c", "d"] as const
+const choices = ["o", "n", "e", "t", "h", "y", "c", "d"] as const
 
 export function AnimatedWordmark(props: { active: boolean }) {
   const [state, setState] = createStore({ letters: [...target] })
@@ -48,7 +48,7 @@ export function AnimatedWordmark(props: { active: boolean }) {
   onCleanup(() => timers.forEach(clearTimeout))
 
   return (
-    <svg class="settings-about-wordmark" viewBox="0 0 234 42" aria-hidden="true">
+    <svg class="settings-about-wordmark" viewBox="0 0 294 42" aria-hidden="true">
       <defs>
         <symbol id="settings-about-letter-o" viewBox="0 0 24 42">
           <path class="settings-about-letter-shadow" d="M18 30H6V18H18V30Z" />
@@ -65,6 +65,18 @@ export function AnimatedWordmark(props: { active: boolean }) {
         <symbol id="settings-about-letter-n" viewBox="0 0 24 42">
           <path class="settings-about-letter-shadow" d="M18 36H6V18H18V36Z" />
           <path d="M18 12H6V36H0V6H18V12ZM24 36H18V12H24V36Z" />
+        </symbol>
+        <symbol id="settings-about-letter-t" viewBox="0 0 24 42">
+          <path class="settings-about-letter-shadow" d="M24 36H0V12H9V36ZM15 36V12H24V36Z" />
+          <path d="M24 12H15V36H9V12H0V6H24V12Z" />
+        </symbol>
+        <symbol id="settings-about-letter-h" viewBox="0 0 24 42">
+          <path class="settings-about-letter-shadow" d="M18 36H6V24H18V36Z" />
+          <path d="M6 6V18H18V6H24V36H18V24H6V36H0V6H6Z" />
+        </symbol>
+        <symbol id="settings-about-letter-y" viewBox="0 0 24 42">
+          <path class="settings-about-letter-shadow" d="M18 18H6V6H18V18Z" />
+          <path d="M6 6V18H18V6H24V24H15V36H9V24H0V6H6Z" />
         </symbol>
         <symbol id="settings-about-letter-c" viewBox="0 0 24 42">
           <path class="settings-about-letter-shadow" d="M24 30H6V18H24V30Z" />

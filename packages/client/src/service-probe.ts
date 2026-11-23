@@ -37,6 +37,14 @@ function fail(message: string) {
 
 /** The default registration file. */
 export function fallback() {
+  if (process.env["OMNICODE_ACTIVE"] === "1" || process.env["ONETHY_ACTIVE"] === "1") {
+    const stateDir =
+      process.env["OMNICODE_STATE_DIR"] ??
+      (process.platform === "win32"
+        ? join(process.env["LOCALAPPDATA"] ?? join(homedir(), "AppData", "Local"), "omnicode", "state")
+        : join(process.env["XDG_STATE_HOME"] ?? join(homedir(), ".local", "state"), "omnicode"))
+    return join(stateDir, "service.json")
+  }
   return join(process.env["XDG_STATE_HOME"] ?? join(homedir(), ".local", "state"), "opencode", "service.json")
 }
 

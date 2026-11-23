@@ -1,7 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512"><svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="512" height="512" fill="#131010"></rect>
-<path d="M320 224V352H192V224H320Z" fill="#5A5858"></path>
-<path fill-rule="evenodd" clip-rule="evenodd" d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" fill="white"></path>
-</svg><style>@media (prefers-color-scheme: light) { :root { filter: none; } }
-@media (prefers-color-scheme: dark) { :root { filter: none; } }
-</style></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="onethy-bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#040711"/>
+      <stop offset="100%" stop-color="#0B132B"/>
+    </linearGradient>
+    <linearGradient id="onethy-crescent" x1="96" y1="80" x2="360" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00F5FF"/>
+      <stop offset="55%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="onethy-hex" x1="220" y1="160" x2="390" y2="340" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00F5FF"/>
+      <stop offset="100%" stop-color="#D946EF"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#onethy-bg)" stroke="url(#onethy-crescent)" stroke-width="10" stroke-opacity="0.55"/>
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M246 112C166.471 112 102 176.471 102 256C102 335.529 166.471 400 246 400C287.2 400 324.36 382.68 350.6 354.92C333.24 362.58 314.04 366.8 293.8 366.8C216.04 366.8 153 303.76 153 226C153 176.3 178.74 132.62 217.6 107.6C226.9 109.1 236.35 112 246 112Z" fill="url(#onethy-crescent)"/>
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M300 174L358 207.5V274.5L300 308L242 274.5V207.5L300 174ZM300 204L268 222.5V259.5L300 278L332 259.5V222.5L300 204Z" fill="url(#onethy-hex)"/>
+  <polygon points="300,226 313,233.5 313,248.5 300,256 287,248.5 287,233.5" fill="#F8FAFC"/>
+</svg>

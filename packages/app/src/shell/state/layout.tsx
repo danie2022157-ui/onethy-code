@@ -17,6 +17,7 @@ import { createSessionKeyReader, ensureSessionKey, pruneSessionKeys } from "./he
 import { requireServerKey } from "@/shell/routes/session"
 import {
   closeSessionTab,
+  copySessionTabs,
   moveSessionTab,
   openSessionTab,
   placeSessionTabs,
@@ -622,12 +623,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           usage.used.set(to, Date.now())
           batch(() => {
             scroll.flush(from)
-            setStore("sessionTabs", to, {
-              all: [...(current?.all ?? [])],
-              active: current?.active,
-              panes: current?.panes ? { ...current.panes } : undefined,
-              selected: current?.selected ? { ...current.selected } : undefined,
-            })
+            setStore("sessionTabs", to, copySessionTabs(current))
             setEphemeral("sessionTabPreview", to, ephemeral.sessionTabPreview[from])
             scroll.drop([to])
             setStore("sessionView", to, {

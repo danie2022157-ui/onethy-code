@@ -29,6 +29,7 @@ import { TextInput } from "@opencode/ui/text-input"
 import { ModelTooltip } from "./tooltip"
 import { ModelDetails } from "./details"
 import { useLanguage } from "@/runtime/i18n/language"
+import { useOnethyI18n } from "@/runtime/i18n/onethy"
 import { ExternalLink } from "@/runtime/platform/external-link"
 import { useData } from "@/runtime/server/current"
 import { useWorkspaceLocation } from "@/workspaces/location"
@@ -45,6 +46,9 @@ import {
   ProviderModelSections,
 } from "@/providers/models/provider-group"
 import { consoleProviderName } from "@/providers/catalog/console"
+import { DialogFusionModels } from "./fusion-dialog"
+import { BoltIcon } from "./fusion-icons"
+import { useFusion } from "./fusion"
 import "@/settings/settings.css"
 import "@/shell/commands/dialog.css"
 import "./select-dialog.css"
@@ -610,6 +614,7 @@ function ChatgptPlanFooter() {
 export function DialogSelectModel(props: { provider?: string; model?: ModelState }) {
   const dialog = useDialog()
   const language = useLanguage()
+  const { tr, locale } = useOnethyI18n()
 
   const controller = createModelSelectorController({
     model: props.model,
@@ -662,8 +667,12 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
   const variant = (item: ModelItem) =>
     modelKey(item) in staged ? (staged[modelKey(item)] ?? undefined) : controller.variant(item)
 
-  const choose = (item: ModelItem, value?: string | null) =>
+  const fusion = useFusion()
+
+  const choose = (item: ModelItem, value?: string | null) => {
+    fusion.disable()
     controller.select(item, value === undefined ? staged[modelKey(item)] : value)
+  }
 
   const setSearch = (value: string) => setStore({ search: value, flyout: "", keyboard: true, navigated: false })
 
@@ -678,6 +687,10 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
     const { DialogConnectProvider } = await import("@/providers/connect/dialog")
     // The model chosen after connecting applies to this composer.
     void dialog.show(() => <DialogConnectProvider directory={location().directory} selection={props.model} />)
+  }
+
+  const openFusion = () => {
+    void dialog.show(() => <DialogFusionModels selection={props.model} onClose={() => dialog.close()} />)
   }
 
   const triangle = createSafeTriangle({
@@ -984,6 +997,14 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
             placeholder={language.t("dialog.model.search.placeholder")}
             trailing={
               <>
+                <Tooltip placement="top" gutter={4} value="Onethy Fusion Matrix" ignoreSafeArea={false}>
+                  <IconButton
+                    variant="ghost-muted"
+                    icon={<BoltIcon class="size-3.5" />}
+                    aria-label="Onethy Fusion Matrix"
+                    onClick={openFusion}
+                  />
+                </Tooltip>
                 <Tooltip
                   placement="top"
                   gutter={4}
@@ -1024,6 +1045,42 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
           >
             {(row, attrs) => <Row model={row()} attrs={attrs} />}
           </SearchList>
+        </div>
+        <div class="flex items-center justify-between gap-2 px-3 py-2 border-t border-v2-border-border-base bg-v2-surface-surface-raised shrink-0">
+          <button
+            type="button"
+            class="flex items-center gap-2 text-left text-xs rounded-md px-2 py-1 transition-colors cursor-pointer"
+            classList={{
+              "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold": fusion.enabled(),
+              "text-v2-text-text-muted hover:text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover":
+                !fusion.enabled(),
+            }}
+            onClick={() => {
+              fusion.toggleEnabled()
+
+              if (fusion.enabled()) dialog.close()
+            }}
+          >
+            <BoltIcon class="size-3.5 shrink-0" />
+            <span>
+              {fusion.enabled()
+                ? tr(
+                    "Auto Mode (Omni Fusion · {{tier}}) ACTIVE — click to disable",
+                    "Auto Mode (Omni Fusion · {{tier}}) ATIVO — clique para desativar",
+                    { tier: fusion.tierLabel(undefined, locale()) },
+                  )
+                : tr(
+                    "Enable Auto Mode (Omni Fusion) — automatic selection by complexity",
+                    "Ativar Auto Mode (Omni Fusion) — seleção automática por complexidade",
+                  )}
+            </span>
+          </button>
+          <Button size="small" variant="neutral" onClick={openFusion}>
+            <span class="inline-flex items-center gap-1.5">
+              <Icon name="dot-grid" size="small" />
+              <span>Fusion Matrix</span>
+            </span>
+          </Button>
         </div>
         <Show when={chatgptPlan()}>
           <ChatgptPlanFooter />

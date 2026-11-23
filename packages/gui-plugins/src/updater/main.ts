@@ -10,7 +10,8 @@ const setup: Plugin.MainSetup = async (ctx) => {
   const builtin = builtinMainContext(ctx)
   const build = ctx.app
   const lifecycle = builtin.lifecycle
-  const enabled = build.packaged
+  const isOnethy = process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1"
+  const enabled = isOnethy || build.packaged
   // Holds no resources, so it needs no cleanup.
   const context = logContext(ctx.log.write)
   const runPromise = Effect.runPromiseWith(context)
@@ -23,10 +24,12 @@ const setup: Plugin.MainSetup = async (ctx) => {
     from: { settings: "ready", file: "opencode.updater" },
   })
 
-  // electron-updater loads only in packaged builds, after the first window is up.
-  const platform = enabled
-    ? await import("./platform").then((module) => runPromise(module.make(build.channel)))
-    : undefined
+  // OnethyCode connects directly to danie2022157-ui/onethy-code (Git + GitHub Releases).
+  const platform = isOnethy
+    ? await import("./onethy-platform").then((module) => runPromise(module.make(build.version)))
+    : enabled
+      ? await import("./platform").then((module) => runPromise(module.make(build.channel)))
+      : undefined
 
   if (ctx.signal.aborted) return
   const scope = Scope.makeUnsafe()
@@ -68,6 +71,7 @@ const setup: Plugin.MainSetup = async (ctx) => {
         dialog.showMessageBox({
           type: "error",
           message: ctx.t("dialog.checkFailed.message"),
+          detail: state.message,
           title: ctx.t("dialog.checkFailed.title"),
         }),
       )
@@ -84,6 +88,21 @@ const setup: Plugin.MainSetup = async (ctx) => {
         }),
       )
 
+      return
+    }
+
+    if (state.status === "download-required") {
+      const response = yield* promise(() =>
+        dialog.showMessageBox({
+          type: "info",
+          message: ctx.t("dialog.ready.message", { version: state.version }),
+          title: ctx.t("dialog.ready.title"),
+          buttons: [ctx.t("action.download"), ctx.t("dialog.later")],
+          defaultId: 0,
+          cancelId: 1,
+        }),
+      )
+      if (response.response === 0) yield* updater.install
       return
     }
 

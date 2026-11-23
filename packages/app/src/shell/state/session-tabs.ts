@@ -223,3 +223,13 @@ export function closeSessionTab(current: SessionTabState, tab: string): SessionT
     preview,
   }
 }
+
+/** Copies tab strip, panes, and selection from one session to another. Pure data transformation. */
+export function copySessionTabs(from: SessionTabs | undefined): SessionTabs {
+  return {
+    all: [...(from?.all ?? [])],
+    active: from?.active,
+    panes: from?.panes ? { ...from.panes } : undefined,
+    selected: from?.selected ? { ...from.selected } : undefined,
+  }
+}

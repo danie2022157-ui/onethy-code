@@ -17,6 +17,8 @@ export function serviceVersion(input: {
 
   if (input.channel === "beta" && !input.isolated) return undefined
 
+  if (process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1") return undefined
+
   return input.version
 }
 

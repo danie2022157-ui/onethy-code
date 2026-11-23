@@ -25,6 +25,7 @@ import {
 import { createStore } from "solid-js/store"
 import { useParams } from "@solidjs/router"
 import { useLanguage } from "@/runtime/i18n/language"
+import { useOnethyI18n } from "@/runtime/i18n/onethy"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useServerSDK } from "@/runtime/server/client"
 import { useData } from "@/runtime/server/current"
@@ -51,6 +52,8 @@ import {
 } from "./controller"
 import { ConsoleAuthorization } from "./console"
 import { DialogChatGPTPlanWelcome } from "./chatgpt-welcome"
+import { DialogAddCustomProvider, DialogManageCustomProvider } from "./dialog-custom"
+import { extractCustomProviders } from "@opencode/client/custom-provider"
 import { authServerName, RemoteAuthNotice } from "./remote"
 import { providerAccounts, type ProviderAccount } from "@/settings/providers/accounts"
 import { AccountNameInput } from "@/settings/providers/account-name"
@@ -265,17 +268,22 @@ export const DialogConnectProvider: Component<{
   )
 }
 
-// The TUI's integration groups and order, with connected integrations pulled up into their own group first.
-const POPULAR = ["opencode", "opencode-go", "openai", "github-copilot", "anthropic", "google"]
+// Matches the TUI's ALLOWED_INTEGRATIONS: only popular & connected providers (plus custom providers & MCP), no Services list.
+const POPULAR = ["opencode", "opencode-go", "openai", "github-copilot", "anthropic", "google", "xai"]
 
 function ProviderPicker(props: { directory?: string; onSelect: (provider: string) => void; onPrepare?: () => void }) {
+  const dialog = useDialog()
   const integrations = useIntegrations(() => props.directory)
   const language = useLanguage()
+  const { tr } = useOnethyI18n()
   const data = useData()
   const location = () => (props.directory ? { directory: props.directory } : undefined)
   const mcpServers = () => data.location.mcp.server.list(location()) ?? []
 
-  createEffect(() => void data.location.mcp.server.sync(location()).catch(() => undefined))
+  createEffect(() => {
+    void data.location.mcp.server.sync(location()).catch(() => undefined)
+    void data.location.config.sync(location()).catch(() => undefined)
+  })
 
   const [store, setStore] = createStore<{
     filter: string
@@ -284,12 +292,26 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
     filter: "",
   })
 
-  const all = createMemo(() => {
+  const customProviders = createMemo(() => {
+    const list = extractCustomProviders(data.location.config.list(location()) ?? [])
     const query = store.filter.trim().toLowerCase()
 
-    if (!query) return integrations.list()
+    if (!query) return list
 
-    return integrations.list().filter((row) => `${row.id} ${row.name}`.toLowerCase().includes(query))
+    return list.filter((item) => `${item.id} ${item.name} ${item.baseURL ?? ""}`.toLowerCase().includes(query))
+  })
+
+  const customIDs = createMemo(() => new Set(extractCustomProviders(data.location.config.list(location()) ?? []).map((item) => item.id)))
+
+  const all = createMemo(() => {
+    const query = store.filter.trim().toLowerCase()
+    const base = integrations
+      .list()
+      .filter((row) => !customIDs().has(row.id))
+
+    if (!query) return base
+
+    return base.filter((row) => `${row.id} ${row.name}`.toLowerCase().includes(query))
   })
 
   // MCP servers keep their own group whether or not they are signed in.
@@ -315,23 +337,16 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
       .toSorted((a, b) => POPULAR.indexOf(a.id) - POPULAR.indexOf(b.id)),
   )
 
-  const services = createMemo(() =>
-    unconnected()
-      .filter((row) => !POPULAR.includes(row.id))
-      .toSorted((a, b) => a.name.localeCompare(b.name)),
-  )
-
   const groups = () => [
     { title: language.t("dialog.provider.connected"), items: connected },
     { title: language.t("dialog.provider.group.mcp"), items: mcp },
     { title: language.t("dialog.provider.group.popular"), items: popular },
-    { title: language.t("dialog.provider.group.services"), items: services },
   ]
 
   // An integration that only reads environment variables has nothing to connect from here.
   const disabled = (row: IntegrationInfo) => connectMethods(row).length === 0 && providerAccounts(row).length === 0
 
-  const rows = createMemo(() => [...connected(), ...mcp(), ...popular(), ...services()].filter((row) => !disabled(row)))
+  const rows = createMemo(() => [...connected(), ...mcp(), ...popular()].filter((row) => !disabled(row)))
 
   let picker: HTMLDivElement | undefined
   let search: HTMLInputElement | undefined
@@ -384,6 +399,71 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
       </div>
       <div class="relative min-h-0 flex-1">
         <div class="flex size-full min-h-0 flex-col gap-0.5 overflow-y-auto pb-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button
+            type="button"
+            class="flex min-h-9 w-full items-center gap-2.5 rounded-md py-2 ps-2.5 pe-2 text-left text-[13px] leading-5 tracking-[-0.04px] bg-v2-surface-surface-raised hover:bg-v2-overlay-simple-overlay-hover border border-v2-border-border-base transition-colors mb-1 cursor-pointer"
+            onClick={() => {
+              void dialog.show(() => (
+                <DialogAddCustomProvider
+                  directory={props.directory}
+                  onClose={() => dialog.close()}
+                />
+              ))
+            }}
+          >
+            <div class="flex size-5 shrink-0 items-center justify-center rounded text-v2-icon-icon-base">
+              <Icon name="outline-globe-plus" size="small" />
+            </div>
+            <div class="flex flex-col min-w-0 flex-1">
+              <span class="font-medium text-v2-text-text-base">
+                {tr("Add Custom Provider", "Adicionar Provedor Personalizado")}
+              </span>
+              <span class="text-[11px] text-v2-text-text-muted">
+                {tr("Compatible with OpenAI / Cosmos / LiteLLM / Ollama", "Compatível com OpenAI / Cosmos / LiteLLM / Ollama")}
+              </span>
+            </div>
+            <Icon name="chevron-right" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+          </button>
+
+          <Show when={customProviders().length > 0}>
+            <section class="flex flex-col gap-0.5">
+              <div class="px-2 pt-2.5 pb-0.5 text-[12px] font-[440] leading-[18px] tracking-[0.05px] text-v2-text-text-faint">
+                {tr("Custom Providers", "Provedores Personalizados")}
+              </div>
+              <For each={customProviders()}>
+                {(custom) => (
+                  <button
+                    type="button"
+                    class="flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 ps-2 pe-1.5 text-left text-[13px] leading-5 tracking-[-0.04px] hover:bg-v2-overlay-simple-overlay-hover focus:bg-v2-overlay-simple-overlay-hover focus:outline-none cursor-pointer"
+                    onClick={() => {
+                      void dialog.show(() => (
+                        <DialogManageCustomProvider
+                          provider={custom}
+                          directory={props.directory}
+                          onClose={() => dialog.close()}
+                        />
+                      ))
+                    }}
+                  >
+                    <Icon name="outline-globe" size="small" class="shrink-0 text-v2-icon-icon-base" />
+                    <span class="min-w-0 truncate font-[440] text-v2-text-text-base">{custom.name}</span>
+                    <Badge class="shrink-0">{tr("{{count}} models", "{{count}} modelos", { count: custom.modelCount })}</Badge>
+                    <Show when={custom.baseURL}>
+                      {(url) => (
+                        <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-v2-text-text-faint">
+                          {url()}
+                        </span>
+                      )}
+                    </Show>
+                    <span class="ms-auto shrink-0 text-[11px] text-v2-text-text-muted">
+                      {tr("Manage", "Gerenciar")}
+                    </span>
+                    <Icon name="chevron-right" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+                  </button>
+                )}
+              </For>
+            </section>
+          </Show>
           <For each={groups()}>
             {(group) => (
               <Show when={group.items().length > 0}>

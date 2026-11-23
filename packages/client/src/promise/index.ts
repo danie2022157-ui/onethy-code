@@ -21,6 +21,9 @@ export type {
   SkillApi,
 } from "./api.js"
 export type { EventSubscribeOutput as OpenCodeEvent } from "./generated/types.js"
+export * from "../custom-provider.js"
+export * from "../memory-bank.js"
+export * from "../fusion.js"
 export type {
   MediaFileAttachment as PromptMediaFileAttachment,
   Attachment as PromptAttachment,

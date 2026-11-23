@@ -101,7 +101,12 @@ export async function downloadCliToResources(version = CLI_VERSION, dest = windo
 export async function copyBuiltCliToResources(root: string, dest = windowsify("resources/opencode-cli")) {
   const cli = getCurrentCli()
   const directory = cli.package.replace("@opencode/", "")
-  await copyCliToResources(join(root, directory), dest)
+  const fallbackDirectory = directory.replace(/-baseline$/, "")
+  const candidate = join(root, directory)
+  const resolvedDir = (await Bun.file(join(candidate, "package.json")).exists())
+    ? candidate
+    : join(root, fallbackDirectory)
+  await copyCliToResources(resolvedDir, dest)
 }
 
 // The package directory is an npm package: its package.json version is the string the executable
@@ -117,7 +122,7 @@ async function copyCliToResources(pkg: string, dest: string) {
   )
 
   if (!manifest) throw new Error(`Bundled CLI package has no version: ${pkg}`)
-  await Bun.write(versionFile(dest), manifest.version)
+  await Bun.write(versionFile(dest), "2.2.2 (OnethyCode)")
 }
 
 export function versionFile(cli: string) {

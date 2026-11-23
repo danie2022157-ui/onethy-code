@@ -70,6 +70,12 @@ export type ElectronAPI = {
   runDesktopMenuAction(action: DesktopMenuAction): Promise<void>
   setBackgroundColor(color: string): Promise<void>
   exportDebugLogs(): Promise<string>
+  readLogs(opts?: {
+    source?: string
+    level?: string
+    search?: string
+    lines?: number
+  }): Promise<{ file: string; lines: string[] }>
   setForceFocus(enabled: boolean): Promise<void>
   recordFatalRendererError(error: FatalRendererError): Promise<void>
   setNativeTranslations(bundle: DesktopNativeBundle): Promise<void>

@@ -142,7 +142,7 @@ const make = Effect.gen(function* () {
   const appProcess = yield* AppProcess.Service
   const flock = yield* EffectFlock.Service
   const installedVersion = yield* Ref.make(OPENCODE_VERSION)
-  const omniUpdateMessage = "OnethyCode has no standalone update channel yet. Update its source checkout manually."
+  const omniUpdateMessage = "OmniCode has no standalone update channel yet. Update its source checkout manually."
   const channel = OPENCODE_CHANNEL.replace(/[^a-zA-Z0-9._-]/g, "-")
   const executable = yield* fs.realPath(process.execPath).pipe(Effect.orElseSucceed(() => process.execPath))
   const installedPackage = yield* Effect.gen(function* () {
@@ -583,6 +583,37 @@ const make = Effect.gen(function* () {
   })
 
   const apply = Effect.fn("cli.updater.apply")(function* (version: string) {
+    if (process.env.ONETHY_ACTIVE === "1" && process.env.ONETHY_INSTALL_ROOT) {
+      const root = process.env.ONETHY_INSTALL_ROOT
+      yield* Effect.tryPromise({
+        try: async () => {
+          const { execFileSync } = await import("node:child_process")
+          const fsNode = await import("node:fs")
+          const os = await import("node:os")
+          const git = (...args: string[]) =>
+            execFileSync("git", args, { cwd: root, encoding: "utf8", timeout: 60_000 }).trim()
+          if (git("status", "--porcelain").length > 0) {
+            throw new Error("Local edits exist; commit or stash them before updating.")
+          }
+          git("pull", "--ff-only", "origin", "main")
+          const defaultBun = path.join(os.homedir(), ".bun", "bin", process.platform === "win32" ? "bun.exe" : "bun")
+          const bun =
+            process.env.BUN_BIN && fsNode.existsSync(process.env.BUN_BIN)
+              ? process.env.BUN_BIN
+              : fsNode.existsSync(defaultBun)
+                ? defaultBun
+                : "bun"
+          execFileSync(bun, ["install"], { cwd: root, timeout: 180_000, stdio: "pipe" })
+          const cacheScript = path.join(root, "packages", "cli", "script", "build-local-cache.ts")
+          if (fsNode.existsSync(cacheScript)) {
+            execFileSync(bun, [cacheScript], { cwd: root, timeout: 120_000, stdio: "pipe" })
+          }
+        },
+        catch: (err) => (err instanceof Error ? err : new Error(String(err))),
+      })
+      yield* Ref.set(installedVersion, version)
+      return
+    }
     if (!(yield* install(version)))
       return yield* Effect.fail(
         new Error(
@@ -592,6 +623,22 @@ const make = Effect.gen(function* () {
   })
 
   const check = Effect.fn("cli.updater.check")(function* () {
+    if (process.env.ONETHY_ACTIVE === "1" && process.env.ONETHY_INSTALL_ROOT) {
+      const root = process.env.ONETHY_INSTALL_ROOT
+      return yield* Effect.tryPromise({
+        try: async () => {
+          const { execFileSync } = await import("node:child_process")
+          const git = (...args: string[]) =>
+            execFileSync("git", args, { cwd: root, encoding: "utf8", timeout: 20_000 }).trim()
+          git("fetch", "origin", "main", "--quiet")
+          const behindCount = Number.parseInt(git("rev-list", "--count", "HEAD..origin/main"), 10)
+          if (!Number.isFinite(behindCount) || behindCount <= 0) return undefined
+          const remoteCommit = git("rev-parse", "--short=7", "origin/main")
+          return { type: "available" as const, version: `${OPENCODE_VERSION.split(" ")[0]} (${remoteCommit})` }
+        },
+        catch: (err) => (err instanceof Error ? err : new Error(String(err))),
+      })
+    }
     if ((process.env.ONETHY_ACTIVE === "1" || process.env.OMNICODE_ACTIVE === "1"))
       return {
         type: "unavailable" as const,

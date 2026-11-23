@@ -26,6 +26,13 @@ import {
 import { createPanelMotion, guardClosingFocus, panelOpacity } from "@/shell/panel-motion"
 import { createSidebarPeek } from "@/shell/sidebar-peek"
 import { windowDragEnabled } from "@/session/header/drag-area"
+import { WorkbenchProvider } from "@/workbench/state"
+import { ActivityBar } from "@/workbench/activity-bar"
+import { WorkbenchSidebar } from "@/workbench/sidebar"
+import { WorkbenchBottomPanel } from "@/workbench/bottom-panel"
+import { WorkbenchStatusBar } from "@/workbench/status-bar"
+import { useWorkbenchCommands } from "@/workbench/commands"
+import "@/workbench/workbench.css"
 
 // How far Home steps along a peek's header to clear the collapsed toggle: to the toggle's end, from the sidebar's 18px
 // start padding.
@@ -36,6 +43,15 @@ type SidebarPose = { closed: number; peek: number | undefined }
 export const sidebarToggleCommand = { id: "sidebar.toggle", keybind: "mod+shift+b" }
 
 export default function Layout(props: ParentProps) {
+  return (
+    <WorkbenchProvider>
+      <ShellContent>{props.children}</ShellContent>
+    </WorkbenchProvider>
+  )
+}
+
+function ShellContent(props: ParentProps) {
+  useWorkbenchCommands()
   const platform = usePlatform()
   const settings = useSettingsSurface()
   const preferences = useSettings()
@@ -232,6 +248,10 @@ export default function Layout(props: ParentProps) {
             data-tauri-drag-region
           />
         </Show>
+        <Show when={!mobile()}>
+          <ActivityBar />
+          <WorkbenchSidebar />
+        </Show>
         <Show when={verticalTabs()}>
           <aside
             id="vertical-tabs-sidebar"
@@ -287,25 +307,33 @@ export default function Layout(props: ParentProps) {
           </aside>
         </Show>
         {/* Size containment collapses percentage-height descendants in WebKit. */}
-        <main
-          class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-content"
-          style={{
-            "padding-top": bottomTitlebar() ? "env(safe-area-inset-top, 0px)" : "0px",
-            "padding-bottom":
-              bottomTitlebar() || settings.active()
-                ? "0px"
+        <div class="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden">
+          <main
+            class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-content"
+            style={{
+              "padding-top": bottomTitlebar() ? "env(safe-area-inset-top, 0px)" : "0px",
+              "padding-bottom":
+                bottomTitlebar() || settings.active()
+                  ? "0px"
+                  : "var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))",
+              "--settings-bottom-inset": bottomTitlebar()
+                ? "40px"
                 : "var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))",
-            "--settings-bottom-inset": bottomTitlebar()
-              ? "40px"
-              : "var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))",
-          }}
-        >
-          <PluginServerCover>
-            <Suspense>{props.children}</Suspense>
-          </PluginServerCover>
-        </main>
+            }}
+          >
+            <PluginServerCover>
+              <Suspense>{props.children}</Suspense>
+            </PluginServerCover>
+          </main>
+          <Show when={!mobile()}>
+            <WorkbenchBottomPanel />
+          </Show>
+        </div>
         <CollapsedSidebarToggle />
       </div>
+      <Show when={!mobile()}>
+        <WorkbenchStatusBar />
+      </Show>
       <PluginSlot at="window.bottom" input={{}} />
       <ToastRegion />
       <UploadToastHost />

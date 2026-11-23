@@ -20,6 +20,12 @@ export function configureApplication() {
     process.chdir(homedir())
   } catch {}
 
+  process.env.OMNICODE_ACTIVE ??= "1"
+  process.env.ONETHY_ACTIVE ??= "1"
+  process.env.ONETHY_ANTIGRAVITY_AUTH ??= "1"
+  process.env.OPENCODE_CLI_NAME ??= "onethy"
+  process.env.OPENCODE_THEME ??= "onethy"
+  process.env.OPENCODE_DESKTOP_DISABLE_AUTO_UPDATER ??= "1"
   process.env.OPENCODE_DISABLE_EMBEDDED_WEB_UI = "true"
 
   app.setName(APP_NAME)

@@ -26,6 +26,11 @@ export const preferApplicationEnvironment = Effect.gen(function* () {
     if (!shellEnv?.XDG_STATE_HOME) delete process.env.XDG_STATE_HOME
     Object.assign(process.env, {
       ...shellEnv,
+      OMNICODE_ACTIVE: process.env.OMNICODE_ACTIVE ?? "1",
+      ONETHY_ACTIVE: process.env.ONETHY_ACTIVE ?? "1",
+      ONETHY_ANTIGRAVITY_AUTH: process.env.ONETHY_ANTIGRAVITY_AUTH ?? "1",
+      OPENCODE_CLI_NAME: process.env.OPENCODE_CLI_NAME ?? "onethy",
+      OPENCODE_THEME: process.env.OPENCODE_THEME ?? "onethy",
       OPENCODE_EXPERIMENTAL_ICON_DISCOVERY: "true",
       OPENCODE_EXPERIMENTAL_FILEWATCHER: "true",
       OPENCODE_CLIENT: "desktop",

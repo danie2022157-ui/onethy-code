@@ -49,6 +49,9 @@ import { useServer } from "@/runtime/server/current"
 import { reviewGlyphFill, SessionReviewToggle } from "./header/session-header-actions"
 import { createTimelineCache } from "./timeline/cache"
 import { createPanelMotion, holdLandingWidth, panelOpacity } from "@/shell/panel-motion"
+import { encodeFilePath } from "@opencode/util/path"
+import { useLocal } from "@/providers/models/selection"
+import { useWorkbench } from "@/workbench/state"
 
 export function SessionScreenView(props: { session: SessionModel }) {
   // Link handling for the rest of the screen; each cached timeline provides its own for its session.
@@ -80,6 +83,8 @@ function SessionScreenContent(props: {
   const attachment = usePluginAttachment()
   const settings = useSettings()
   const server = useServer()
+  const local = useLocal()
+  const workbench = useWorkbench()
   const isDesktop = session.isDesktop
   const bottomMobileTabs = () => settings.general.mobileTitlebarPosition() === "bottom"
   const sidebar = createPanelSidebar()
@@ -142,6 +147,66 @@ function SessionScreenContent(props: {
   })
 
   const sideVisible = createMemo(() => isDesktop() && screen.side.open())
+  const editorFocus = createMemo(() => sideVisible() && workbench.layoutMode() === "editor")
+
+  const contextPercent = createMemo<number | undefined>(() => {
+    const id = session.identity.params.id
+    if (!id) return undefined
+    const messages = server.ctx.data.session.message.list(id) ?? []
+    const lastAssistant = messages.findLast((msg) => msg.type === "assistant")
+    const currentModel = local.model.current()
+    const limit = currentModel?.limit.context
+    if (!lastAssistant || lastAssistant.type !== "assistant" || !limit || limit <= 0) return undefined
+    const tokens = lastAssistant.tokens
+    if (!tokens) return undefined
+    const used = tokens.input + tokens.output + tokens.reasoning + tokens.cache.read + tokens.cache.write
+    return Math.min(100, Math.max(0, (used / limit) * 100))
+  })
+
+  onCleanup(
+    workbench.registerSessionBridge({
+      sessionID: () => session.identity.params.id,
+      directory: () => session.data.info()?.location.directory,
+      openFile: (path, opts) => {
+        const normalized = props.screen.file.resolve(path)
+        const key = `file://${encodeFilePath(normalized)}`
+        if (!session.layout.view().side.opened()) session.layout.view().side.toggle()
+        attachment.openTab(key, props.view())
+        void props.screen.file.sync(normalized)
+        if (opts?.line) {
+          props.screen.file.selection.set(normalized, {
+            start: opts.line,
+            end: opts.endLine ?? opts.line,
+          })
+        }
+      },
+      openDiff: () => {
+        if (!session.layout.view().side.opened()) session.layout.view().side.toggle()
+        attachment.openTab("review:changes", props.view())
+      },
+      openTerminal: () => {
+        workbench.openBottom("terminal")
+      },
+      insertText: (text) => {
+        props.screen.composer.insert(text)
+      },
+      setAgent: (agentId) => {
+        local.agent.set(agentId)
+      },
+      activeAgent: () => local.agent.current()?.name,
+      activeModel: () => {
+        const m = local.model.current()
+        if (!m) return undefined
+        return { providerID: m.provider.id, modelID: m.id, name: m.name }
+      },
+      contextPercent,
+      setSideOpen: (open) => {
+        const current = session.layout.view().side.opened()
+        if (current !== open) session.layout.view().side.toggle()
+      },
+      sideOpen: () => session.layout.view().side.opened(),
+    }),
+  )
 
   const location = {
     directory: () => session.data.info()?.location.directory,
@@ -477,6 +542,7 @@ function SessionScreenContent(props: {
           <div
             ref={chat}
             class="relative z-10 min-w-0 shrink-0 flex flex-col min-h-0 h-full flex-1 md:flex-none"
+            classList={{ hidden: editorFocus() }}
             data-slot="session-chat-panel"
             data-scrollbar-hidden={store.timelineScrollbarHidden}
             onPointerMove={revealTimelineScrollbar}
@@ -525,7 +591,7 @@ function SessionScreenContent(props: {
                 ref={sideContent}
                 data-slot="session-side-panel-content"
                 class="absolute inset-y-0 start-0 size-full [contain:layout_style] will-change-[opacity]"
-                style={{ "--session-side-content-width": screen.side.contentWidth() }}
+                style={{ "--session-side-content-width": editorFocus() ? "100%" : screen.side.contentWidth() }}
               >
                 <div data-slot="session-side-region" class="absolute inset-0 min-h-0 overflow-visible">
                   <Show when={store.sideMounted}>

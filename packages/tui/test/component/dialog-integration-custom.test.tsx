@@ -2,12 +2,59 @@ import { expect, test } from "bun:test"
 import type { ConfigEntry } from "@opencode/client"
 import {
   extractCustomProviders,
+  fetchModelsFromEndpoint,
+  normalizeProviderBaseURL,
   removeCustomProvider,
   saveCustomProvider,
   updateCustomProviderApiKey,
   updateCustomProviderBaseURL,
 } from "../../src/component/dialog-integration-custom"
 import { createApi, createFetch } from "../fixture/tui-client"
+
+test("normalizeProviderBaseURL adds protocol and strips endpoint suffixes", () => {
+  expect(normalizeProviderBaseURL("api.cosmospro.dev/v1/chat/completions")).toBe("https://api.cosmospro.dev/v1")
+  expect(normalizeProviderBaseURL(' "https://api.cosmospro.dev/v1/models" ')).toBe("https://api.cosmospro.dev/v1")
+  expect(normalizeProviderBaseURL("localhost:11434/v1/")).toBe("http://localhost:11434/v1")
+  expect(normalizeProviderBaseURL(" /// ")).toBe("")
+})
+
+test("fetchModelsFromEndpoint discovers models and preserves 401 message over fallback 404", async () => {
+  const server = Bun.serve({
+    port: 0,
+    fetch(req) {
+      const url = new URL(req.url)
+      if (url.pathname === "/v1/models") {
+        const auth = req.headers.get("authorization")
+        const xApiKey = req.headers.get("x-api-key")
+        // Simulate strict server that rejects simultaneous Authorization + x-api-key, or requires valid key
+        if (auth === "Bearer valid-key" && !xApiKey) {
+          return Response.json({
+            data: [{ id: "claude-opus-5-5", name: "Claude Opus 5.5" }, { id: "claude-sonnet-5-5" }],
+          })
+        }
+        return Response.json(
+          { error: { message: "Authentication Error, Key is blocked." } },
+          { status: 401 },
+        )
+      }
+      return new Response("Not Found", { status: 404 })
+    },
+  })
+
+  try {
+    const models = await fetchModelsFromEndpoint(`127.0.0.1:${server.port}/v1/chat/completions`, "Bearer valid-key")
+    expect(models).toEqual([
+      { id: "claude-opus-5-5", name: "Claude Opus 5.5" },
+      { id: "claude-sonnet-5-5", name: "claude-sonnet-5-5" },
+    ])
+
+    await expect(fetchModelsFromEndpoint(`127.0.0.1:${server.port}`, "blocked-key")).rejects.toThrow(
+      "HTTP 401: Authentication Error, Key is blocked.",
+    )
+  } finally {
+    await server.stop(true)
+  }
+})
 
 test("saveCustomProvider writes non-secret config and stores apiKey in SQLite credentials", async () => {
   const requests: { method: string; path: string; body?: unknown }[] = []

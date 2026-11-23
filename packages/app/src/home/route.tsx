@@ -9,6 +9,7 @@ import { createHomeScrollController } from "./scroll"
 import { createHomeSessionSearchController } from "./sessions/search"
 import { createHomeSessionsController } from "./sessions/controller"
 import { HomeSessions } from "./sessions/region"
+import { WelcomeDashboard } from "./welcome-dashboard"
 
 export function Home() {
   const mobile = createMediaQuery("(max-width: 767px)")
@@ -38,6 +39,9 @@ export function Home() {
         viewportRef={scroll.viewport.setViewport}
         onScroll={(event) => scroll.viewport.update(event.currentTarget.scrollTop)}
       >
+        <div class="mx-auto w-full max-w-[1080px] px-3 pt-4 lg:px-6">
+          <WelcomeDashboard />
+        </div>
         <div
           class={`
             mx-auto grid min-h-full w-full max-w-[1080px] grid-rows-[auto_minmax(0,1fr)] gap-4 px-3

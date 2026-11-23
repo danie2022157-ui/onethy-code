@@ -12,15 +12,26 @@ import { useIntegrations } from "@/providers/catalog/integrations"
 import { createEffect, createMemo, type Component, For, type JSX, Show } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
+import { useOnethyI18n } from "@/runtime/i18n/onethy"
 import { useServerSDK } from "@/runtime/server/client"
 import { formatServerError } from "@/runtime/server/errors"
 import { CONSOLE_INTEGRATION } from "@/providers/connect/controller"
 import { DialogConnectProvider, useProviderConnectController } from "@/providers/connect/dialog"
+import { DialogAddCustomProvider, DialogManageCustomProvider } from "@/providers/connect/dialog-custom"
 import { ProviderModelIcon } from "@/providers/models/provider-group"
 import { SettingsList } from "@/settings/list"
 import { activeProviderAccount, providerAccounts, type ProviderAccount } from "./accounts"
 import { AccountNameInput } from "./account-name"
 import { useProviderAccountActions } from "./account-actions"
+import { useData } from "@/runtime/server/current"
+import {
+  extractCustomProviders,
+  fetchModelsFromEndpoint,
+  readCustomProviderApiKey,
+  removeCustomProvider,
+  saveCustomProvider,
+  type CustomProviderRecord,
+} from "@opencode/client/custom-provider"
 import "@/settings/settings.css"
 
 type ProviderSource = "env" | "api" | "account" | "config" | "custom"
@@ -45,11 +56,76 @@ export const SettingsProviders: Component<{
 }> = (props) => {
   const dialog = useDialog()
   const language = useLanguage()
+  const { tr } = useOnethyI18n()
   const serverSdk = useServerSDK()
   const providers = useProviders(() => props.directory)
   const integrations = useIntegrations(() => props.directory)
   const providerConnect = useProviderConnectController()
   const accountActions = useProviderAccountActions(() => props.directory)
+  const data = useData()
+  const location = () => (props.directory ? { directory: props.directory } : undefined)
+  const configList = () => data.location.config.list(location()) ?? []
+  const customProviders = createMemo(() => extractCustomProviders(configList()))
+
+  createEffect(() => void data.location.config.sync(location()).catch(() => undefined))
+
+  const syncCustomProviders = async () => {
+    await Promise.allSettled([
+      data.location.config.sync(location()),
+      data.location.provider.sync(location()),
+      data.location.model.sync(location()),
+      data.location.integration.sync(location()),
+    ])
+  }
+
+  const reloadCustomProvider = async (item: CustomProviderRecord) => {
+    if (!item.baseURL) {
+      showToast({
+        title: tr("Provider has no Base URL configured", "Provedor sem Base URL configurada"),
+        variant: "error",
+      })
+
+      return
+    }
+
+    try {
+      const apiKey = await readCustomProviderApiKey(serverSdk.api, item)
+      const models = await fetchModelsFromEndpoint(item.baseURL, apiKey)
+
+      if (models.length === 0) {
+        showToast({
+          title: tr("No models returned by endpoint", "Nenhum modelo retornado pelo endpoint"),
+          variant: "error",
+        })
+
+        return
+      }
+
+      const modelsRecord: Record<string, { readonly name?: string; readonly type?: "chat" | "image" }> = {}
+
+      for (const m of models) modelsRecord[m.id] = { name: m.name || m.id, type: m.type }
+
+      await saveCustomProvider(serverSdk.api, {
+        id: item.id,
+        name: item.name,
+        baseURL: item.baseURL,
+        models: modelsRecord,
+      })
+
+      await syncCustomProviders()
+      showToast({
+        title: tr("Reloaded models for {{name}}", "Modelos de {{name}} recarregados", { name: item.name }),
+        description: tr("{{count}} model(s) updated.", "{{count}} modelo(s) atualizados.", { count: models.length }),
+        variant: "success",
+      })
+    } catch (err) {
+      showToast({
+        title: tr("Failed to reload models", "Erro ao recarregar modelos"),
+        description: err instanceof Error ? err.message : String(err),
+        variant: "error",
+      })
+    }
+  }
 
   const [state, setState] = createStore<{
     disconnecting: Record<string, "removing" | "removed" | "absent" | undefined>
@@ -404,6 +480,116 @@ export const SettingsProviders: Component<{
       </div>
 
       <div class="settings-tab-body settings-tab-body--sectioned settings-providers">
+        <div class="settings-section" data-component="custom-providers-section">
+          <div class="flex items-center justify-between pb-1">
+            <h3 class="settings-section-title">
+              {tr("Custom Providers (OpenAI-compatible)", "Provedores Personalizados (OpenAI-compatible)")}
+            </h3>
+            <Button
+              size="normal"
+              variant="neutral"
+              icon="plus"
+              onClick={() => {
+                void dialog.show(() => (
+                  <DialogAddCustomProvider
+                    directory={props.directory}
+                    onClose={() => dialog.close()}
+                  />
+                ))
+              }}
+            >
+              {tr("Add Provider", "Adicionar Provedor")}
+            </Button>
+          </div>
+          <SettingsList variant="catalog">
+            <Show
+              when={customProviders().length > 0}
+              fallback={
+                <div class="settings-provider-empty">
+                  {tr(
+                    'No custom provider configured. Click "Add Provider" to connect Cosmos, LiteLLM, Ollama, vLLM, etc.',
+                    'Nenhum provedor personalizado configurado. Clique em "Adicionar Provedor" para conectar Cosmos, LiteLLM, Ollama, vLLM, etc.',
+                  )}
+                </div>
+              }
+            >
+              <For each={customProviders()}>
+                {(item) => (
+                  <div class="settings-provider-row group">
+                    <div class="settings-provider-lead">
+                      <div class="flex size-7 items-center justify-center rounded bg-v2-surface-surface-raised border border-v2-border-border-base text-v2-icon-icon-base">
+                        <Icon name="outline-globe" size="small" />
+                      </div>
+                      <div class="settings-provider-copy">
+                        <div class="settings-provider-main">
+                          <span class="settings-provider-name truncate">{item.name}</span>
+                          <Badge>{tr("{{count}} models", "{{count}} modelos", { count: item.modelCount })}</Badge>
+                        </div>
+                        <Show when={item.baseURL}>
+                          {(url) => <p class="settings-provider-description font-mono text-[11px]">{url()}</p>}
+                        </Show>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <Button
+                        size="small"
+                        variant="ghost-muted"
+                        onClick={() => void reloadCustomProvider(item)}
+                        title={tr("Fetch models from endpoint", "Puxar modelos do endpoint")}
+                      >
+                        <span class="inline-flex items-center gap-1">
+                          <Icon name="outline-rotate-clockwise" size="small" />
+                          <span>{tr("Fetch Models", "Puxar Modelos")}</span>
+                        </span>
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="ghost-muted"
+                        onClick={() => {
+                          void dialog.show(() => (
+                            <DialogManageCustomProvider
+                              provider={item}
+                              directory={props.directory}
+                              onClose={() => dialog.close()}
+                            />
+                          ))
+                        }}
+                      >
+                        <span class="inline-flex items-center gap-1">
+                          <Icon name="edit" size="small" />
+                          <span>{tr("Manage", "Gerenciar")}</span>
+                        </span>
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="ghost-danger"
+                        onClick={async () => {
+                          try {
+                            await removeCustomProvider(serverSdk.api, item)
+                            await syncCustomProviders()
+                            showToast({ title: tr("Provider removed", "Provedor removido"), variant: "success" })
+                          } catch (err) {
+                            showToast({
+                              title: tr("Failed to remove provider", "Erro ao remover provedor"),
+                              description: err instanceof Error ? err.message : String(err),
+                              variant: "error",
+                            })
+                          }
+                        }}
+                      >
+                        <span class="inline-flex items-center gap-1">
+                          <Icon name="outline-trash" size="small" />
+                          <span>{tr("Remove", "Remover")}</span>
+                        </span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </For>
+            </Show>
+          </SettingsList>
+        </div>
+
         <div class="settings-section" data-component="connected-providers-section">
           <h3 class="settings-section-title">{language.t("settings.providers.section.connected")}</h3>
           <SettingsList variant="catalog">

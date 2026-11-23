@@ -13,7 +13,8 @@ let probe: Promise<Endpoint | undefined> | undefined
 
 export function startSidecarProbe() {
   if (!app.isPackaged) return
-  const version = CHANNEL === "beta" ? undefined : bundledVersion()
+  const isOmni = process.env.OMNICODE_ACTIVE === "1" || process.env.ONETHY_ACTIVE === "1"
+  const version = isOmni || CHANNEL === "beta" ? undefined : bundledVersion()
 
   if (version === "") return
   probe = import("@opencode/client/service")

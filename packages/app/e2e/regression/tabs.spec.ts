@@ -4,6 +4,7 @@ import {
   NO_PROVIDER,
   REMOTE_SERVER,
   SERVER,
+  T0,
   draftHref,
   expectPath,
   holdRoute,
@@ -26,6 +27,45 @@ const b = { id: "ses_tab_b", title: "Tab B session" }
 const c = { id: "ses_tab_c", title: "Tab C session" }
 
 test.use({ serviceWorkers: "block" })
+
+test("Inbox archives a finished session and restores it to Recent", async ({ page }) => {
+  await page.clock.install({ time: new Date(T0) })
+  const finished = {
+    id: "ses_inbox_archive",
+    title: "Finished inbox session",
+    time: { created: 1700000000000, updated: 1700000000000, idle: 1700000000000, viewed: 1700000000000 },
+  }
+  const updates: { archived?: boolean }[] = []
+  await mockWorkspace(page, {
+    name: "InboxArchive",
+    sessions: [finished],
+    seed: { settings: { appearance: { tabLayout: "inbox" } } },
+  })
+  await page.route(`**/api/session/${finished.id}`, async (route) => {
+    if (route.request().method() !== "PATCH") return route.fallback()
+    updates.push(route.request().postDataJSON())
+    await route.fulfill({ status: 200, json: { data: {} } })
+  })
+
+  // Open a session so the app (and its sidebar Inbox) mounts. `mockWorkspace` only seeds storage; tests must navigate.
+  await page.goto(sessionHref(finished.id))
+  await expect(page.locator('[data-slot="sidebar-inbox"]')).toBeVisible()
+
+  const inbox = page.locator('[data-slot="sidebar-inbox"]')
+  const row = inbox.locator('[data-slot="sidebar-inbox-item"]').filter({ hasText: finished.title })
+  const archived = inbox.getByText("Archived", { exact: true }).locator("xpath=../..")
+  await expect(row).toBeVisible()
+  await row.click({ button: "right" })
+  await page.getByRole("menuitem", { name: "Archive", exact: true }).click()
+  await expect.poll(() => updates).toEqual([{ archived: true }])
+  const archivedRow = archived.locator('[data-slot="sidebar-inbox-item"]').filter({ hasText: finished.title })
+  await expect(archivedRow).toBeVisible()
+  await archivedRow.click({ button: "right" })
+  await page.getByRole("menuitem", { name: "Unarchive", exact: true }).click()
+  await expect.poll(() => updates).toEqual([{ archived: true }, { archived: false }])
+  await expect(row).toBeVisible()
+  await expect(archived.locator('[data-slot="sidebar-inbox-item"]').filter({ hasText: finished.title })).toHaveCount(0)
+})
 
 test("recently closed shows ten sessions and searches older closures in close order", async ({ page }) => {
   const sessions = Array.from({ length: 100 }, (_, index) => ({

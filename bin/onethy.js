@@ -76,31 +76,95 @@ function resolveBundledEntry(dir, commit) {
 
 const cliDir = path.join(rootDir, "packages", "cli")
 const activeCommit = resolveGitCommit(rootDir)
-const bundledEntry = resolveBundledEntry(cliDir, activeCommit)
-const bunArgs = bundledEntry
-  ? [bundledEntry, ...process.argv.slice(2)]
-  : ["run", "--cwd", cliDir, "src/index.ts", ...process.argv.slice(2)]
+const userArgs = process.argv.slice(2)
+const omniEnv = {
+  ...makeOmniEnvironment(process.env, bunBin),
+  ONETHY_ACTIVE: "1",
+  ONETHY_INSTALL_ROOT: rootDir,
+  ONETHY_ANTIGRAVITY_AUTH: process.env.ONETHY_ANTIGRAVITY_AUTH ?? "1",
+  ...(activeCommit ? { ONETHY_COMMIT: activeCommit } : {}),
+  OPENCODE_CLI_NAME: "onethy",
+  OPENCODE_THEME: process.env.OPENCODE_THEME || "onethy",
+}
 
-const child = spawn(bunBin, bunArgs, {
-  stdio: "inherit",
-  env: {
-    ...makeOmniEnvironment(process.env, bunBin),
-    ONETHY_ACTIVE: "1",
-    ONETHY_INSTALL_ROOT: rootDir,
-    ONETHY_ANTIGRAVITY_AUTH: process.env.ONETHY_ANTIGRAVITY_AUTH ?? "1",
-    ...(activeCommit ? { ONETHY_COMMIT: activeCommit } : {}),
-    OPENCODE_CLI_NAME: "onethy",
-    OPENCODE_THEME: process.env.OPENCODE_THEME || "onethy",
-  },
-  cwd: process.cwd(),
-})
+if (userArgs[0] === "desktop" || userArgs[0] === "app") {
+  const desktopArgs = userArgs.slice(1)
+  const desktopExeCandidates = [
+    path.join(rootDir, "dist", "desktop", "app", "OnethyCode.exe"),
+    path.join(rootDir, "dist", "desktop", "app", "OpenCode.exe"),
+    path.join(rootDir, "packages", "desktop", "dist", "win-unpacked", "OnethyCode.exe"),
+    path.join(rootDir, "packages", "desktop", "dist", "win-unpacked", "OpenCode.exe"),
+  ]
+  const desktopExe = desktopArgs.includes("--dev")
+    ? undefined
+    : desktopExeCandidates.find((candidate) => fs.existsSync(candidate))
 
-child.on("exit", (code) => {
-  process.exit(code ?? 0)
-})
+  if (desktopExe) {
+    const appChild = spawn(desktopExe, desktopArgs, {
+      detached: true,
+      stdio: "ignore",
+      env: omniEnv,
+      cwd: process.cwd(),
+    })
+    appChild.unref()
+    process.exit(0)
+  }
 
-child.on("error", (err) => {
-  console.error("[OnethyCode Error]", err.message)
-  process.exit(1)
-})
+  const devChild = spawn(
+    bunBin,
+    ["run", "--cwd", path.join(rootDir, "packages", "desktop"), "dev", ...desktopArgs.filter((a) => a !== "--dev")],
+    {
+      stdio: "inherit",
+      env: omniEnv,
+      cwd: process.cwd(),
+    },
+  )
+  devChild.on("exit", (code) => process.exit(code ?? 0))
+  devChild.on("error", (err) => {
+    console.error("[OnethyCode Desktop Error]", err.message)
+    process.exit(1)
+  })
+} else {
+  const nativeExeCandidates =
+    process.platform === "win32" && process.env.ONETHY_NO_NATIVE_EXE !== "1"
+      ? [
+          path.join(cliDir, "dist", "cli-windows-x64", "bin", "onethy.exe"),
+          path.join(cliDir, "dist", "cli-windows-x64", "bin", "opencode.exe"),
+          path.join(cliDir, "dist", "cli-windows-x64-baseline", "bin", "opencode.exe"),
+        ]
+      : []
+  const foundNativeExe = nativeExeCandidates.find((candidate) => fs.existsSync(candidate))
+  const bundledEntry = resolveBundledEntry(cliDir, activeCommit)
+  const preferBundled =
+    Boolean(foundNativeExe && bundledEntry) &&
+    (() => {
+      try {
+        return fs.statSync(bundledEntry).mtimeMs > fs.statSync(foundNativeExe).mtimeMs
+      } catch {
+        return false
+      }
+    })()
+  const nativeExe = preferBundled ? undefined : foundNativeExe
+  const spawnBin = nativeExe ?? bunBin
+  const spawnArgs = nativeExe
+    ? userArgs
+    : bundledEntry
+      ? [bundledEntry, ...userArgs]
+      : ["run", "--cwd", cliDir, "src/index.ts", ...userArgs]
+
+  const child = spawn(spawnBin, spawnArgs, {
+    stdio: "inherit",
+    env: omniEnv,
+    cwd: process.cwd(),
+  })
+
+  child.on("exit", (code) => {
+    process.exit(code ?? 0)
+  })
+
+  child.on("error", (err) => {
+    console.error("[OnethyCode Error]", err.message)
+    process.exit(1)
+  })
+}
 

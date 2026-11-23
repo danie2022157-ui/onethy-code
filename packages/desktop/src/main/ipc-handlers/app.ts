@@ -1,5 +1,6 @@
 import { BrowserWindow } from "electron"
 import { parseDesktopNativeBundle } from "@opencode/app/i18n/desktop-native"
+import { errorLogPath, logPath, readLogs, type Level, type Source } from "@opencode/util/observability/log-view"
 import { Effect } from "effect"
 import { AppRpcs } from "../../shared/ipc-rpc"
 import { openExternalURL } from "../files"
@@ -38,6 +39,22 @@ export const appHandlers = AppRpcs.toLayer(
       AppResolveAppPath: ({ appName }) => resolveAppPath(appName).pipe(Effect.orDie),
       AppSetBackgroundColor: ({ color }) => Effect.sync(() => setBackgroundColor(color)),
       AppExportDebugLogs: () => logging.exportDebug,
+      AppReadLogs: ({ source, level, search, lines }) =>
+        promise(async () => {
+          const validSources: ReadonlySet<string> = new Set(["all", "cli", "tui", "server"])
+          const validLevels: ReadonlySet<string> = new Set(["all", "DEBUG", "INFO", "WARN", "ERROR"])
+          const nextSource: Source = source && validSources.has(source) ? (source as Source) : "all"
+          const nextLevel: Level = level && validLevels.has(level) ? (level as Level) : "all"
+          const channel = process.env.ONETHY_CHANNEL || process.env.OPENCODE_CHANNEL || "local"
+          const file = nextLevel === "ERROR" || nextLevel === "WARN" ? errorLogPath(channel) : logPath(channel)
+          const result = await readLogs(file, {
+            source: nextSource,
+            level: nextLevel,
+            search: search?.trim() || undefined,
+            lines: lines ?? 200,
+          }).catch(() => [] as string[])
+          return { file, lines: result }
+        }),
       AppSetForceFocus: ({ enabled }, context) => promise(() => setForceFocus(sender(handoff, context), enabled)),
       AppRecordFatalRendererError: ({ error }) =>
         scoped("renderer", Effect.logError("fatal renderer error", { ...error })),

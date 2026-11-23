@@ -38,6 +38,19 @@ export const AppSetBackgroundColor = Rpc.make("AppSetBackgroundColor", {
 
 export const AppExportDebugLogs = Rpc.make("AppExportDebugLogs", { success: Schema.String })
 
+export const AppReadLogs = Rpc.make("AppReadLogs", {
+  payload: {
+    source: Schema.optionalKey(Schema.String),
+    level: Schema.optionalKey(Schema.String),
+    search: Schema.optionalKey(Schema.String),
+    lines: Schema.optionalKey(Schema.Number),
+  },
+  success: Schema.Struct({
+    file: Schema.String,
+    lines: Schema.Array(Schema.String),
+  }),
+})
+
 export const AppSetForceFocus = Rpc.make("AppSetForceFocus", {
   payload: { enabled: Schema.Boolean },
 })
@@ -70,6 +83,7 @@ export const AppRpcs = RpcGroup.make(
   AppResolveAppPath,
   AppSetBackgroundColor,
   AppExportDebugLogs,
+  AppReadLogs,
   AppSetForceFocus,
   AppRecordFatalRendererError,
   AppSetNativeTranslations,

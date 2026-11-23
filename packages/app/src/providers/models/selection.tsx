@@ -106,7 +106,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       void syncWhileBooting(() => data.location.agent.sync({ directory })).catch(() => undefined)
     })
 
-    const agentsVisible = createMemo(() => settings.visibility.customAgents() || hasCustomAgent(list()))
+    const agentsVisible = createMemo(
+      () => settings.visibility.customAgents() || hasCustomAgent(list()) || list().some((item) => item.name === "omni"),
+    )
     const connected = createMemo(() => new Set(providers.connected().map((item) => item.id)))
 
     const [saved, setSaved, , savedReady] = persisted(
@@ -120,7 +122,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       draft?: State
       promoting?: State
     }>({
-      current: list()[0]?.name,
+      current: resolveAgent(list())?.name,
       draft: undefined,
     })
 
@@ -154,7 +156,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       }
 
       if (items.some((item) => item.name === store.current)) return
-      setStore("current", items[0]?.name)
+      setStore("current", resolveAgent(items)?.name)
     })
 
     const scope = createMemo<State | undefined>(() => {

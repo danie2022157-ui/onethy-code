@@ -77,6 +77,10 @@ export type ComposerEditorProps = {
   class?: string
   modelControl?: JSX.Element
   modelControlsVisible?: boolean
+  hideVariant?: boolean
+  extraControls?: JSX.Element
+  extraActions?: JSX.Element
+  extraAddMenuItems?: JSX.Element
   attachKeybind?: string[]
   attachShortcut?: string
   alternateKeybind?: string[]
@@ -400,6 +404,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
               commandsLabel={i18n.t("ui.promptInput.commands")}
               contextLabel={i18n.t("ui.promptInput.context")}
               shellLabel={i18n.t("ui.promptInput.shell")}
+              extraItems={props.extraAddMenuItems}
               onAttach={props.controller.attach}
               onCommands={props.controller.openCommands}
               onContext={props.controller.openContext}
@@ -426,12 +431,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
                     title={i18n.t("ui.promptInput.chooseAgent")}
                     keybind={["Mod", "."]}
                     control={control}
+                    leadingIcon={<Icon name="models" size="small" class="shrink-0 text-emerald-500" />}
                   />
                 )}
               </Show>
               <Show when={props.modelControlsVisible ?? true}>
                 {props.modelControl}
-                <Show when={view.variant} keyed>
+                <Show when={!props.hideVariant && view.variant} keyed>
                   {(control) => (
                     <Show when={control.options().length > 1}>
                       <ComposerEditorConfiguredSelect
@@ -439,16 +445,19 @@ export function ComposerEditor(props: ComposerEditorProps) {
                         title={i18n.t("ui.promptInput.chooseVariant")}
                         keybind={["Shift", "Mod", "D"]}
                         control={control}
+                        leadingIcon={<Icon name="outline-brain" size="small" class="shrink-0 text-v2-icon-icon-muted" />}
                         class={control.current() === "default" ? "composer-variant-default" : undefined}
                       />
                     </Show>
                   )}
                 </Show>
+                {props.extraControls}
               </Show>
             </div>
           </div>
-          <div data-slot="composer-actions" class="flex shrink-0 items-center">
+          <div data-slot="composer-actions" class="flex shrink-0 items-center gap-1">
             <Show when={state.mode === "normal"}>
+              {props.extraActions}
               <ComposerEditorAlternateDelivery
                 controller={props.controller}
                 keybind={props.alternateKeybind ?? ["Mod", "Enter"]}
@@ -910,6 +919,7 @@ function ComposerEditorAddMenu(props: {
   commandsLabel: string
   contextLabel: string
   shellLabel: string
+  extraItems?: JSX.Element
   onAttach: () => void
   onCommands: () => void
   onContext: () => void
@@ -943,7 +953,7 @@ function ComposerEditorAddMenu(props: {
           <Menu.Content
             onCloseAutoFocus={focus.onCloseAutoFocus}
             class="[&_[data-slot=menu-v2-item-shortcut]]:w-5 [&_[data-slot=menu-v2-item-shortcut]]:justify-center"
-            style={{ "min-width": "180px" }}
+            style={{ "min-width": "210px" }}
           >
             <Menu.Item onSelect={props.onAttach} shortcut={props.attachShortcut}>
               {props.attachLabel}
@@ -958,6 +968,10 @@ function ComposerEditorAddMenu(props: {
             <Menu.Item onSelect={props.onShell} shortcut="!">
               {props.shellLabel}
             </Menu.Item>
+            <Show when={props.extraItems}>
+              <Menu.Separator />
+              {props.extraItems}
+            </Show>
           </Menu.Content>
         </Menu.Portal>
       </Menu>
@@ -999,6 +1013,7 @@ function ComposerEditorConfiguredSelect(props: {
   keybind?: string[]
   control: ComposerSelectControl
   model?: boolean
+  leadingIcon?: JSX.Element
   class?: string
 }) {
   const current = () => props.control.current()
@@ -1013,9 +1028,11 @@ function ComposerEditorConfiguredSelect(props: {
       options={props.control.options()}
       current={current()}
       currentIcon={
-        <Show when={props.model && providerID()}>
-          {(id) => <ProviderModelIcon provider={{ id: id(), name: id() }} class="shrink-0 opacity-60" />}
-        </Show>
+        props.leadingIcon ?? (
+          <Show when={props.model && providerID()}>
+            {(id) => <ProviderModelIcon provider={{ id: id(), name: id() }} class="shrink-0 opacity-60" />}
+          </Show>
+        )
       }
       onSelect={props.control.onSelect}
     />

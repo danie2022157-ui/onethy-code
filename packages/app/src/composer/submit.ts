@@ -12,6 +12,7 @@ import { setCursorPosition } from "./editor/dom"
 import { blobDataUrl, resolveBlobUrl } from "@/runtime/persistence/drafts"
 import { isAttachment } from "./prompt-parts"
 import type { ModelSelection } from "@/providers/models/selection"
+import { useFusion } from "@/providers/models/fusion"
 import { parseSlashCommand } from "./client-slash-command"
 
 const submitting = new WeakSet<object>()
@@ -327,7 +328,7 @@ function readSubmission(
 
   if (!text.trim() && !prompt.some(isAttachment) && comments === 0) return
 
-  const selection = currentSelection(input)
+  const selection = currentSelection(input, text)
 
   if (!selection) {
     if (input.adapter.controls().model.loading) return "loading"
@@ -381,17 +382,58 @@ function whenLoaded(input: ComposerSubmitInput, owner: ReturnType<typeof getOwne
   )
 }
 
-function currentSelection(input: ComposerSubmitInput): ComposerSelection | undefined {
+function currentSelection(input: ComposerSubmitInput, promptText?: string): ComposerSelection | undefined {
   const controls = input.adapter.controls()
-  const model = controls.model.selection.current()
+  const selection = controls.model.selection
   const agent = controls.agents.current
+  const fusion = useFusion()
+
+  if (fusion.enabled() && promptText !== undefined && input.mode() === "normal" && agent) {
+    const candidates = selection.list().map((item) => ({
+      providerID: item.provider.id,
+      id: item.id,
+      name: item.name,
+      providerName: item.provider.name,
+      variants: Object.keys(item.variants ?? {}),
+    }))
+
+    if (candidates.length > 0) {
+      const favorites = new Set(selection.favorite.list().map((item) => `${item.provider.id}/${item.id}`))
+      const recents = new Set(
+        selection
+          .recent()
+          .filter((item): item is NonNullable<typeof item> => !!item)
+          .map((item) => `${item.provider.id}/${item.id}`),
+      )
+      const currentModel = selection.current()
+      const decision = fusion.routeForPrompt(promptText, candidates, {
+        activeProviderID: currentModel?.provider.id,
+        favorites,
+        recents,
+      })
+
+      if (decision) {
+        selection.set({ providerID: decision.providerID, modelID: decision.modelID })
+
+        if (decision.thinking) selection.variant.set(decision.thinking)
+
+        return {
+          agent,
+          model: { providerID: decision.providerID, modelID: decision.modelID },
+          variant: decision.thinking ?? selection.variant.current(),
+        }
+      }
+    }
+  }
+
+  const model = selection.current()
 
   if (!model || !agent) return
 
   return {
     agent,
     model: { modelID: model.id, providerID: model.provider.id },
-    variant: controls.model.selection.variant.current(),
+    variant: selection.variant.current(),
   }
 }
 

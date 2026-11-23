@@ -24,7 +24,10 @@
     "./effect": "./src/effect/index.ts",
     "./effect/api": "./src/effect/api.ts",
     "./effect/service": "./src/effect/service.ts",
-    "./mcp": "./src/mcp.ts"
+    "./mcp": "./src/mcp.ts",
+    "./custom-provider": "./src/custom-provider.ts",
+    "./memory-bank": "./src/memory-bank.ts",
+    "./fusion": "./src/fusion.ts"
   },
   "scripts": {
     "build": "bun run script/build.ts",
