@@ -445,6 +445,23 @@ onethy
 
 O instalador cria atalhos em `~/.local/bin`; verifique se esse diretório está incluído na variável `PATH`.
 
+### Aplicação desktop no Windows
+
+O repositório inclui uma aplicação desktop baseada em Electron. O script `install.ps1` instala a CLI/TUI e, se já existir uma build desktop no checkout, pode criar atalhos para ela. **O script não instala um executável desktop isolado chamado `onethycode.exe` nem cria os comandos `onethy-tui` ou `onethycode`.**
+
+Para preparar uma build desktop de desenvolvimento a partir do checkout:
+
+```powershell
+# Na raiz do repositório, depois de bun install --frozen-lockfile
+$env:OPENCODE_CHANNEL = "dev"
+bun run --cwd packages/desktop build
+bun run --cwd packages/desktop pack
+```
+
+O empacotamento local para Windows coloca a aplicação completa em `dist/desktop/app/` (incluindo `OnethyCode Dev.exe` e os arquivos de recursos). Execute o `.exe` dentro dessa pasta; **não copie apenas o executável**, pois ele depende dos arquivos que o acompanham. `pack` não cria um instalador NSIS independente nesse fluxo. Para canais `beta`/`prod`, consulte [`packages/desktop/README.md`](packages/desktop/README.md) e a configuração de build; o canal padrão é `dev`.
+
+A CLI/TUI continua sendo instalada separadamente pelo `install.ps1` e é iniciada com `onethy`. Não apague o checkout clonado: o comando instalado usa os arquivos dessa pasta.
+
 ### Primeiro acesso
 
 Depois de iniciar `onethy`:
